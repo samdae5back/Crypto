@@ -159,11 +159,12 @@ int main() {
     for (int i = 0;i < 256;i++) {
         f[i] = rand() % q;
     }
-    srand(time(NULL));
+
     for (int i = 0;i < 256;i++) {
         g[i] = rand() % q;
     }
 
+    /*
     NTT(f, f_, zeta, q);
     NTT(g, g_, zeta, q);
 
@@ -171,9 +172,66 @@ int main() {
 
     NTT_inv(h_, h, zeta, q);
 
-    for (int i = 0;i < 256;i++) {
-        fg[i] = f[i] * g[i] % q;
+
+
+    int* f_512 = (int*)malloc(sizeof(int) * 512);
+    int* g_512 = (int*)malloc(sizeof(int) * 512);
+    if (f_512 == NULL) {
+        perror("Failed to allocate memory for f512"); // 오류 메시지 출력
+        exit(EXIT_FAILURE);// 메모리 할당 실패 시 더 이상 진행 불가, 프로그램 종료 또는 오류 처리
     }
+    printf("Memory allocated successfully at: %p\n", f_512);
+    if (g_512 == NULL) {
+        perror("Failed to allocate memory for g512"); // 오류 메시지 출력
+        exit(EXIT_FAILURE);// 메모리 할당 실패 시 더 이상 진행 불가, 프로그램 종료 또는 오류 처리
+    }
+    printf("Memory allocated successfully at: %p\n", g_512);
+
+    for (int i = 0;i < 256;i++) {
+        f_512[i] = f[i];
+        g_512[i] = g[i];
+    }
+    for (int i = 256;i < 512;i++) {
+        f_512[i] = 0;
+        g_512[i] = 0;
+    }
+    int* fg_512 = (int*)malloc(sizeof(int) * 512);
+    if (fg_512 == NULL) {
+        perror("Failed to allocate memory for fg512"); // 오류 메시지 출력
+        exit(EXIT_FAILURE);// 메모리 할당 실패 시 더 이상 진행 불가, 프로그램 종료 또는 오류 처리
+    }
+    printf("Memory allocated successfully at: %p\n", fg_512);
+    for (int i = 0;i < 512;i++) {
+        fg_512[i] = 0;
+    }
+    for (int i = 0;i < 512;i++) {
+        for (int j = 0;j < i + 1;j++) {
+            fg_512[i] = (fg_512[i] + (f_512[j] * g_512[i - j])) % q;
+        }
+    }
+    printf("f_512 = ");
+    printf("\n");
+    for (int i = 0;i < 512;i++) {
+        printf("%d ", f_512[i]);
+    }
+    
+    printf("g_512 = ");
+    printf("\n");
+    for (int i = 0;i < 512;i++) {
+        printf("%d ", g_512[i]);
+    }
+    
+    printf("fg_512 = ");
+    printf("\n");
+    for (int i = 0;i < 512;i++) {
+        printf("%d ", fg_512[i]);
+    }
+    for (int i = 0;i < 256;i++) {
+        fg[i] = (fg_512[i] - fg_512[i + 256] + q) % q;
+    }
+    
+
+
 
     for (int i = 0;i < 256;i++) {
         if (fg[i] != h[i]) {
@@ -194,10 +252,11 @@ int main() {
         printf("%d ", h[i]);
     }
     printf("}\n");
+    */
 
 
 
-    /*
+    
     NTT(f, g, zeta, q);
     NTT_inv(g, h, zeta, q);
 
@@ -217,12 +276,18 @@ int main() {
     }
     printf("}\n");
 
+    printf("g=\n{");
+    for (int i = 0;i < 256;i++) {
+        printf("%d ", g[i]);
+    }
+    printf("}\n");
+
     printf("h=\n{");
     for (int i = 0;i < 256;i++) {
         printf("%d ",h[i]);
     }
     printf("}\n");
-    */
+    
 
 
 
