@@ -3,7 +3,7 @@
 #include <time.h>
 #include "NTT.h"
 
-//ºñÆ® ¹ÝÀü ÇÔ¼ö
+//ë¹„íŠ¸ ë°˜ì „ í•¨ìˆ˜
 int bit_rev(int x) {
     int t[7];
     for (int i = 0; i < 7; i++) {
@@ -98,11 +98,11 @@ void Multiply_NTT(int* f, int* g, int* h, int* zeta, int q) {
 int main() {
     int q = 3329;//q = (2^8) * 13 + 1 
 
-    //256-th primity root of unity ¹è¿­¿¡ ÀúÀå (128°³)
+    //256-th primity root of unity ë°°ì—´ì— ì €ìž¥ (128ê°œ)
     int* zeta = (int*)malloc(sizeof(int) * 256);
     if (zeta == NULL) {
-        perror("Failed to allocate memory for zeta"); // ¿À·ù ¸Þ½ÃÁö Ãâ·Â
-        exit(EXIT_FAILURE);// ¸Þ¸ð¸® ÇÒ´ç ½ÇÆÐ ½Ã ´õ ÀÌ»ó ÁøÇà ºÒ°¡, ÇÁ·Î±×·¥ Á¾·á ¶Ç´Â ¿À·ù Ã³¸®
+        perror("Failed to allocate memory for zeta"); // ì˜¤ë¥˜ ë©”ì‹œì§€ ì¶œë ¥
+        exit(EXIT_FAILURE);// ë©”ëª¨ë¦¬ í• ë‹¹ ì‹¤íŒ¨ ì‹œ ë” ì´ìƒ ì§„í–‰ ë¶ˆê°€, í”„ë¡œê·¸ëž¨ ì¢…ë£Œ ë˜ëŠ” ì˜¤ë¥˜ ì²˜ë¦¬
     }
     printf("Memory allocated successfully at: %p\n", zeta);
     zeta[0] = 1;
@@ -110,7 +110,7 @@ int main() {
         zeta[i] = zeta[i - 1] * 17 % q;
     }
 
-    //ÇÔ¼ö¿­ »ý¼º f,g,h --> NTT --> f_,g_h_
+    //í•¨ìˆ˜ì—´ ìƒì„± f,g,h --> NTT --> f_,g_h_
     //fg(x)=f(x)*g(x)
     int* f = (int*)malloc(sizeof(int) * 256);
     int* f_ = (int*)malloc(sizeof(int) * 256);
@@ -120,42 +120,42 @@ int main() {
     int* h_ = (int*)malloc(sizeof(int) * 256);
     int* fg = (int*)malloc(sizeof(int) * 256);
     if (f == NULL) {
-        perror("Failed to allocate memory for f"); // ¿À·ù ¸Þ½ÃÁö Ãâ·Â
-        exit(EXIT_FAILURE);// ¸Þ¸ð¸® ÇÒ´ç ½ÇÆÐ ½Ã ´õ ÀÌ»ó ÁøÇà ºÒ°¡, ÇÁ·Î±×·¥ Á¾·á ¶Ç´Â ¿À·ù Ã³¸®
+        perror("Failed to allocate memory for f"); // ì˜¤ë¥˜ ë©”ì‹œì§€ ì¶œë ¥
+        exit(EXIT_FAILURE);// ë©”ëª¨ë¦¬ í• ë‹¹ ì‹¤íŒ¨ ì‹œ ë” ì´ìƒ ì§„í–‰ ë¶ˆê°€, í”„ë¡œê·¸ëž¨ ì¢…ë£Œ ë˜ëŠ” ì˜¤ë¥˜ ì²˜ë¦¬
     }
     printf("Memory allocated successfully at: %p\n", f);
     if (f_ == NULL) {
-        perror("Failed to allocate memory for f_"); // ¿À·ù ¸Þ½ÃÁö Ãâ·Â
-        exit(EXIT_FAILURE);// ¸Þ¸ð¸® ÇÒ´ç ½ÇÆÐ ½Ã ´õ ÀÌ»ó ÁøÇà ºÒ°¡, ÇÁ·Î±×·¥ Á¾·á ¶Ç´Â ¿À·ù Ã³¸®
+        perror("Failed to allocate memory for f_"); // ì˜¤ë¥˜ ë©”ì‹œì§€ ì¶œë ¥
+        exit(EXIT_FAILURE);// ë©”ëª¨ë¦¬ í• ë‹¹ ì‹¤íŒ¨ ì‹œ ë” ì´ìƒ ì§„í–‰ ë¶ˆê°€, í”„ë¡œê·¸ëž¨ ì¢…ë£Œ ë˜ëŠ” ì˜¤ë¥˜ ì²˜ë¦¬
     }
     printf("Memory allocated successfully at: %p\n", f_);
     if (g == NULL) {
-        perror("Failed to allocate memory for g"); // ¿À·ù ¸Þ½ÃÁö Ãâ·Â
-        exit(EXIT_FAILURE);// ¸Þ¸ð¸® ÇÒ´ç ½ÇÆÐ ½Ã ´õ ÀÌ»ó ÁøÇà ºÒ°¡, ÇÁ·Î±×·¥ Á¾·á ¶Ç´Â ¿À·ù Ã³¸®
+        perror("Failed to allocate memory for g"); // ì˜¤ë¥˜ ë©”ì‹œì§€ ì¶œë ¥
+        exit(EXIT_FAILURE);// ë©”ëª¨ë¦¬ í• ë‹¹ ì‹¤íŒ¨ ì‹œ ë” ì´ìƒ ì§„í–‰ ë¶ˆê°€, í”„ë¡œê·¸ëž¨ ì¢…ë£Œ ë˜ëŠ” ì˜¤ë¥˜ ì²˜ë¦¬
     }
     printf("Memory allocated successfully at: %p\n", g);
     if (g_ == NULL) {
-        perror("Failed to allocate memory for g_"); // ¿À·ù ¸Þ½ÃÁö Ãâ·Â
-        exit(EXIT_FAILURE);// ¸Þ¸ð¸® ÇÒ´ç ½ÇÆÐ ½Ã ´õ ÀÌ»ó ÁøÇà ºÒ°¡, ÇÁ·Î±×·¥ Á¾·á ¶Ç´Â ¿À·ù Ã³¸®
+        perror("Failed to allocate memory for g_"); // ì˜¤ë¥˜ ë©”ì‹œì§€ ì¶œë ¥
+        exit(EXIT_FAILURE);// ë©”ëª¨ë¦¬ í• ë‹¹ ì‹¤íŒ¨ ì‹œ ë” ì´ìƒ ì§„í–‰ ë¶ˆê°€, í”„ë¡œê·¸ëž¨ ì¢…ë£Œ ë˜ëŠ” ì˜¤ë¥˜ ì²˜ë¦¬
     }
     printf("Memory allocated successfully at: %p\n", g_);
     if (h == NULL) {
-        perror("Failed to allocate memory for h_"); // ¿À·ù ¸Þ½ÃÁö Ãâ·Â
-        exit(EXIT_FAILURE);// ¸Þ¸ð¸® ÇÒ´ç ½ÇÆÐ ½Ã ´õ ÀÌ»ó ÁøÇà ºÒ°¡, ÇÁ·Î±×·¥ Á¾·á ¶Ç´Â ¿À·ù Ã³¸®
+        perror("Failed to allocate memory for h_"); // ì˜¤ë¥˜ ë©”ì‹œì§€ ì¶œë ¥
+        exit(EXIT_FAILURE);// ë©”ëª¨ë¦¬ í• ë‹¹ ì‹¤íŒ¨ ì‹œ ë” ì´ìƒ ì§„í–‰ ë¶ˆê°€, í”„ë¡œê·¸ëž¨ ì¢…ë£Œ ë˜ëŠ” ì˜¤ë¥˜ ì²˜ë¦¬
     }
     printf("Memory allocated successfully at: %p\n", h);
     if (h_ == NULL) {
-        perror("Failed to allocate memory for h_"); // ¿À·ù ¸Þ½ÃÁö Ãâ·Â
-        exit(EXIT_FAILURE);// ¸Þ¸ð¸® ÇÒ´ç ½ÇÆÐ ½Ã ´õ ÀÌ»ó ÁøÇà ºÒ°¡, ÇÁ·Î±×·¥ Á¾·á ¶Ç´Â ¿À·ù Ã³¸®
+        perror("Failed to allocate memory for h_"); // ì˜¤ë¥˜ ë©”ì‹œì§€ ì¶œë ¥
+        exit(EXIT_FAILURE);// ë©”ëª¨ë¦¬ í• ë‹¹ ì‹¤íŒ¨ ì‹œ ë” ì´ìƒ ì§„í–‰ ë¶ˆê°€, í”„ë¡œê·¸ëž¨ ì¢…ë£Œ ë˜ëŠ” ì˜¤ë¥˜ ì²˜ë¦¬
     }
     printf("Memory allocated successfully at: %p\n", h_);
     if (fg == NULL) {
-        perror("Failed to allocate memory for fg"); // ¿À·ù ¸Þ½ÃÁö Ãâ·Â
-        exit(EXIT_FAILURE);// ¸Þ¸ð¸® ÇÒ´ç ½ÇÆÐ ½Ã ´õ ÀÌ»ó ÁøÇà ºÒ°¡, ÇÁ·Î±×·¥ Á¾·á ¶Ç´Â ¿À·ù Ã³¸®
+        perror("Failed to allocate memory for fg"); // ì˜¤ë¥˜ ë©”ì‹œì§€ ì¶œë ¥
+        exit(EXIT_FAILURE);// ë©”ëª¨ë¦¬ í• ë‹¹ ì‹¤íŒ¨ ì‹œ ë” ì´ìƒ ì§„í–‰ ë¶ˆê°€, í”„ë¡œê·¸ëž¨ ì¢…ë£Œ ë˜ëŠ” ì˜¤ë¥˜ ì²˜ë¦¬
     }
     printf("Memory allocated successfully at: %p\n", fg);
 
-    //f, g¿¡ ·£´ý °ª ÀÔ·Â
+    //f, gì— ëžœë¤ ê°’ ìž…ë ¥
     srand(time(NULL));
     for (int i = 0;i < 256;i++) {
         f[i] = rand() % q;
@@ -165,7 +165,7 @@ int main() {
     }
 
 
-    //NTT¿¬»êÀ» ÅëÇØ f_, g_»ý¼º, NTT°öÀ» ÅëÇØ h_±¸ÇÏ°í NTT_inverse ÅëÇØ h °è»ê
+    //NTTì—°ì‚°ì„ í†µí•´ f_, g_ìƒì„±, NTTê³±ì„ í†µí•´ h_êµ¬í•˜ê³  NTT_inverse í†µí•´ h ê³„ì‚°
     NTT(f, f_, zeta, q);
     NTT(g, g_, zeta, q);
 
@@ -173,7 +173,7 @@ int main() {
 
     NTT_inv(h_, h, zeta, q);
 
-    // NTT°ü·Ã °¢ ÇÔ¼ö Ãâ·Â
+    // NTTê´€ë ¨ ê° í•¨ìˆ˜ ì¶œë ¥
     printf("f = ");
     printf("\n");
     for (int i = 0;i < 256;i++) {
@@ -212,22 +212,22 @@ int main() {
     printf("\n");
 
 
-    //f(x)*g(x)°è»êÀ» À§ÇØ 512±æÀÌÀÇ f_512, g_512 »ý¼º
+    //f(x)*g(x)ê³„ì‚°ì„ ìœ„í•´ 512ê¸¸ì´ì˜ f_512, g_512 ìƒì„±
     int* f_512 = (int*)malloc(sizeof(int) * 512);
     int* g_512 = (int*)malloc(sizeof(int) * 512);
     if (f_512 == NULL) {
-        perror("Failed to allocate memory for f512"); // ¿À·ù ¸Þ½ÃÁö Ãâ·Â
-        exit(EXIT_FAILURE);// ¸Þ¸ð¸® ÇÒ´ç ½ÇÆÐ ½Ã ´õ ÀÌ»ó ÁøÇà ºÒ°¡, ÇÁ·Î±×·¥ Á¾·á ¶Ç´Â ¿À·ù Ã³¸®
+        perror("Failed to allocate memory for f512"); // ì˜¤ë¥˜ ë©”ì‹œì§€ ì¶œë ¥
+        exit(EXIT_FAILURE);// ë©”ëª¨ë¦¬ í• ë‹¹ ì‹¤íŒ¨ ì‹œ ë” ì´ìƒ ì§„í–‰ ë¶ˆê°€, í”„ë¡œê·¸ëž¨ ì¢…ë£Œ ë˜ëŠ” ì˜¤ë¥˜ ì²˜ë¦¬
     }
     printf("Memory allocated successfully at: %p\n", f_512);
     if (g_512 == NULL) {
-        perror("Failed to allocate memory for g512"); // ¿À·ù ¸Þ½ÃÁö Ãâ·Â
-        exit(EXIT_FAILURE);// ¸Þ¸ð¸® ÇÒ´ç ½ÇÆÐ ½Ã ´õ ÀÌ»ó ÁøÇà ºÒ°¡, ÇÁ·Î±×·¥ Á¾·á ¶Ç´Â ¿À·ù Ã³¸®
+        perror("Failed to allocate memory for g512"); // ì˜¤ë¥˜ ë©”ì‹œì§€ ì¶œë ¥
+        exit(EXIT_FAILURE);// ë©”ëª¨ë¦¬ í• ë‹¹ ì‹¤íŒ¨ ì‹œ ë” ì´ìƒ ì§„í–‰ ë¶ˆê°€, í”„ë¡œê·¸ëž¨ ì¢…ë£Œ ë˜ëŠ” ì˜¤ë¥˜ ì²˜ë¦¬
     }
     printf("Memory allocated successfully at: %p\n", g_512);
 
 
-    //0~255Ç×±îÁö´Â f, g¿Í µ¿ÀÏÇÑ °ª ÀÔ·Â, ±× ÀÌ¿Ü¿¡´Â 0ÀÔ·Â
+    //0~255í•­ê¹Œì§€ëŠ” f, gì™€ ë™ì¼í•œ ê°’ ìž…ë ¥, ê·¸ ì´ì™¸ì—ëŠ” 0ìž…ë ¥
     for (int i = 0;i < 256;i++) {
         f_512[i] = f[i];
         g_512[i] = g[i];
@@ -237,28 +237,28 @@ int main() {
         g_512[i] = 0;
     }
 
-    //°è»ê°ª ÀúÀå À§ÇØ 512±æÀÌÀÇ fg_512 »ý¼º
+    //ê³„ì‚°ê°’ ì €ìž¥ ìœ„í•´ 512ê¸¸ì´ì˜ fg_512 ìƒì„±
     int* fg_512 = (int*)malloc(sizeof(int) * 512);
     if (fg_512 == NULL) {
-        perror("Failed to allocate memory for fg512"); // ¿À·ù ¸Þ½ÃÁö Ãâ·Â
-        exit(EXIT_FAILURE);// ¸Þ¸ð¸® ÇÒ´ç ½ÇÆÐ ½Ã ´õ ÀÌ»ó ÁøÇà ºÒ°¡, ÇÁ·Î±×·¥ Á¾·á ¶Ç´Â ¿À·ù Ã³¸®
+        perror("Failed to allocate memory for fg512"); // ì˜¤ë¥˜ ë©”ì‹œì§€ ì¶œë ¥
+        exit(EXIT_FAILURE);// ë©”ëª¨ë¦¬ í• ë‹¹ ì‹¤íŒ¨ ì‹œ ë” ì´ìƒ ì§„í–‰ ë¶ˆê°€, í”„ë¡œê·¸ëž¨ ì¢…ë£Œ ë˜ëŠ” ì˜¤ë¥˜ ì²˜ë¦¬
     }
     printf("Memory allocated successfully at: %p\n", fg_512);
 
 
-    //°ª 0À¸·Î ÃÊ±âÈ­
+    //ê°’ 0ìœ¼ë¡œ ì´ˆê¸°í™”
     for (int i = 0;i < 512;i++) {
         fg_512[i] = 0;
     }
 
-    //f(x)*g(x) °è»ê
+    //f(x)*g(x) ê³„ì‚°
     for (int i = 0;i < 512;i++) {
         for (int j = 0;j < i + 1;j++) {
             fg_512[i] = (fg_512[i] + (f_512[j] * g_512[i - j])) % q;
         }
     }
 
-    // °¢ ÇÔ¼ö Ãâ·Â
+    // ê° í•¨ìˆ˜ ì¶œë ¥
     printf("f_512 = ");
     printf("\n");
     for (int i = 0;i < 512;i++) {
@@ -279,12 +279,12 @@ int main() {
     printf("\n");
 
 
-    //fg_512(x) modulo x^512+1 °è»ê
+    //fg_512(x) modulo x^512+1 ê³„ì‚°
     for (int i = 0;i < 256;i++) {
         fg[i] = (fg_512[i] - fg_512[i + 256] + q) % q;
     }
 
-    //f(x)*g(x)Ãâ·Â
+    //f(x)*g(x)ì¶œë ¥
     printf("f*g=\n{");
     for (int i = 0;i < 256;i++) {
         printf("%d ", fg[i]);
@@ -308,7 +308,7 @@ int main() {
         printf("\n{");
     }
 
-    //h, h_ Ãâ·Â
+    //h, h_ ì¶œë ¥
     printf("h=\n{");
     for (int i = 0;i < 256;i++) {
         printf("%d ", h[i]);
