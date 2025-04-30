@@ -1,4 +1,4 @@
-#include <openssl/evp.h> // ¶Ç´Â <openssl/sha.h> ±¸¹öÀü ¹æ½Ä
+#include <openssl/evp.h> // ë˜ëŠ” <openssl/sha.h> êµ¬ë²„ì „ ë°©ì‹
 #include <stdio.h>
 #include <string.h>
 #include "SHA3_512.h"
@@ -8,34 +8,34 @@ void sha3_512_hash(const unsigned char* input, size_t input_len, unsigned char* 
     const EVP_MD* md;
     unsigned int md_len;
 
-    md = EVP_sha3_512(); // SHA3-512 ¾Ë°í¸®Áò °¡Á®¿À±â
+    md = EVP_sha3_512(); // SHA3-512 ì•Œê³ ë¦¬ì¦˜ ê°€ì ¸ì˜¤ê¸°
     mdctx = EVP_MD_CTX_new();
 
     if (mdctx == NULL || md == NULL) {
-        // ¿À·ù Ã³¸®
+        // ì˜¤ë¥˜ ì²˜ë¦¬
         printf("Error setting up SHA3-512 context.\n");
         if (mdctx) EVP_MD_CTX_free(mdctx);
         return;
     }
 
-    EVP_DigestInit_ex(mdctx, md, NULL); // ÄÁÅØ½ºÆ® ÃÊ±âÈ­
-    EVP_DigestUpdate(mdctx, input, input_len); // ÇØ½ÃÇÒ µ¥ÀÌÅÍ ¾÷µ¥ÀÌÆ®
-    EVP_DigestFinal_ex(mdctx, output, &md_len); // ÃÖÁ¾ ÇØ½Ã °ª °è»ê (output ¹öÆÛ´Â ÃÖ¼Ò 64¹ÙÀÌÆ®¿©¾ß ÇÔ)
+    EVP_DigestInit_ex(mdctx, md, NULL); // ì»¨í…ìŠ¤íŠ¸ ì´ˆê¸°í™”
+    EVP_DigestUpdate(mdctx, input, input_len); // í•´ì‹œí•  ë°ì´í„° ì—…ë°ì´íŠ¸
+    EVP_DigestFinal_ex(mdctx, output, &md_len); // ìµœì¢… í•´ì‹œ ê°’ ê³„ì‚° (output ë²„í¼ëŠ” ìµœì†Œ 64ë°”ì´íŠ¸ì—¬ì•¼ í•¨)
 
-    EVP_MD_CTX_free(mdctx); // ÄÁÅØ½ºÆ® ÇØÁ¦
+    EVP_MD_CTX_free(mdctx); // ì»¨í…ìŠ¤íŠ¸ í•´ì œ
 }
 
 /*
 int main() {
     const char* message = "This is a test message.";
-    unsigned char hash[EVP_MAX_MD_SIZE]; // ÃæºĞÇÑ Å©±âÀÇ ¹öÆÛ (SHA3-512´Â 64¹ÙÀÌÆ®)
+    unsigned char hash[EVP_MAX_MD_SIZE]; // ì¶©ë¶„í•œ í¬ê¸°ì˜ ë²„í¼ (SHA3-512ëŠ” 64ë°”ì´íŠ¸)
     size_t message_len = strlen(message);
 
     sha3_512_hash((const unsigned char*)message, message_len, hash);
 
     printf("%p\n",message);
     printf("SHA3-512 Hash: ");
-    for (int i = 0; i < SHA3_512_DIGEST_LENGTH; i++) { // SHA3-512 Ãâ·ÂÀº 64¹ÙÀÌÆ®
+    for (int i = 0; i < SHA3_512_DIGEST_LENGTH; i++) { // SHA3-512 ì¶œë ¥ì€ 64ë°”ì´íŠ¸
         printf("%02x", hash[i]);
     }
     
