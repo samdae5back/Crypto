@@ -4,13 +4,13 @@
 
 #include <openssl/evp.h>
 
-// ÃÊ±âÈ­ ÇÔ¼ö ¼±¾ğ
+// ì´ˆê¸°í™” í•¨ìˆ˜ ì„ ì–¸
 void XOF_init(EVP_MD_CTX** ctx);
 
-// µ¥ÀÌÅÍ Èí¼ö ÇÔ¼ö ¼±¾ğ
+// ë°ì´í„° í¡ìˆ˜ í•¨ìˆ˜ ì„ ì–¸
 void XOF_absorb(EVP_MD_CTX* ctx, char* str);
 
-// ½ºÄûÁî ÇÔ¼ö ¼±¾ğ
+// ìŠ¤í€´ì¦ˆ í•¨ìˆ˜ ì„ ì–¸
 unsigned char* XOF_squeeze(EVP_MD_CTX* ctx, unsigned int length);
 
 #endif // XOF_H
