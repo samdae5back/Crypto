@@ -11,17 +11,17 @@ void SampleNTT(unsigned char* B, unsigned char* a) {
     unsigned int l = 3;
     unsigned char* m = (char*)malloc(sizeof(unsigned char) * l);
     if (m == NULL) {
-        perror("Failed to allocate memory for m"); // ¿À·ù ¸Ş½ÃÁö Ãâ·Â
-        exit(EXIT_FAILURE);// ¸Ş¸ğ¸® ÇÒ´ç ½ÇÆĞ ½Ã ´õ ÀÌ»ó ÁøÇà ºÒ°¡, ÇÁ·Î±×·¥ Á¾·á ¶Ç´Â ¿À·ù Ã³¸®
+        perror("Failed to allocate memory for m"); // ì˜¤ë¥˜ ë©”ì‹œì§€ ì¶œë ¥
+        exit(EXIT_FAILURE);// ë©”ëª¨ë¦¬ í• ë‹¹ ì‹¤íŒ¨ ì‹œ ë” ì´ìƒ ì§„í–‰ ë¶ˆê°€, í”„ë¡œê·¸ë¨ ì¢…ë£Œ ë˜ëŠ” ì˜¤ë¥˜ ì²˜ë¦¬
     }
     XOF_init(&ctx);
-    if (ctx != NULL) { // ÃÊ±âÈ­ ¼º°ø ¿©ºÎ È®ÀÎ
-        XOF_absorb(ctx, B);//¸Ş¼¼Áö Èí¼ö
+    if (ctx != NULL) { // ì´ˆê¸°í™” ì„±ê³µ ì—¬ë¶€ í™•ì¸
+        XOF_absorb(ctx, B);//ë©”ì„¸ì§€ í¡ìˆ˜
     }
     else {
         fprintf(stderr, "Error initializing SHAKE-128 context in SampleNTT.\n");
         EVP_cleanup();
-        return ; // ¿À·ù ¹ß»ı ½Ã 0ÀÌ ¾Æ´Ñ °ª ¹İÈ¯
+        return ; // ì˜¤ë¥˜ ë°œìƒ ì‹œ 0ì´ ì•„ë‹Œ ê°’ ë°˜í™˜
     }
 
     int j = 0;
@@ -43,16 +43,16 @@ void SampleNTT(unsigned char* B, unsigned char* a) {
 
     }
 
-    free(m); // ½ºÄûÁî °á°ú ¸Ş¸ğ¸® ÇØÁ¦
-    EVP_MD_CTX_free(ctx); // ÄÁÅØ½ºÆ® ÇØÁ¦
+    free(m); // ìŠ¤í€´ì¦ˆ ê²°ê³¼ ë©”ëª¨ë¦¬ í•´ì œ
+    EVP_MD_CTX_free(ctx); // ì»¨í…ìŠ¤íŠ¸ í•´ì œ
     EVP_cleanup();
 }
 
 int main() {
     unsigned char* a = (char*)malloc(sizeof(unsigned char) * 256);
     if (a == NULL) {
-        perror("Failed to allocate memory for a"); // ¿À·ù ¸Ş½ÃÁö Ãâ·Â
-        exit(EXIT_FAILURE);// ¸Ş¸ğ¸® ÇÒ´ç ½ÇÆĞ ½Ã ´õ ÀÌ»ó ÁøÇà ºÒ°¡, ÇÁ·Î±×·¥ Á¾·á ¶Ç´Â ¿À·ù Ã³¸®
+        perror("Failed to allocate memory for a"); // ì˜¤ë¥˜ ë©”ì‹œì§€ ì¶œë ¥
+        exit(EXIT_FAILURE);// ë©”ëª¨ë¦¬ í• ë‹¹ ì‹¤íŒ¨ ì‹œ ë” ì´ìƒ ì§„í–‰ ë¶ˆê°€, í”„ë¡œê·¸ë¨ ì¢…ë£Œ ë˜ëŠ” ì˜¤ë¥˜ ì²˜ë¦¬
     }
     SampleNTT("test message", a);
     for (int i = 0;i < 256;i++) {
