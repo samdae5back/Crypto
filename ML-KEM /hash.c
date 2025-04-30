@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include "hash.h"
 
-//ÃÊ±âÈ­ ÇÔ¼ö (¿ÜºÎ¿¡¼­ ctx ÀÌÁß Æ÷ÀÎÅÍ ÇüÅÂ·Î ¹Ş¾Æ¼­ *ctx°¡ ÃÊ±âÈ­µÈ °ªÀÇ ÁÖ¼Ò¸¦ °¡¸®Å°µµ·Ï ÇÔ)
+//ì´ˆê¸°í™” í•¨ìˆ˜ (ì™¸ë¶€ì—ì„œ ctx ì´ì¤‘ í¬ì¸í„° í˜•íƒœë¡œ ë°›ì•„ì„œ *ctxê°€ ì´ˆê¸°í™”ëœ ê°’ì˜ ì£¼ì†Œë¥¼ ê°€ë¦¬í‚¤ë„ë¡ í•¨)
 void XOF_init(EVP_MD_CTX** ctx) {
     EVP_MD_CTX* mdctx = NULL;
     const EVP_MD* shake128 = NULL;
@@ -42,7 +42,7 @@ void XOF_init(EVP_MD_CTX** ctx) {
     return;
 }
 
-//µ¥ÀÌÅÍ Èí¼ö ÇÔ¼ö
+//ë°ì´í„° í¡ìˆ˜ í•¨ìˆ˜
 void XOF_absorb(EVP_MD_CTX* ctx, char* str) {
     if (ctx == NULL) {
         fprintf(stderr, "Error: Message Digest Context is NULL in XOF_absorb.\n");
@@ -68,7 +68,7 @@ void XOF_absorb(EVP_MD_CTX* ctx, char* str) {
     return;
 }
 
-//½ºÄûÁî ÇÔ¼ö
+//ìŠ¤í€´ì¦ˆ í•¨ìˆ˜
 unsigned char* XOF_squeeze(EVP_MD_CTX* ctx, unsigned int length) {
     if (ctx == NULL || length <= 0) {
         fprintf(stderr, "Error: Invalid input to XOF_squeeze.\n");
@@ -119,7 +119,7 @@ unsigned char* XOF_squeeze(EVP_MD_CTX* ctx, unsigned int length) {
 int main() {
     EVP_MD_CTX* mdctx = NULL;
     const EVP_MD* shake128 = NULL;
-    unsigned char output[32]; // ¿øÇÏ´Â Ãâ·Â ±æÀÌ (Á¶Á¤ °¡´É)
+    unsigned char output[32]; // ì›í•˜ëŠ” ì¶œë ¥ ê¸¸ì´ (ì¡°ì • ê°€ëŠ¥)
     unsigned int output_len = sizeof(output);
     const char* message1 = "Data block 1 to be absorbed.";
     const char* message2 = "Another data block.";
@@ -146,7 +146,7 @@ int main() {
         goto err;
     }
 
-    // 2. shake.absorb (EVP_DigestUpdate - ¿©·¯ ¹ø È£Ãâ °¡´É)
+    // 2. shake.absorb (EVP_DigestUpdate - ì—¬ëŸ¬ ë²ˆ í˜¸ì¶œ ê°€ëŠ¥)
     printf("Absorbing data block 1...\n");
     if (!EVP_DigestUpdate(mdctx, message1, len1)) {
         fprintf(stderr, "Error: EVP_DigestUpdate (block 1) failed.\n");
@@ -159,7 +159,7 @@ int main() {
         goto err;
     }
 
-    // 3. shake.squeeze (EVP_DigestFinalXOF - ¿øÇÏ´Â ±æÀÌ¸¸Å­ ¹İº¹ È£Ãâ °¡´É)
+    // 3. shake.squeeze (EVP_DigestFinalXOF - ì›í•˜ëŠ” ê¸¸ì´ë§Œí¼ ë°˜ë³µ í˜¸ì¶œ ê°€ëŠ¥)
     printf("Squeezing output (first %u bytes)...\n", output_len);
     if (!EVP_DigestFinalXOF(mdctx, output, output_len)) {
         fprintf(stderr, "Error: EVP_DigestFinalXOF (first squeeze) failed.\n");
@@ -172,7 +172,7 @@ int main() {
     }
     printf("\n");
 
-    // Ãß°¡ÀûÀÎ Â¥³»±â (squeeze) ¿¹½Ã
+    // ì¶”ê°€ì ì¸ ì§œë‚´ê¸° (squeeze) ì˜ˆì‹œ
     unsigned char output2[16];
     unsigned int output2_len = sizeof(output2);
     printf("Squeezing more output (%u bytes)...\n", output2_len);
