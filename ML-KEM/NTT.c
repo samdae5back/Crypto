@@ -1,11 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
-#include "NTT.h"
+//#include <time.h>
+#include "parameter.h"
 
 //비트 반전 함수
 int bit_rev(int x) {
-    int t[7];
+    int t[7] = { NULL };
     for (int i = 0; i < 7; i++) {
         t[i] = x % 2;
         //printf("%d", t[i]);
@@ -23,7 +23,7 @@ int bit_rev(int x) {
 }
 
 
-void NTT(int *f, int *g, int *zeta, int q) {
+void NTT(int *f, int *g, int *zeta) {//input, output, zeta
     for (int i = 0;i < 256;i++) {
         g[i] = f[i];
     }
@@ -49,7 +49,7 @@ void NTT(int *f, int *g, int *zeta, int q) {
     return;
 }
 
-void NTT_inv(int* f, int* g, int* zeta, int q) {
+void NTT_inv(int* f, int* g, int* zeta) {
     for (int i = 0;i < 256;i++) {
         g[i] = f[i];
     }
@@ -74,13 +74,13 @@ void NTT_inv(int* f, int* g, int* zeta, int q) {
     return;
 }
 
-void Multiply_basic(int a0, int a1, int  b0, int b1, int* c0, int* c1, int r, int q) {
+void Multiply_basic(int a0, int a1, int  b0, int b1, int* c0, int* c1, int r) {
     *c0 = (a0 * b0 + (a1 * b1 % q) * r) % q;
     *c1 = (a0 * b1 + a1 * b0) % q;
     return;
 }
 
-void Multiply_NTT(int* f, int* g, int* h, int* zeta, int q) {
+void Multiply_NTT(int* f, int* g, int* h, int* zeta) {
     for (int i = 0;i < 128;i++) {
         Multiply_basic(f[2 * i], f[2 * i + 1], g[2 * i], g[2 * i + 1], &h[2 * i], &h[2 * i + 1], zeta[(2 * bit_rev(i)) + 1], q);
         /*
@@ -92,6 +92,24 @@ void Multiply_NTT(int* f, int* g, int* h, int* zeta, int q) {
         */
     }
     return;
+}
+
+int* GenZeta() {
+    //256-th primity root of unity 배열에 저장 (128개)
+    int* zeta = (int*)malloc(sizeof(int) * 256);
+    if (zeta == NULL) {
+        perror("Failed to allocate memory for zeta"); // 오류 메시지 출력
+        exit(EXIT_FAILURE);// 메모리 할당 실패 시 더 이상 진행 불가, 프로그램 종료 또는 오류 처리
+    }
+    else {
+        printf("Memory for Zeta allocated successfully at: %p\n", zeta);
+    }
+    zeta[0] = 1;
+    for (int i = 1;i < 256;i++) {
+        zeta[i] = zeta[i - 1] * 17 % q;
+    }
+    printf("Zeta generated successfully\n");
+    return zeta;
 }
 
 /*
