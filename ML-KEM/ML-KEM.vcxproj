@@ -20,27 +20,20 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="auxiliary.c" />
-    <ClCompile Include="internel.c" />
-    <ClCompile Include="K-PKE_Dec.c" />
-    <ClCompile Include="K-PKE_KeyGen.c" />
-    <ClCompile Include="K-PKE_Enc.c" />
-    <ClCompile Include="K-PKE_Test.c" />
-    <ClCompile Include="main.c" />
-    <ClCompile Include="ML-KEM_internal_Test.c" />
+    <ClCompile Include="K-PKE.c" />
+    <ClCompile Include="KAT.c" />
     <ClCompile Include="ML-KEM.c" />
-    <ClCompile Include="NTT.c" />
+    <ClCompile Include="NTT_.c" />
     <ClCompile Include="hash.c" />
+    <ClCompile Include="time_test.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="internal.h" />
-    <ClInclude Include="K-PKE_Dec.h" />
-    <ClInclude Include="K-PKE_KeyGen.h" />
+    <ClInclude Include="K-PKE.h" />
     <ClInclude Include="ML-KEM.h" />
-    <ClInclude Include="NTT.h" />
+    <ClInclude Include="NTT_.h" />
     <ClInclude Include="hash.h" />
     <ClInclude Include="auxiliary.h" />
     <ClInclude Include="parameter.h" />
-    <ClInclude Include="K-PKE_Enc.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

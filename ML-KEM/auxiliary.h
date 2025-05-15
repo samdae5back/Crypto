@@ -1,6 +1,7 @@
-#pragma once
+#ifndef AUXILIARY_H
+#define AUXILIARY_H
 
-int exp(int x, int exp);
+int exp_int(int x, int exp);
 
 void Bit2Byte(unsigned char* b, unsigned char* B, size_t output_length);
 
@@ -18,3 +19,4 @@ void Comp(int* input, int d, int* output, size_t inout_length);
 
 void Decomp(int* input, int d, int* output, size_t inout_length);
 
+#endif // AUXILIARY_H

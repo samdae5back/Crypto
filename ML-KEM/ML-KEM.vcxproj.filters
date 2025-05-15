@@ -15,7 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="NTT.c">
+    <ClCompile Include="NTT_.c">
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="hash.c">
@@ -24,33 +24,21 @@
     <ClCompile Include="auxiliary.c">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="K-PKE_KeyGen.c">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="K-PKE_Enc.c">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="K-PKE_Test.c">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="K-PKE_Dec.c">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="internel.c">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="ML-KEM_internal_Test.c">
+    <ClCompile Include="K-PKE.c">
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="ML-KEM.c">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="main.c">
+    <ClCompile Include="KAT.c">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="time_test.c">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="NTT.h">
+    <ClInclude Include="NTT_.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="hash.h">
@@ -62,16 +50,7 @@
     <ClInclude Include="parameter.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="K-PKE_KeyGen.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="K-PKE_Enc.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="K-PKE_Dec.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="internal.h">
+    <ClInclude Include="K-PKE.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="ML-KEM.h">
