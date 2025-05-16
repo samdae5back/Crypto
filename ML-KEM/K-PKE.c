@@ -138,8 +138,6 @@ void K_PKE_KeyGen(unsigned char* d, unsigned char* ek_pke, unsigned char* dk_pke
 	}
 	memcpy(ek_pke + (k * 384), rho, 32);
 
-	free(zeta);
-
 	//결과 출력
 	//printf("\nK-PKE KeyGen Succeed\n");
 
@@ -268,14 +266,14 @@ void K_PKE_Enc(unsigned char* ek_pke, unsigned char* message, unsigned char* ran
 			//각 행, 열 마다 A^t_hat*y_hat 계산
 			Multiply_NTT(A[j][i], y_hat[j], buffer_int, zeta);
 			//u_hat행의 각 다항식 차수별로 연산
-			for (int l = 0;l < 256;l++) {
+			for (int l = 0;l < n;l++) {
 				u_hat[i][l] = (u_hat[i][l] + buffer_int[l]) % q;
 			}
 		}
 		//u_hat에서 u로 NTT_inverse 연산
 		NTT_inv(u_hat[i], u[i], zeta);
 		//e_1 더하기
-		for (int j = 0;j < 256;j++) {
+		for (int j = 0;j < n;j++) {
 			u[i][j] = (u[i][j] + e_1[i][j]) % q;
 		}
 	}
@@ -352,8 +350,6 @@ void K_PKE_Enc(unsigned char* ek_pke, unsigned char* message, unsigned char* ran
 	ByteEncode(buffer_int, d_v, ciphertext + k * 32 * d_u);
 
 	free(buffer_int);
-
-	free(zeta);
 
 	//결과 출력
 	//printf("\nK-PKE Encryption Succeed\n");
@@ -454,7 +450,6 @@ void K_PKE_Dec(unsigned char* dk_pke, unsigned char* ciphertext, unsigned char* 
 		w[i] = (v_[i] - w[i] + q) % q;
 	}
 
-
 	//m_ 계산 위해 버퍼에 메모리 할당
 	buffer_int = (int*)malloc(sizeof(int) * n);
 	if (buffer_int == NULL) {
@@ -467,10 +462,6 @@ void K_PKE_Dec(unsigned char* dk_pke, unsigned char* ciphertext, unsigned char* 
 	ByteEncode(buffer_int, 1, message_);
 
 	free(buffer_int);
-
-
-
-	free(zeta);
 
 	//결과 출력
 	//printf("\nK-PKE Decryption Succeed\n");
