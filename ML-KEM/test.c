@@ -8,6 +8,7 @@
 #include "auxiliary.h"
 #include "K-PKE.h"
 #include "ML-KEM.h"
+#include "KAT.h"
 #include "parameter.h"
 
 int main() {
@@ -25,9 +26,8 @@ int main() {
 	int f = 0;
 
 	for (i = 0; ; i++) { // 무한 루프처럼 보이지만 내부에서 break
-		printf("Test vector (%d) \n", i);
+		printf("Test vector number (%d) : ", i);
 		state = ScanKAT(fip);
-		printf("\n");
 
 		if (state == -1) { // EOF 또는 심각한 오류로 더 이상 진행 불가
 			break;
@@ -78,21 +78,21 @@ int main() {
 		start = clock();
 		ML_KEM_KeyGen(ek, dk);
 		finish = clock();
-		duration = (double)(finish - start) / CLOCKS_PER_SEC;
+		duration = ((double)finish - (double)start) / CLOCKS_PER_SEC;
 		total_time_GeyGen = total_time_GeyGen + duration;
 
 		//Enc test
 		start = clock();
 		ML_KEM_Encaps(ek, SharedSecretKey, ciphertext);
 		finish = clock();
-		duration = (double)(finish - start) / CLOCKS_PER_SEC;
+		duration = ((double)finish - (double)start) / CLOCKS_PER_SEC;
 		total_time_Enc = total_time_Enc + duration;
 
 		//Dec test
 		start = clock();
 		ML_KEM_Decaps(dk, ciphertext, SharedSecretKey_);
 		finish = clock();
-		duration = (double)(finish - start) / CLOCKS_PER_SEC;
+		duration = ((double)finish - (double)start) / CLOCKS_PER_SEC;
 		total_time_Dec = total_time_Dec + duration;
 	}
 

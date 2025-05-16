@@ -25,7 +25,7 @@ void Bit2Byte(unsigned char* b, unsigned char* B, size_t output_length) {
         exit(EXIT_FAILURE);
     }
     memset(B, 0, sizeof(unsigned char) * output_length);
-    for (int i = 0;i < 8 * output_length;i++) {
+    for (int i = 0;i < 8 * (int)output_length;i++) {
         B[i / 8] += b[i] * exp_int(2, i % 8);
     }
     return;
@@ -37,7 +37,7 @@ void Byte2Bit(unsigned char* B, unsigned char* b, size_t input_length) {
         exit(EXIT_FAILURE);
     }
     unsigned char t = 0;
-    for (int i = 0;i < input_length;i++) {
+    for (int i = 0;i < (int)input_length;i++) {
         t = B[i];
         for (int j = 0;j < 8;j++) {
             b[(8 * i) + j] = t % 2;
@@ -59,7 +59,7 @@ void ByteEncode(int* F, size_t d, unsigned char* output) {
     }
     for (int i = 0;i < 256;i++) {
         int t = F[i];
-        for (int j = 0;j < d;j++) {
+        for (int j = 0;j < (int)d;j++) {
             b[i * d + j] = t % 2;
             t = (t - b[i * d + j]) / 2;
         }
@@ -89,7 +89,7 @@ void ByteDecode(unsigned char* B, size_t d, int* output) {
     Byte2Bit(B, b, input_size);
     memset(output, 0, sizeof(int) * n);
     for (int i = 0;i < n;i++) {
-        for (int j = 0;j < d;j++) {
+        for (int j = 0;j < (int)d;j++) {
             output[i] = (output[i] + (b[i * d + j] * exp_int(2, j))) % m;
         }
     }
@@ -162,7 +162,7 @@ void SamplePolyCBD(unsigned char* B, int* f, size_t input_length) {
 void Comp(int* input, int d, int* output, size_t inout_length) {
     int pow2 = exp_int(2, d);
     int half_q = q / 2;
-    for (int i = 0;i < inout_length;i++) {
+    for (int i = 0;i < (int)inout_length;i++) {
         output[i] = (pow2 * input[i] + half_q) / q;
         output[i] = output[i] % pow2;
     }
@@ -172,7 +172,7 @@ void Comp(int* input, int d, int* output, size_t inout_length) {
 void Decomp(int* input, int d, int* output, size_t inout_length) {
     int pow2 = exp_int(2, d);
     int half_pow2 = exp_int(2, d - 1);
-    for (int i = 0;i < inout_length;i++) {
+    for (int i = 0;i < (int)inout_length;i++) {
         output[i] = (q * input[i] + half_pow2) / pow2;
     }
     return;

@@ -190,7 +190,6 @@ int ScanKAT(FILE* fip) {//scan a file and run Known Answer Test
 	ML_KEM_Encaps_internal(pk_, m, ss_, ct_);
 	ML_KEM_Decaps_internal(sk_, ct_, ss__);
 	
-	printf("\n");
 	int err = 0;
 	int t_err = 0;
 	for (int i = 0;i < 384 * k + 32;i++) {

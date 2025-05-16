@@ -4,6 +4,7 @@
 #include "NTT_.h"
 #include "auxiliary.h"
 #include "K-PKE.h"
+#include "KAT.h"
 #include "parameter.h"
 
 void K_PKE_KeyGen(unsigned char* d, unsigned char* ek_pke, unsigned char* dk_pke) {

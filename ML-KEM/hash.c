@@ -112,9 +112,8 @@ void G(unsigned char* input, size_t input_length, unsigned char* output_1, unsig
 //XOF 초기화 함수 (외부에서 ctx 이중 포인터 형태로 받아서 *ctx가 초기화된 값의 주소를 가리키도록 함)
 void XOF_init(EVP_MD_CTX** ctx) {
     EVP_MD_CTX* mdctx = NULL;
-    EVP_MD* shake128 = NULL;
 
-    shake128 = EVP_shake128();
+    const EVP_MD* shake128 = EVP_shake128();
     if (!shake128) {
         fprintf(stderr, "Error: SHAKE-128 algorithm not found.\n");
         if (mdctx) {
