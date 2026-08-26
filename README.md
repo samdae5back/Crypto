@@ -105,7 +105,7 @@ if (err == CRYPTO_SUCCESS)
 AES_CONTEXT_CLEAR(&ctx);
 ```
 
-One-shot modes are also provided:
+One-shot confidentiality-only modes are also provided:
 
 - `AES_ECB_ENCRYPT` / `AES_ECB_DECRYPT`
 - `AES_CBC_ENCRYPT` / `AES_CBC_DECRYPT`
@@ -113,18 +113,32 @@ One-shot modes are also provided:
 
 ECB and CBC require `INPUT_LENGTH` to be a multiple of 16 bytes and **do not add or remove padding**. CTR accepts arbitrary lengths and uses a 128-bit big-endian counter increment. CBC and CTR require the caller to provide the IV/initial counter.
 
+For authenticated encryption, use the AEAD APIs:
+
+- `AES_GCM_ENCRYPT` / `AES_GCM_DECRYPT`
+- `AES_CCM_ENCRYPT` / `AES_CCM_DECRYPT`
+
+GCM accepts an explicit IV and AAD. A 12-byte IV is the recommended/common fast path. CCM accepts nonce lengths from 7 through 13 bytes and even tag lengths from 4 through 16 bytes. Both APIs return ciphertext and authentication tag separately. Decryption returns `CRYPTO_ERROR_AUTHENTICATION_FAILED` if the tag does not verify and clears the caller's plaintext output range on failure.
+
 ```c
-CryptoError err = AES_CBC_ENCRYPT(
-    ALG_AES_128,
-    key, 16,
-    iv,
+uint8_t ciphertext[plaintext_len];
+uint8_t tag[16];
+
+CryptoError err = AES_GCM_ENCRYPT(
+    ALG_AES_256,
+    key, 32,
+    nonce, nonce_len,
+    aad, aad_len,
     plaintext, plaintext_len,
-    ciphertext, ciphertext_len);
+    ciphertext, sizeof(ciphertext),
+    tag, sizeof(tag));
 ```
 
-These APIs provide confidentiality only. ECB should generally be avoided, and CBC/CTR must be combined with an appropriate authentication construction when integrity/authenticity is required. No implicit padding, MAC, or AEAD behavior is added by these functions.
+GCM authentication uses a bit-serial GHASH implementation without secret-indexed GHASH lookup tables, and authentication tags are compared without an early-exit byte comparison. This does **not** make the complete AES implementation side-channel hardened: the portable AES round implementation still uses S-box lookup tables whose cache access pattern can leak timing information on some systems.
 
-The test suite includes AES-128/192/256 FIPS-197 known-answer vectors and SP 800-38A CBC/CTR vectors.
+ECB should generally be avoided. CBC/CTR provide confidentiality only and need a separate authentication construction if integrity/authenticity is required; GCM or CCM is preferable when an AEAD construction fits the protocol.
+
+The test suite includes AES-128/192/256 FIPS-197 known-answer vectors, SP 800-38A CBC/CTR vectors, a GCM known-answer vector, RFC 3610 CCM Packet Vector #1, and negative tag-verification tests.
 
 ## ML-KEM dynamic dispatch
 
@@ -226,6 +240,7 @@ Public fallible APIs use `CryptoError` from `ERROR.h` where appropriate. Errors 
 - `CRYPTO_ERROR_PRIME_GENERATION_FAILED`
 - `CRYPTO_ERROR_ARITHMETIC`
 - `CRYPTO_ERROR_INTERNAL`
+- `CRYPTO_ERROR_AUTHENTICATION_FAILED`
 
 Use `CRYPTO_ERROR_STRING()` for a human-readable description.
 

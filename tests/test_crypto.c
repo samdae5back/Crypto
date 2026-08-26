@@ -95,6 +95,64 @@ static int test_aes(void) {
     return 0;
 }
 
+static int test_aes_aead(void) {
+    static const uint8_t gcm_key[16] = {0};
+    static const uint8_t gcm_iv[12] = {0};
+    static const uint8_t gcm_pt[16] = {0};
+    static const uint8_t gcm_ct_expected[16] = {
+        0x03,0x88,0xda,0xce,0x60,0xb6,0xa3,0x92,0xf3,0x28,0xc2,0xb9,0x71,0xb2,0xfe,0x78
+    };
+    static const uint8_t gcm_tag_expected[16] = {
+        0xab,0x6e,0x47,0xd4,0x2c,0xec,0x13,0xbd,0xf5,0x3a,0x67,0xb2,0x12,0x57,0xbd,0xdf
+    };
+    static const uint8_t ccm_key[16] = {
+        0xc0,0xc1,0xc2,0xc3,0xc4,0xc5,0xc6,0xc7,0xc8,0xc9,0xca,0xcb,0xcc,0xcd,0xce,0xcf
+    };
+    static const uint8_t ccm_nonce[13] = {
+        0x00,0x00,0x00,0x03,0x02,0x01,0x00,0xa0,0xa1,0xa2,0xa3,0xa4,0xa5
+    };
+    static const uint8_t ccm_aad[8] = {0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07};
+    static const uint8_t ccm_pt[23] = {
+        0x08,0x09,0x0a,0x0b,0x0c,0x0d,0x0e,0x0f,0x10,0x11,0x12,0x13,
+        0x14,0x15,0x16,0x17,0x18,0x19,0x1a,0x1b,0x1c,0x1d,0x1e
+    };
+    static const uint8_t ccm_ct_expected[23] = {
+        0x58,0x8c,0x97,0x9a,0x61,0xc6,0x63,0xd2,0xf0,0x66,0xd0,0xc2,
+        0xc0,0xf9,0x89,0x80,0x6d,0x5f,0x6b,0x61,0xda,0xc3,0x84
+    };
+    static const uint8_t ccm_tag_expected[8] = {0x17,0xe8,0xd1,0x2c,0xfd,0xf9,0x26,0xe0};
+    uint8_t ct[32], pt[32], tag[16], bad_tag[16];
+    size_t i;
+
+    if (AES_GCM_ENCRYPT(ALG_AES_128, gcm_key, sizeof(gcm_key), gcm_iv, sizeof(gcm_iv),
+                        NULL, 0u, gcm_pt, sizeof(gcm_pt), ct, sizeof(ct), tag, sizeof(tag)) != CRYPTO_SUCCESS) return 1;
+    if (memcmp(ct, gcm_ct_expected, sizeof(gcm_ct_expected)) != 0 || memcmp(tag, gcm_tag_expected, sizeof(tag)) != 0) return 1;
+    if (AES_GCM_DECRYPT(ALG_AES_128, gcm_key, sizeof(gcm_key), gcm_iv, sizeof(gcm_iv),
+                        NULL, 0u, ct, sizeof(gcm_pt), tag, sizeof(tag), pt, sizeof(pt)) != CRYPTO_SUCCESS) return 1;
+    if (memcmp(pt, gcm_pt, sizeof(gcm_pt)) != 0) return 1;
+    memcpy(bad_tag, tag, sizeof(tag)); bad_tag[0] ^= 1u; memset(pt, 0xa5, sizeof(gcm_pt));
+    if (AES_GCM_DECRYPT(ALG_AES_128, gcm_key, sizeof(gcm_key), gcm_iv, sizeof(gcm_iv),
+                        NULL, 0u, ct, sizeof(gcm_pt), bad_tag, sizeof(tag), pt, sizeof(pt)) != CRYPTO_ERROR_AUTHENTICATION_FAILED) return 1;
+    for (i = 0; i < sizeof(gcm_pt); ++i) if (pt[i] != 0u) return 1;
+
+    if (AES_CCM_ENCRYPT(ALG_AES_128, ccm_key, sizeof(ccm_key), ccm_nonce, sizeof(ccm_nonce),
+                        ccm_aad, sizeof(ccm_aad), ccm_pt, sizeof(ccm_pt), ct, sizeof(ct), tag, 8u) != CRYPTO_SUCCESS) return 1;
+    if (memcmp(ct, ccm_ct_expected, sizeof(ccm_ct_expected)) != 0 || memcmp(tag, ccm_tag_expected, 8u) != 0) return 1;
+    if (AES_CCM_DECRYPT(ALG_AES_128, ccm_key, sizeof(ccm_key), ccm_nonce, sizeof(ccm_nonce),
+                        ccm_aad, sizeof(ccm_aad), ct, sizeof(ccm_pt), tag, 8u, pt, sizeof(pt)) != CRYPTO_SUCCESS) return 1;
+    if (memcmp(pt, ccm_pt, sizeof(ccm_pt)) != 0) return 1;
+    memcpy(bad_tag, tag, 8u); bad_tag[7] ^= 1u; memset(pt, 0xa5, sizeof(ccm_pt));
+    if (AES_CCM_DECRYPT(ALG_AES_128, ccm_key, sizeof(ccm_key), ccm_nonce, sizeof(ccm_nonce),
+                        ccm_aad, sizeof(ccm_aad), ct, sizeof(ccm_pt), bad_tag, 8u, pt, sizeof(pt)) != CRYPTO_ERROR_AUTHENTICATION_FAILED) return 1;
+    for (i = 0; i < sizeof(ccm_pt); ++i) if (pt[i] != 0u) return 1;
+
+    if (AES_CCM_ENCRYPT(ALG_AES_128, ccm_key, sizeof(ccm_key), ccm_nonce, 6u,
+                        NULL, 0u, NULL, 0u, ct, sizeof(ct), tag, 8u) != CRYPTO_ERROR_INVALID_ARGUMENT) return 1;
+    if (AES_CCM_ENCRYPT(ALG_AES_128, ccm_key, sizeof(ccm_key), ccm_nonce, sizeof(ccm_nonce),
+                        NULL, 0u, NULL, 0u, ct, sizeof(ct), tag, 5u) != CRYPTO_ERROR_INVALID_ARGUMENT) return 1;
+    return 0;
+}
+
 static int test_endian(void) {
     uint8_t b[8];
     ENDIAN_STORE64_BE(b, UINT64_C(0x0123456789abcdef));
@@ -171,6 +229,7 @@ int main(void) {
     size_t i;
     if (test_hash()) { fprintf(stderr, "hash test failed\n"); return 1; }
     if (test_aes()) { fprintf(stderr, "aes test failed\n"); return 1; }
+    if (test_aes_aead()) { fprintf(stderr, "aes aead test failed\n"); return 1; }
     if (test_endian()) { fprintf(stderr, "endian test failed\n"); return 1; }
     if (test_bignum()) { fprintf(stderr, "bignum test failed\n"); return 1; }
     if (test_ntt()) { fprintf(stderr, "ntt test failed\n"); return 1; }

@@ -31,10 +31,11 @@ const char *CRYPTO_ERROR_STRING(CryptoError error) {
         case CRYPTO_ERROR_ALLOCATION_FAILED: return "memory allocation failed";
         case CRYPTO_ERROR_RANDOM_FAILED: return "operating-system random source failed";
         case CRYPTO_ERROR_INVALID_KEY: return "invalid key";
-        case CRYPTO_ERROR_MESSAGE_TOO_LARGE: return "message is too large for the selected key";
+        case CRYPTO_ERROR_MESSAGE_TOO_LARGE: return "message is too large for the selected key or mode";
         case CRYPTO_ERROR_PRIME_GENERATION_FAILED: return "prime generation failed";
         case CRYPTO_ERROR_ARITHMETIC: return "arithmetic operation failed";
         case CRYPTO_ERROR_INTERNAL: return "internal error";
+        case CRYPTO_ERROR_AUTHENTICATION_FAILED: return "authentication tag verification failed";
         default: return "unknown error";
     }
 }

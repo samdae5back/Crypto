@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(Crypto VERSION 0.3.0 LANGUAGES C)
+project(Crypto VERSION 0.4.0 LANGUAGES C)
 
 option(BUILD_SHARED_LIBS "Build Crypto as a shared library" ON)
 option(CRYPTO_BUILD_TESTS "Build Crypto tests" ON)
@@ -18,6 +18,7 @@ endif()
 set(CRYPTO_SOURCES
     src/CORE/core.c
     src/AES/aes.c
+    src/AES/aes_aead.c
     src/BIGNUM/bignum.c
     src/PRIME/prime.c
     src/RSA/rsa.c
