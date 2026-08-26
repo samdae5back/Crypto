@@ -34,6 +34,8 @@ int crypto_entropy_get(uint8_t *out, size_t out_len) {
 #include <sys/random.h>
 #endif
 
+#define CRYPTO_ENTROPY_CHUNK (256u * 1024u)
+
 static int read_urandom(uint8_t *out, size_t out_len) {
     int fd;
 
@@ -46,7 +48,8 @@ static int read_urandom(uint8_t *out, size_t out_len) {
     }
 
     while (out_len) {
-        ssize_t n = read(fd, out, out_len);
+        size_t request = out_len > CRYPTO_ENTROPY_CHUNK ? CRYPTO_ENTROPY_CHUNK : out_len;
+        ssize_t n = read(fd, out, request);
         if (n < 0) {
             if (errno == EINTR) {
                 continue;
@@ -73,7 +76,8 @@ int crypto_entropy_get(uint8_t *out, size_t out_len) {
 
 #if defined(__linux__)
     while (out_len) {
-        ssize_t n = getrandom(out, out_len, 0);
+        size_t request = out_len > CRYPTO_ENTROPY_CHUNK ? CRYPTO_ENTROPY_CHUNK : out_len;
+        ssize_t n = getrandom(out, request, 0);
         if (n < 0) {
             if (errno == EINTR) {
                 continue;

@@ -77,8 +77,9 @@ static int transform(const crypto_ntt_plan *plan, uint32_t *a, uint32_t root) {
             for (j = 0; j < len / 2; ++j) {
                 uint32_t u = a[i + j] % q;
                 uint32_t v = (uint32_t)(((uint64_t)a[i + j + len / 2] * w) % q);
-                a[i + j] = (u + v >= q) ? (u + v - q) : (u + v);
-                a[i + j + len / 2] = (u >= v) ? (u - v) : (u + q - v);
+                uint64_t sum = (uint64_t)u + v;
+                a[i + j] = (uint32_t)(sum >= q ? sum - q : sum);
+                a[i + j + len / 2] = (u >= v) ? (u - v) : (uint32_t)((uint64_t)u + q - v);
                 w = (uint32_t)(((uint64_t)w * wlen) % q);
             }
         }
