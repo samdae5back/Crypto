@@ -41,11 +41,14 @@ size_t CTR_DRBG_SEED_SIZE(AlgID ALG) {
     return key_length + CTR_DRBG_BLOCK_BYTES;
 }
 
+/* V is secret DRBG state: always walk all 16 bytes instead of stopping at the first non-carry byte. */
 static void increment_v(uint8_t v[16]) {
+    uint16_t carry = 1u;
     int i;
     for (i = 15; i >= 0; --i) {
-        v[i] = (uint8_t)(v[i] + 1u);
-        if (v[i] != 0u) break;
+        uint16_t sum = (uint16_t)v[i] + carry;
+        v[i] = (uint8_t)sum;
+        carry = (uint16_t)(sum >> 8);
     }
 }
 
@@ -86,11 +89,12 @@ static CryptoError block_cipher_df(AlgID aes_alg, size_t key_length,
     uint8_t *s = NULL;
     size_t s_length, used = 0u, generated = 0u, i;
     uint32_t counter = 0u;
+    const size_t uint32_max = (size_t)((uint32_t)~(uint32_t)0u);
     CryptoError err = CRYPTO_SUCCESS;
 
     if ((!input && input_length) || !output || output_length == 0u || output_length > CTR_DRBG_MAX_SEED_BYTES)
         return CRYPTO_ERROR_INVALID_ARGUMENT;
-    if (input_length > (size_t)UINT32_MAX || output_length > (size_t)UINT32_MAX)
+    if (input_length > uint32_max || output_length > uint32_max)
         return CRYPTO_ERROR_MESSAGE_TOO_LARGE;
     if (input_length > ((size_t)-1) - 9u) return CRYPTO_ERROR_MESSAGE_TOO_LARGE;
     s_length = 8u + input_length + 1u;
@@ -99,6 +103,7 @@ static CryptoError block_cipher_df(AlgID aes_alg, size_t key_length,
     s = (uint8_t *)calloc(1u, s_length);
     if (!s) return CRYPTO_ERROR_ALLOCATION_FAILED;
 
+    /* SP 800-90A Block_Cipher_df encodes L and N as byte counts in 32-bit big-endian integers. */
     store32_be(s, (uint32_t)input_length);
     store32_be(s + 4u, (uint32_t)output_length);
     if (input_length) memcpy(s + 8u, input, input_length);
@@ -193,12 +198,13 @@ static CryptoError make_df_seed(CTR_DRBG_CONTEXT *ctx,
     size_t seed_length = (size_t)ctx->KEY_LENGTH + 16u;
     size_t total;
     uint8_t *joined = NULL;
+    const size_t uint32_max = (size_t)((uint32_t)~(uint32_t)0u);
     CryptoError err;
 
     if (a_length > (size_t)-1 - b_length || a_length + b_length > (size_t)-1 - c_length)
         return CRYPTO_ERROR_MESSAGE_TOO_LARGE;
     total = a_length + b_length + c_length;
-    if (total > (size_t)UINT32_MAX) return CRYPTO_ERROR_MESSAGE_TOO_LARGE;
+    if (total > uint32_max) return CRYPTO_ERROR_MESSAGE_TOO_LARGE;
     if (total) {
         joined = (uint8_t *)malloc(total);
         if (!joined) return CRYPTO_ERROR_ALLOCATION_FAILED;
@@ -250,7 +256,8 @@ CryptoError CTR_DRBG_INSTANTIATE(CTR_DRBG_CONTEXT *CONTEXT, AlgID ALG,
     CONTEXT->USE_DF = (uint8_t)(use_df != 0);
 
     if (use_df) {
-        if (ENTROPY_LENGTH < security_bytes || NONCE_LENGTH < (security_bytes + 1u) / 2u) {
+        if (ENTROPY_LENGTH < security_bytes ||
+            ENTROPY_LENGTH + NONCE_LENGTH < security_bytes + (security_bytes + 1u) / 2u) {
             CTR_DRBG_CLEAR(CONTEXT);
             return CRYPTO_ERROR_INVALID_ARGUMENT;
         }
@@ -360,7 +367,6 @@ CryptoError CTR_DRBG_GENERATE(CTR_DRBG_CONTEXT *CONTEXT,
     if (!CONTEXT || !CONTEXT->INSTANTIATED || (!OUTPUT && OUTPUT_LENGTH) ||
         (!ADDITIONAL && ADDITIONAL_LENGTH)) return CRYPTO_ERROR_INVALID_ARGUMENT;
     if (OUTPUT_LENGTH > CTR_DRBG_MAX_REQUEST_BYTES) return CRYPTO_ERROR_MESSAGE_TOO_LARGE;
-    if (CONTEXT->RESEED_COUNTER > ((uint64_t)1u << 48)) return CRYPTO_ERROR_RESEED_REQUIRED;
 
     if (PREDICTION_RESISTANCE) {
         err = CTR_DRBG_RESEED_OS(CONTEXT, ADDITIONAL, ADDITIONAL_LENGTH);
@@ -368,8 +374,14 @@ CryptoError CTR_DRBG_GENERATE(CTR_DRBG_CONTEXT *CONTEXT,
         ADDITIONAL = NULL;
         ADDITIONAL_LENGTH = 0u;
     }
+    if (CONTEXT->RESEED_COUNTER > ((uint64_t)1u << 48)) return CRYPTO_ERROR_RESEED_REQUIRED;
+
     err = prepare_additional(CONTEXT, ADDITIONAL, ADDITIONAL_LENGTH, provided);
-    if (err != CRYPTO_SUCCESS) return err;
+    if (err != CRYPTO_SUCCESS) {
+        crypto_zeroize(provided, sizeof(provided));
+        crypto_zeroize(block, sizeof(block));
+        return err;
+    }
     if (ADDITIONAL_LENGTH) {
         err = ctr_drbg_update(CONTEXT, provided);
         if (err != CRYPTO_SUCCESS) goto done;
