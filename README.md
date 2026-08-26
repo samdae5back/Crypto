@@ -10,6 +10,7 @@ A portable C11 cryptography library that collects the algorithms and reusable pr
 .
 ├── CMakeLists.txt
 ├── LICENSE
+├── THIRD_PARTY_NOTICES.md
 ├── include/                 # public API only
 │   ├── CRYPTO.h
 │   ├── ALGID.h
@@ -25,7 +26,9 @@ A portable C11 cryptography library that collects the algorithms and reusable pr
 │   ├── RANDOM.h
 │   ├── ENDIAN.h
 │   ├── NTT.h
-│   └── ML_KEM.h
+│   ├── ML_KEM.h
+│   ├── ML_DSA.h
+│   └── SLH_DSA.h
 ├── src/
 │   ├── AES/
 │   ├── BIGNUM/
@@ -36,11 +39,16 @@ A portable C11 cryptography library that collects the algorithms and reusable pr
 │   ├── HASH/
 │   ├── INTERNAL/
 │   ├── ML_KEM/
+│   ├── ML_DSA/
 │   ├── NTT/
 │   ├── PRIME/
 │   ├── RANDOM/
 │   ├── RSA/
-│   └── SHA3/
+│   ├── SHA3/
+│   └── SLH_DSA/
+├── third_party/
+│   ├── mldsa-native/        # pinned FIPS 204 backend
+│   └── slhdsa-c/            # pinned FIPS 205 backend
 └── tests/
 ```
 
@@ -52,7 +60,10 @@ All implementation/internal headers live below `src/`. Public consumers should i
 
 ## Build
 
+The FIPS 204/205 signature backends are pinned Git submodules, so initialize them before configuring a fresh checkout:
+
 ```sh
+git submodule update --init --recursive
 cmake -S . -B build -DBUILD_SHARED_LIBS=ON -DCRYPTO_BUILD_TESTS=ON
 cmake --build build
 ctest --test-dir build --output-on-failure
@@ -94,6 +105,21 @@ On Windows the shared library links `bcrypt` for `BCryptGenRandom`. Linux uses `
 | `ALG_CTR_DRBG_AES_128_NO_DF` | `0x6011` | CTR_DRBG AES-128 without DF |
 | `ALG_CTR_DRBG_AES_192_NO_DF` | `0x6012` | CTR_DRBG AES-192 without DF |
 | `ALG_CTR_DRBG_AES_256_NO_DF` | `0x6013` | CTR_DRBG AES-256 without DF |
+| `ALG_ML_DSA_44` | `0x7001` | ML-DSA-44 |
+| `ALG_ML_DSA_65` | `0x7002` | ML-DSA-65 |
+| `ALG_ML_DSA_87` | `0x7003` | ML-DSA-87 |
+| `ALG_SLH_DSA_SHA2_128S` | `0x8001` | SLH-DSA-SHA2-128s |
+| `ALG_SLH_DSA_SHA2_128F` | `0x8002` | SLH-DSA-SHA2-128f |
+| `ALG_SLH_DSA_SHA2_192S` | `0x8003` | SLH-DSA-SHA2-192s |
+| `ALG_SLH_DSA_SHA2_192F` | `0x8004` | SLH-DSA-SHA2-192f |
+| `ALG_SLH_DSA_SHA2_256S` | `0x8005` | SLH-DSA-SHA2-256s |
+| `ALG_SLH_DSA_SHA2_256F` | `0x8006` | SLH-DSA-SHA2-256f |
+| `ALG_SLH_DSA_SHAKE_128S` | `0x8011` | SLH-DSA-SHAKE-128s |
+| `ALG_SLH_DSA_SHAKE_128F` | `0x8012` | SLH-DSA-SHAKE-128f |
+| `ALG_SLH_DSA_SHAKE_192S` | `0x8013` | SLH-DSA-SHAKE-192s |
+| `ALG_SLH_DSA_SHAKE_192F` | `0x8014` | SLH-DSA-SHAKE-192f |
+| `ALG_SLH_DSA_SHAKE_256S` | `0x8015` | SLH-DSA-SHAKE-256s |
+| `ALG_SLH_DSA_SHAKE_256F` | `0x8016` | SLH-DSA-SHAKE-256f |
 
 `ALGID_NAME()` returns a printable name for an identifier.
 
@@ -200,7 +226,7 @@ The DRBG counter state `V` is incremented with a fixed 16-byte loop rather than 
 
 Sensitive temporary storage is cleared through the internal helper `crypto_zeroize()` in `src/INTERNAL/secure_zero.c`. It performs writes through a `volatile uint8_t *` so the explicit clearing operation is not represented as an ordinary dead `memset` that an optimizer may simply discard.
 
-The AES, GCM/CCM, and CTR_DRBG implementations explicitly clear sensitive internal material before returning or releasing storage, including:
+The AES, GCM/CCM, CTR_DRBG, and post-quantum signature wrappers explicitly clear sensitive temporary material before returning or releasing storage, including:
 
 - AES expanded round-key contexts and key-schedule temporary words
 - AES encryption/decryption states, CBC chaining blocks, CTR keystream/counters
@@ -208,6 +234,8 @@ The AES, GCM/CCM, and CTR_DRBG implementations explicitly clear sensitive intern
 - CCM CBC-MAC state, counter blocks, keystream and expected tags
 - CTR_DRBG seed material, `Block_Cipher_df`/BCC intermediates, temporary AES contexts and generated blocks
 - DRBG OS entropy/nonce buffers after instantiate or reseed
+- ML-DSA key-generation seeds, signing randomness, and domain-separation temporary buffers
+- SLH-DSA key-generation seed material and per-signature additional randomness
 - the complete DRBG context when `CTR_DRBG_CLEAR()` is called
 
 Authentication-failure paths in GCM/CCM continue to clear the caller-visible plaintext output range.
@@ -236,6 +264,73 @@ if (err == CRYPTO_SUCCESS)
 ```
 
 The three ML-KEM variants are built from the same implementation sources with separate parameter definitions and private symbol namespaces, then selected by the public dispatch layer.
+
+## ML-DSA dynamic dispatch
+
+ML-DSA follows FIPS 204 and exposes ML-DSA-44, ML-DSA-65, and ML-DSA-87 through one `AlgID`-selected API. Buffer sizes are queried before allocation with:
+
+- `ML_DSA_PUBLIC_KEY_SIZE`
+- `ML_DSA_PRIVATE_KEY_SIZE`
+- `ML_DSA_SIGNATURE_SIZE`
+
+The three parameter sets use the following serialized sizes:
+
+| Parameter set | Public key | Private key | Signature |
+|---|---:|---:|---:|
+| ML-DSA-44 | 1312 | 2560 | 2420 |
+| ML-DSA-65 | 1952 | 4032 | 3309 |
+| ML-DSA-87 | 2592 | 4896 | 4627 |
+
+Example:
+
+```c
+AlgID alg = ALG_ML_DSA_65;
+size_t pk_len = ML_DSA_PUBLIC_KEY_SIZE(alg);
+size_t sk_len = ML_DSA_PRIVATE_KEY_SIZE(alg);
+size_t sig_len = ML_DSA_SIGNATURE_SIZE(alg);
+
+uint8_t *pk = malloc(pk_len);
+uint8_t *sk = malloc(sk_len);
+uint8_t *sig = malloc(sig_len);
+
+CryptoError err = ML_DSA_KEYGEN(alg, pk, pk_len, sk, sk_len);
+if (err == CRYPTO_SUCCESS)
+    err = ML_DSA_SIGN(alg, sk, sk_len, message, message_len,
+                      context, context_len, sig, sig_len);
+if (err == CRYPTO_SUCCESS)
+    err = ML_DSA_VERIFY(alg, pk, pk_len, message, message_len,
+                        context, context_len, sig, sig_len);
+```
+
+The FIPS 204 context string may be empty and is limited to 255 bytes. Key generation and randomized signing obtain randomness through the library's `RANDOM_BYTES` OS-CSPRNG abstraction. Verification failures return `CRYPTO_ERROR_SIGNATURE_INVALID`.
+
+The backend is the pinned `mldsa-native` implementation documented in `THIRD_PARTY_NOTICES.md`. A local multi-level adapter builds the same portable source for all three parameter sets with private namespaced symbols, while the public wrapper performs `AlgID` dispatch.
+
+## SLH-DSA dynamic dispatch
+
+SLH-DSA follows FIPS 205. All twelve approved parameter sets are available dynamically:
+
+- SHA2-128s / SHA2-128f
+- SHA2-192s / SHA2-192f
+- SHA2-256s / SHA2-256f
+- SHAKE-128s / SHAKE-128f
+- SHAKE-192s / SHAKE-192f
+- SHAKE-256s / SHAKE-256f
+
+Use `SLH_DSA_PUBLIC_KEY_SIZE`, `SLH_DSA_PRIVATE_KEY_SIZE`, and `SLH_DSA_SIGNATURE_SIZE` to size buffers for the chosen `AlgID`, then call `SLH_DSA_KEYGEN`, `SLH_DSA_SIGN`, and `SLH_DSA_VERIFY`.
+
+| Strength/variant | Public key | Private key | Signature |
+|---|---:|---:|---:|
+| 128s | 32 | 64 | 7856 |
+| 128f | 32 | 64 | 17088 |
+| 192s | 48 | 96 | 16224 |
+| 192f | 48 | 96 | 35664 |
+| 256s | 64 | 128 | 29792 |
+| 256f | 64 | 128 | 49856 |
+
+SHA2 and SHAKE variants at the same strength/speed setting have the same serialized sizes. The FIPS 205 context string is limited to 255 bytes. Key-generation seeds and per-signature additional randomness are drawn through `RANDOM_BYTES`; invalid signatures return `CRYPTO_ERROR_SIGNATURE_INVALID`.
+
+The backend is the pinned portable `slhdsa-c` implementation. The test suite performs keygen/sign/verify plus tampered-signature rejection for every one of the 12 `AlgID` values.
 
 ## Hash dispatch
 
@@ -314,6 +409,7 @@ Public fallible APIs use `CryptoError` from `ERROR.h` where appropriate. Errors 
 - `CRYPTO_ERROR_INTERNAL`
 - `CRYPTO_ERROR_AUTHENTICATION_FAILED`
 - `CRYPTO_ERROR_RESEED_REQUIRED`
+- `CRYPTO_ERROR_SIGNATURE_INVALID`
 
 Use `CRYPTO_ERROR_STRING()` for a human-readable description.
 
@@ -325,6 +421,10 @@ Only public declarations marked `CRYPTO_API` are intended to be exported by shar
 - Linux: default visibility on `CRYPTO_API`, hidden visibility for other symbols
 - macOS: default visibility on `CRYPTO_API`, hidden visibility for other symbols
 - Other Unix platforms: explicit export policy intentionally deferred
+
+## Third-party implementations
+
+The FIPS 204/205 signature implementations are pinned as submodules rather than fetched dynamically at build time. Their exact commits and upstream license choices are recorded in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Both selected upstream projects permit MIT licensing; their original notices remain in the submodules.
 
 ## License
 
