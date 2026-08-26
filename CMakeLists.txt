@@ -132,4 +132,8 @@ if(CRYPTO_BUILD_TESTS)
     add_executable(crypto_tests tests/test_crypto.c)
     target_link_libraries(crypto_tests PRIVATE Crypto)
     add_test(NAME crypto_tests COMMAND crypto_tests)
+
+    add_executable(ctr_drbg_tests tests/test_ctr_drbg.c)
+    target_link_libraries(ctr_drbg_tests PRIVATE Crypto)
+    add_test(NAME ctr_drbg_tests COMMAND ctr_drbg_tests)
 endif()
