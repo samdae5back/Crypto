@@ -4,6 +4,7 @@
 #include "ALGID.h"
 #include "ERROR.h"
 #include "AES.h"
+#include "CTR_DRBG.h"
 #include "BIGNUM.h"
 #include "PRIME.h"
 #include "RSA.h"

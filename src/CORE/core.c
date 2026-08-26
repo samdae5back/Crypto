@@ -16,6 +16,12 @@ const char *ALGID_NAME(AlgID alg) {
         case ALG_AES_128: return "AES-128";
         case ALG_AES_192: return "AES-192";
         case ALG_AES_256: return "AES-256";
+        case ALG_CTR_DRBG_AES_128_DF: return "CTR-DRBG-AES-128-DF";
+        case ALG_CTR_DRBG_AES_192_DF: return "CTR-DRBG-AES-192-DF";
+        case ALG_CTR_DRBG_AES_256_DF: return "CTR-DRBG-AES-256-DF";
+        case ALG_CTR_DRBG_AES_128_NO_DF: return "CTR-DRBG-AES-128-NO-DF";
+        case ALG_CTR_DRBG_AES_192_NO_DF: return "CTR-DRBG-AES-192-NO-DF";
+        case ALG_CTR_DRBG_AES_256_NO_DF: return "CTR-DRBG-AES-256-NO-DF";
         case ALG_NONE: return "NONE";
         default: return "UNKNOWN";
     }
@@ -36,6 +42,7 @@ const char *CRYPTO_ERROR_STRING(CryptoError error) {
         case CRYPTO_ERROR_ARITHMETIC: return "arithmetic operation failed";
         case CRYPTO_ERROR_INTERNAL: return "internal error";
         case CRYPTO_ERROR_AUTHENTICATION_FAILED: return "authentication tag verification failed";
+        case CRYPTO_ERROR_RESEED_REQUIRED: return "DRBG reseed required";
         default: return "unknown error";
     }
 }

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(Crypto VERSION 0.4.0 LANGUAGES C)
+project(Crypto VERSION 0.5.0 LANGUAGES C)
 
 option(BUILD_SHARED_LIBS "Build Crypto as a shared library" ON)
 option(CRYPTO_BUILD_TESTS "Build Crypto tests" ON)
@@ -17,8 +17,10 @@ endif()
 
 set(CRYPTO_SOURCES
     src/CORE/core.c
+    src/INTERNAL/secure_zero.c
     src/AES/aes.c
     src/AES/aes_aead.c
+    src/DRBG/ctr_drbg.c
     src/BIGNUM/bignum.c
     src/PRIME/prime.c
     src/RSA/rsa.c
@@ -130,4 +132,8 @@ if(CRYPTO_BUILD_TESTS)
     add_executable(crypto_tests tests/test_crypto.c)
     target_link_libraries(crypto_tests PRIVATE Crypto)
     add_test(NAME crypto_tests COMMAND crypto_tests)
+
+    add_executable(ctr_drbg_tests tests/test_ctr_drbg.c)
+    target_link_libraries(ctr_drbg_tests PRIVATE Crypto)
+    add_test(NAME ctr_drbg_tests COMMAND ctr_drbg_tests)
 endif()

@@ -2,7 +2,7 @@
 
 A portable C11 cryptography library that collects the algorithms and reusable primitives in this repository behind one CMake target and one public include directory.
 
-> **Status:** educational/reference implementation. In particular, `ALG_RSA_RAW` is textbook/raw RSA without OAEP/PSS padding and must not be used directly as a production encryption/signature scheme. The portable AES implementation uses lookup tables and is not designed to provide cache-timing resistance; use a platform/hardware-backed constant-time implementation for high-assurance production use.
+> **Status:** educational/reference implementation. In particular, `ALG_RSA_RAW` is textbook/raw RSA without OAEP/PSS padding and must not be used directly as a production encryption/signature scheme. The portable AES implementation is source-level cache-timing hardened by avoiding secret-indexed S-box/T-table lookups, but this is not a proof of resistance to every compiler, microarchitectural, speculative-execution, power/EM, or fault side channel. Platform hardware AES is preferable for high-assurance production use where available.
 
 ## Layout
 
@@ -15,6 +15,7 @@ A portable C11 cryptography library that collects the algorithms and reusable pr
 │   ├── ALGID.h
 │   ├── ERROR.h
 │   ├── AES.h
+│   ├── CTR_DRBG.h
 │   ├── BIGNUM.h
 │   ├── PRIME.h
 │   ├── RSA.h
@@ -29,6 +30,7 @@ A portable C11 cryptography library that collects the algorithms and reusable pr
 │   ├── AES/
 │   ├── BIGNUM/
 │   ├── CORE/
+│   ├── DRBG/
 │   ├── ELGAMAL/
 │   ├── ENDIAN/
 │   ├── HASH/
@@ -86,6 +88,12 @@ On Windows the shared library links `bcrypt` for `BCryptGenRandom`. Linux uses `
 | `ALG_AES_128` | `0x5001` | AES-128 |
 | `ALG_AES_192` | `0x5002` | AES-192 |
 | `ALG_AES_256` | `0x5003` | AES-256 |
+| `ALG_CTR_DRBG_AES_128_DF` | `0x6001` | CTR_DRBG AES-128 with Block_Cipher_df |
+| `ALG_CTR_DRBG_AES_192_DF` | `0x6002` | CTR_DRBG AES-192 with Block_Cipher_df |
+| `ALG_CTR_DRBG_AES_256_DF` | `0x6003` | CTR_DRBG AES-256 with Block_Cipher_df |
+| `ALG_CTR_DRBG_AES_128_NO_DF` | `0x6011` | CTR_DRBG AES-128 without DF |
+| `ALG_CTR_DRBG_AES_192_NO_DF` | `0x6012` | CTR_DRBG AES-192 without DF |
+| `ALG_CTR_DRBG_AES_256_NO_DF` | `0x6013` | CTR_DRBG AES-256 without DF |
 
 `ALGID_NAME()` returns a printable name for an identifier.
 
@@ -104,6 +112,10 @@ if (err == CRYPTO_SUCCESS)
     err = AES_ENCRYPT_BLOCK(&ctx, plaintext_block, out);
 AES_CONTEXT_CLEAR(&ctx);
 ```
+
+The portable AES core deliberately does not contain byte-indexed S-box or T-tables. The S-box and inverse S-box are computed algebraically in `GF(2^8)` using a fixed operation pattern, and finite-field multiplication performs a fixed eight iterations with masking instead of secret-dependent branches. This removes the classic cache-line leakage caused by `SBOX[secret_byte]`-style accesses.
+
+This is **cache-timing hardening**, not a claim that the implementation is universally constant-time under every compiler/CPU or resistant to all side channels. It does not by itself address power analysis, EM leakage, transient/speculative-execution effects, fault attacks, or every possible optimizer transformation. AES-NI or ARM Cryptography Extensions are preferable when a trusted platform implementation is available.
 
 One-shot confidentiality-only modes are also provided:
 
@@ -134,11 +146,71 @@ CryptoError err = AES_GCM_ENCRYPT(
     tag, sizeof(tag));
 ```
 
-GCM authentication uses a bit-serial GHASH implementation without secret-indexed GHASH lookup tables, and authentication tags are compared without an early-exit byte comparison. This does **not** make the complete AES implementation side-channel hardened: the portable AES round implementation still uses S-box lookup tables whose cache access pattern can leak timing information on some systems.
+GCM authentication uses bit-serial GHASH without secret-indexed GHASH lookup tables. Authentication tags are compared over the complete requested tag length rather than exiting on the first mismatching byte.
 
 ECB should generally be avoided. CBC/CTR provide confidentiality only and need a separate authentication construction if integrity/authenticity is required; GCM or CCM is preferable when an AEAD construction fits the protocol.
 
 The test suite includes AES-128/192/256 FIPS-197 known-answer vectors, SP 800-38A CBC/CTR vectors, a GCM known-answer vector, RFC 3610 CCM Packet Vector #1, and negative tag-verification tests.
+
+## CTR_DRBG
+
+`CTR_DRBG` follows the CTR_DRBG construction from NIST SP 800-90A Rev. 1 and supports AES-128, AES-192, and AES-256. Both derivation-function and no-derivation-function variants have separate `AlgID` values.
+
+Public operations:
+
+- `CTR_DRBG_INSTANTIATE`
+- `CTR_DRBG_INSTANTIATE_OS`
+- `CTR_DRBG_RESEED`
+- `CTR_DRBG_RESEED_OS`
+- `CTR_DRBG_GENERATE`
+- `CTR_DRBG_CLEAR`
+- `CTR_DRBG_SEED_SIZE`
+
+Example using the OS entropy source and AES-256 with `Block_Cipher_df`:
+
+```c
+CTR_DRBG_CONTEXT drbg;
+uint8_t random_bytes[64];
+
+CryptoError err = CTR_DRBG_INSTANTIATE_OS(
+    &drbg,
+    ALG_CTR_DRBG_AES_256_DF,
+    (const uint8_t *)"application-v1", 14);
+
+if (err == CRYPTO_SUCCESS) {
+    err = CTR_DRBG_GENERATE(
+        &drbg,
+        random_bytes, sizeof(random_bytes),
+        NULL, 0,
+        0);
+}
+
+CTR_DRBG_CLEAR(&drbg);
+```
+
+For `*_DF`, entropy, nonce, personalization, reseed material, and additional input are conditioned with `Block_Cipher_df` as required by the construction. The direct instantiate API requires at least the selected AES security strength of entropy and sufficient combined entropy+nonce input; `CTR_DRBG_INSTANTIATE_OS` obtains appropriate entropy/nonce bytes through `RANDOM_BYTES`.
+
+For `*_NO_DF`, instantiation requires a full-entropy input exactly equal to `seedlen = keylen + 128 bits`; no nonce is used. Personalization and additional input are zero-padded/XORed to `seedlen` and therefore may not exceed `seedlen`.
+
+`CTR_DRBG_GENERATE` limits one request to 65,536 bytes. The reseed interval is `2^48` requests; once exceeded, generation returns `CRYPTO_ERROR_RESEED_REQUIRED`. Setting the prediction-resistance argument requests a fresh OS-backed reseed before generation.
+
+The DRBG counter state `V` is incremented with a fixed 16-byte loop rather than a carry-dependent early exit. The tests include a NIST CAVP AES-256 no-DF known-answer vector that checks instantiate state, generated bytes, final `Key`, final `V`, and the reseed counter, plus deterministic DF-path checks for AES-128/192/256.
+
+## Explicit zeroization
+
+Sensitive temporary storage is cleared through the internal helper `crypto_zeroize()` in `src/INTERNAL/secure_zero.c`. It performs writes through a `volatile uint8_t *` so the explicit clearing operation is not represented as an ordinary dead `memset` that an optimizer may simply discard.
+
+The AES, GCM/CCM, and CTR_DRBG implementations explicitly clear sensitive internal material before returning or releasing storage, including:
+
+- AES expanded round-key contexts and key-schedule temporary words
+- AES encryption/decryption states, CBC chaining blocks, CTR keystream/counters
+- GCM hash subkeys, `J0`, full authentication tags, GHASH temporaries and CTR state
+- CCM CBC-MAC state, counter blocks, keystream and expected tags
+- CTR_DRBG seed material, `Block_Cipher_df`/BCC intermediates, temporary AES contexts and generated blocks
+- DRBG OS entropy/nonce buffers after instantiate or reseed
+- the complete DRBG context when `CTR_DRBG_CLEAR()` is called
+
+Authentication-failure paths in GCM/CCM continue to clear the caller-visible plaintext output range.
 
 ## ML-KEM dynamic dispatch
 
@@ -241,6 +313,7 @@ Public fallible APIs use `CryptoError` from `ERROR.h` where appropriate. Errors 
 - `CRYPTO_ERROR_ARITHMETIC`
 - `CRYPTO_ERROR_INTERNAL`
 - `CRYPTO_ERROR_AUTHENTICATION_FAILED`
+- `CRYPTO_ERROR_RESEED_REQUIRED`
 
 Use `CRYPTO_ERROR_STRING()` for a human-readable description.
 
