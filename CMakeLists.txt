@@ -79,6 +79,11 @@ set_target_properties(crypto_slhdsa PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(crypto_slhdsa PRIVATE ${SLHDSA_C_DIR})
 
 if(MSVC)
+    # slhdsa-c compares GCC byte-order macros directly. When both are absent,
+    # MSVC preprocesses them as zero and incorrectly selects big-endian SHA-2.
+    target_compile_definitions(crypto_slhdsa PRIVATE
+        __BYTE_ORDER__=1234 __ORDER_BIG_ENDIAN__=4321
+    )
     target_compile_options(crypto_mldsa PRIVATE /W4)
     target_compile_options(crypto_slhdsa PRIVATE /W4)
 else()
