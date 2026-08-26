@@ -41,7 +41,7 @@ CRYPTO_API CryptoError AES_CTR_CRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_L
                                      const uint8_t *INPUT, size_t INPUT_LENGTH,
                                      uint8_t *OUTPUT, size_t OUTPUT_LENGTH);
 
-/* GCM tag lengths accepted by this API: 4, 8, 12, 13, 14, 15, or 16 bytes. */
+/* GCM accepts truncated authentication tags from 4 through 16 bytes. */
 CRYPTO_API CryptoError AES_GCM_ENCRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
                                        const uint8_t *IV, size_t IV_LENGTH,
                                        const uint8_t *AAD, size_t AAD_LENGTH,
