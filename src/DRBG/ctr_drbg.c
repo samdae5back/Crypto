@@ -35,7 +35,7 @@ static CryptoError ctr_drbg_parameters(AlgID alg, AlgID *aes_alg, size_t *key_le
     }
 }
 
-size_t CTR_DRBG_SEED_SIZE(AlgID ALG) {
+size_t CRYPTO_CTR_DRBG_SEED_SIZE(AlgID ALG) {
     size_t key_length = 0u;
     if (ctr_drbg_parameters(ALG, NULL, &key_length, NULL, NULL) != CRYPTO_SUCCESS) return 0u;
     return key_length + CTR_DRBG_BLOCK_BYTES;
@@ -66,11 +66,11 @@ static CryptoError bcc(const AES_CONTEXT *ctx, const uint8_t iv[16],
     CryptoError err;
 
     for (i = 0u; i < 16u; ++i) x[i] = (uint8_t)(chain[i] ^ iv[i]);
-    err = AES_ENCRYPT_BLOCK(ctx, x, chain);
+    err = CRYPTO_AES_ENCRYPT_BLOCK(ctx, x, chain);
     if (err != CRYPTO_SUCCESS) goto done;
     for (offset = 0u; offset < s_length; offset += 16u) {
         for (i = 0u; i < 16u; ++i) x[i] = (uint8_t)(chain[i] ^ s[offset + i]);
-        err = AES_ENCRYPT_BLOCK(ctx, x, chain);
+        err = CRYPTO_AES_ENCRYPT_BLOCK(ctx, x, chain);
         if (err != CRYPTO_SUCCESS) goto done;
     }
     memcpy(out, chain, 16u);
@@ -110,7 +110,7 @@ static CryptoError block_cipher_df(AlgID aes_alg, size_t key_length,
     s[8u + input_length] = 0x80u;
     for (i = 0u; i < key_length; ++i) initial_key[i] = (uint8_t)i;
 
-    err = AES_CONTEXT_INIT(&ctx, aes_alg, initial_key, key_length);
+    err = CRYPTO_AES_CONTEXT_INIT(&ctx, aes_alg, initial_key, key_length);
     if (err != CRYPTO_SUCCESS) goto done;
     while (used < key_length + 16u) {
         size_t copy_length;
@@ -123,14 +123,14 @@ static CryptoError block_cipher_df(AlgID aes_alg, size_t key_length,
         memcpy(temp + used, block, copy_length);
         used += copy_length;
     }
-    AES_CONTEXT_CLEAR(&ctx);
+    CRYPTO_AES_CONTEXT_CLEAR(&ctx);
 
     memcpy(x, temp + key_length, 16u);
-    err = AES_CONTEXT_INIT(&ctx, aes_alg, temp, key_length);
+    err = CRYPTO_AES_CONTEXT_INIT(&ctx, aes_alg, temp, key_length);
     if (err != CRYPTO_SUCCESS) goto done;
     while (generated < output_length) {
         size_t copy_length;
-        err = AES_ENCRYPT_BLOCK(&ctx, x, x);
+        err = CRYPTO_AES_ENCRYPT_BLOCK(&ctx, x, x);
         if (err != CRYPTO_SUCCESS) goto clear_ctx;
         copy_length = output_length - generated;
         if (copy_length > 16u) copy_length = 16u;
@@ -139,7 +139,7 @@ static CryptoError block_cipher_df(AlgID aes_alg, size_t key_length,
     }
 
 clear_ctx:
-    AES_CONTEXT_CLEAR(&ctx);
+    CRYPTO_AES_CONTEXT_CLEAR(&ctx);
 
 done:
     if (err != CRYPTO_SUCCESS && output) crypto_zeroize(output, output_length);
@@ -165,11 +165,11 @@ static CryptoError ctr_drbg_update(CTR_DRBG_CONTEXT *ctx, const uint8_t *provide
 
     err = ctr_drbg_parameters(ctx->ALG, &aes_alg, NULL, NULL, NULL);
     if (err != CRYPTO_SUCCESS) return err;
-    err = AES_CONTEXT_INIT(&aes, aes_alg, ctx->KEY, ctx->KEY_LENGTH);
+    err = CRYPTO_AES_CONTEXT_INIT(&aes, aes_alg, ctx->KEY, ctx->KEY_LENGTH);
     if (err != CRYPTO_SUCCESS) return err;
     while (used < seed_length) {
         increment_v(ctx->V);
-        err = AES_ENCRYPT_BLOCK(&aes, ctx->V, block);
+        err = CRYPTO_AES_ENCRYPT_BLOCK(&aes, ctx->V, block);
         if (err != CRYPTO_SUCCESS) goto done;
         copy_length = seed_length - used;
         if (copy_length > 16u) copy_length = 16u;
@@ -183,7 +183,7 @@ static CryptoError ctr_drbg_update(CTR_DRBG_CONTEXT *ctx, const uint8_t *provide
     memcpy(ctx->V, temp + ctx->KEY_LENGTH, 16u);
 
 done:
-    AES_CONTEXT_CLEAR(&aes);
+    CRYPTO_AES_CONTEXT_CLEAR(&aes);
     crypto_zeroize(block, sizeof(block));
     crypto_zeroize(temp, sizeof(temp));
     return err;
@@ -236,7 +236,7 @@ static CryptoError prepare_additional(CTR_DRBG_CONTEXT *ctx, const uint8_t *addi
     return CRYPTO_SUCCESS;
 }
 
-CryptoError CTR_DRBG_INSTANTIATE(CTR_DRBG_CONTEXT *CONTEXT, AlgID ALG,
+CryptoError CRYPTO_CTR_DRBG_INSTANTIATE(CTR_DRBG_CONTEXT *CONTEXT, AlgID ALG,
                                  const uint8_t *ENTROPY, size_t ENTROPY_LENGTH,
                                  const uint8_t *NONCE, size_t NONCE_LENGTH,
                                  const uint8_t *PERSONALIZATION, size_t PERSONALIZATION_LENGTH) {
@@ -258,14 +258,14 @@ CryptoError CTR_DRBG_INSTANTIATE(CTR_DRBG_CONTEXT *CONTEXT, AlgID ALG,
     if (use_df) {
         if (ENTROPY_LENGTH < security_bytes ||
             ENTROPY_LENGTH + NONCE_LENGTH < security_bytes + (security_bytes + 1u) / 2u) {
-            CTR_DRBG_CLEAR(CONTEXT);
+            CRYPTO_CTR_DRBG_CLEAR(CONTEXT);
             return CRYPTO_ERROR_INVALID_ARGUMENT;
         }
         err = make_df_seed(CONTEXT, ENTROPY, ENTROPY_LENGTH, NONCE, NONCE_LENGTH,
                            PERSONALIZATION, PERSONALIZATION_LENGTH, seed);
     } else {
         if (ENTROPY_LENGTH != seed_length || NONCE_LENGTH != 0u || PERSONALIZATION_LENGTH > seed_length) {
-            CTR_DRBG_CLEAR(CONTEXT);
+            CRYPTO_CTR_DRBG_CLEAR(CONTEXT);
             return CRYPTO_ERROR_INVALID_ARGUMENT;
         }
         memcpy(seed, ENTROPY, seed_length);
@@ -277,13 +277,13 @@ CryptoError CTR_DRBG_INSTANTIATE(CTR_DRBG_CONTEXT *CONTEXT, AlgID ALG,
         CONTEXT->RESEED_COUNTER = 1u;
         CONTEXT->INSTANTIATED = 1u;
     } else {
-        CTR_DRBG_CLEAR(CONTEXT);
+        CRYPTO_CTR_DRBG_CLEAR(CONTEXT);
     }
     crypto_zeroize(seed, sizeof(seed));
     return err;
 }
 
-CryptoError CTR_DRBG_RESEED(CTR_DRBG_CONTEXT *CONTEXT,
+CryptoError CRYPTO_CTR_DRBG_RESEED(CTR_DRBG_CONTEXT *CONTEXT,
                             const uint8_t *ENTROPY, size_t ENTROPY_LENGTH,
                             const uint8_t *ADDITIONAL, size_t ADDITIONAL_LENGTH) {
     size_t security_bytes, seed_length, i;
@@ -312,7 +312,7 @@ CryptoError CTR_DRBG_RESEED(CTR_DRBG_CONTEXT *CONTEXT,
     return err;
 }
 
-CryptoError CTR_DRBG_INSTANTIATE_OS(CTR_DRBG_CONTEXT *CONTEXT, AlgID ALG,
+CryptoError CRYPTO_CTR_DRBG_INSTANTIATE_OS(CTR_DRBG_CONTEXT *CONTEXT, AlgID ALG,
                                     const uint8_t *PERSONALIZATION, size_t PERSONALIZATION_LENGTH) {
     size_t key_length, security_bytes, seed_length, nonce_length;
     int use_df;
@@ -324,10 +324,10 @@ CryptoError CTR_DRBG_INSTANTIATE_OS(CTR_DRBG_CONTEXT *CONTEXT, AlgID ALG,
     if (err != CRYPTO_SUCCESS) return err;
     seed_length = key_length + 16u;
     nonce_length = use_df ? (security_bytes + 1u) / 2u : 0u;
-    err = RANDOM_BYTES(entropy, use_df ? security_bytes : seed_length);
-    if (err == CRYPTO_SUCCESS && nonce_length) err = RANDOM_BYTES(nonce, nonce_length);
+    err = CRYPTO_RANDOM_BYTES(entropy, use_df ? security_bytes : seed_length);
+    if (err == CRYPTO_SUCCESS && nonce_length) err = CRYPTO_RANDOM_BYTES(nonce, nonce_length);
     if (err == CRYPTO_SUCCESS)
-        err = CTR_DRBG_INSTANTIATE(CONTEXT, ALG, entropy, use_df ? security_bytes : seed_length,
+        err = CRYPTO_CTR_DRBG_INSTANTIATE(CONTEXT, ALG, entropy, use_df ? security_bytes : seed_length,
                                    nonce_length ? nonce : NULL, nonce_length,
                                    PERSONALIZATION, PERSONALIZATION_LENGTH);
     crypto_zeroize(entropy, sizeof(entropy));
@@ -335,7 +335,7 @@ CryptoError CTR_DRBG_INSTANTIATE_OS(CTR_DRBG_CONTEXT *CONTEXT, AlgID ALG,
     return err;
 }
 
-CryptoError CTR_DRBG_RESEED_OS(CTR_DRBG_CONTEXT *CONTEXT,
+CryptoError CRYPTO_CTR_DRBG_RESEED_OS(CTR_DRBG_CONTEXT *CONTEXT,
                                const uint8_t *ADDITIONAL, size_t ADDITIONAL_LENGTH) {
     size_t security_bytes, seed_length;
     uint8_t entropy[CTR_DRBG_MAX_SEED_BYTES];
@@ -346,15 +346,15 @@ CryptoError CTR_DRBG_RESEED_OS(CTR_DRBG_CONTEXT *CONTEXT,
     err = ctr_drbg_parameters(CONTEXT->ALG, NULL, NULL, &security_bytes, NULL);
     if (err != CRYPTO_SUCCESS) return err;
     seed_length = (size_t)CONTEXT->KEY_LENGTH + 16u;
-    err = RANDOM_BYTES(entropy, CONTEXT->USE_DF ? security_bytes : seed_length);
+    err = CRYPTO_RANDOM_BYTES(entropy, CONTEXT->USE_DF ? security_bytes : seed_length);
     if (err == CRYPTO_SUCCESS)
-        err = CTR_DRBG_RESEED(CONTEXT, entropy, CONTEXT->USE_DF ? security_bytes : seed_length,
+        err = CRYPTO_CTR_DRBG_RESEED(CONTEXT, entropy, CONTEXT->USE_DF ? security_bytes : seed_length,
                               ADDITIONAL, ADDITIONAL_LENGTH);
     crypto_zeroize(entropy, sizeof(entropy));
     return err;
 }
 
-CryptoError CTR_DRBG_GENERATE(CTR_DRBG_CONTEXT *CONTEXT,
+CryptoError CRYPTO_CTR_DRBG_GENERATE(CTR_DRBG_CONTEXT *CONTEXT,
                               uint8_t *OUTPUT, size_t OUTPUT_LENGTH,
                               const uint8_t *ADDITIONAL, size_t ADDITIONAL_LENGTH,
                               int PREDICTION_RESISTANCE) {
@@ -369,7 +369,7 @@ CryptoError CTR_DRBG_GENERATE(CTR_DRBG_CONTEXT *CONTEXT,
     if (OUTPUT_LENGTH > CTR_DRBG_MAX_REQUEST_BYTES) return CRYPTO_ERROR_MESSAGE_TOO_LARGE;
 
     if (PREDICTION_RESISTANCE) {
-        err = CTR_DRBG_RESEED_OS(CONTEXT, ADDITIONAL, ADDITIONAL_LENGTH);
+        err = CRYPTO_CTR_DRBG_RESEED_OS(CONTEXT, ADDITIONAL, ADDITIONAL_LENGTH);
         if (err != CRYPTO_SUCCESS) return err;
         ADDITIONAL = NULL;
         ADDITIONAL_LENGTH = 0u;
@@ -388,18 +388,18 @@ CryptoError CTR_DRBG_GENERATE(CTR_DRBG_CONTEXT *CONTEXT,
     }
     err = ctr_drbg_parameters(CONTEXT->ALG, &aes_alg, NULL, NULL, NULL);
     if (err != CRYPTO_SUCCESS) goto done;
-    err = AES_CONTEXT_INIT(&aes, aes_alg, CONTEXT->KEY, CONTEXT->KEY_LENGTH);
+    err = CRYPTO_AES_CONTEXT_INIT(&aes, aes_alg, CONTEXT->KEY, CONTEXT->KEY_LENGTH);
     if (err != CRYPTO_SUCCESS) goto done;
     while (offset < OUTPUT_LENGTH) {
         increment_v(CONTEXT->V);
-        err = AES_ENCRYPT_BLOCK(&aes, CONTEXT->V, block);
+        err = CRYPTO_AES_ENCRYPT_BLOCK(&aes, CONTEXT->V, block);
         if (err != CRYPTO_SUCCESS) break;
         copy_length = OUTPUT_LENGTH - offset;
         if (copy_length > 16u) copy_length = 16u;
         memcpy(OUTPUT + offset, block, copy_length);
         offset += copy_length;
     }
-    AES_CONTEXT_CLEAR(&aes);
+    CRYPTO_AES_CONTEXT_CLEAR(&aes);
     if (err != CRYPTO_SUCCESS) goto done;
     err = ctr_drbg_update(CONTEXT, provided);
     if (err == CRYPTO_SUCCESS) ++CONTEXT->RESEED_COUNTER;
@@ -411,6 +411,6 @@ done:
     return err;
 }
 
-void CTR_DRBG_CLEAR(CTR_DRBG_CONTEXT *CONTEXT) {
+void CRYPTO_CTR_DRBG_CLEAR(CTR_DRBG_CONTEXT *CONTEXT) {
     if (CONTEXT) crypto_zeroize(CONTEXT, sizeof(*CONTEXT));
 }

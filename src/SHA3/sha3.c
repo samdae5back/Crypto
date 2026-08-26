@@ -55,10 +55,10 @@ static uint8_t get_byte(const SHA3_CONTEXT *ctx, size_t pos) {
     return (uint8_t)(ctx->STATE[lane] >> shift);
 }
 
-void SHAKE128_INIT(SHA3_CONTEXT *CONTEXT) { if (CONTEXT) ctx_init(CONTEXT, 168u, 0x1fu); }
-void SHAKE256_INIT(SHA3_CONTEXT *CONTEXT) { if (CONTEXT) ctx_init(CONTEXT, 136u, 0x1fu); }
+void CRYPTO_SHAKE128_INIT(SHA3_CONTEXT *CONTEXT) { if (CONTEXT) ctx_init(CONTEXT, 168u, 0x1fu); }
+void CRYPTO_SHAKE256_INIT(SHA3_CONTEXT *CONTEXT) { if (CONTEXT) ctx_init(CONTEXT, 136u, 0x1fu); }
 
-void SHA3_UPDATE(SHA3_CONTEXT *CONTEXT, const uint8_t *IN, size_t IN_LENGTH) {
+void CRYPTO_SHA3_UPDATE(SHA3_CONTEXT *CONTEXT, const uint8_t *IN, size_t IN_LENGTH) {
     size_t i;
     if (!CONTEXT || (!IN && IN_LENGTH) || CONTEXT->FINALIZED) return;
     for (i = 0; i < IN_LENGTH; ++i) {
@@ -70,7 +70,7 @@ void SHA3_UPDATE(SHA3_CONTEXT *CONTEXT, const uint8_t *IN, size_t IN_LENGTH) {
     }
 }
 
-void SHA3_FINALIZE(SHA3_CONTEXT *CONTEXT) {
+void CRYPTO_SHA3_FINALIZE(SHA3_CONTEXT *CONTEXT) {
     if (!CONTEXT || CONTEXT->FINALIZED) return;
     xor_byte(CONTEXT, CONTEXT->POS, CONTEXT->DOMAIN);
     xor_byte(CONTEXT, CONTEXT->RATE - 1u, 0x80u);
@@ -79,10 +79,10 @@ void SHA3_FINALIZE(SHA3_CONTEXT *CONTEXT) {
     CONTEXT->FINALIZED = 1;
 }
 
-void SHA3_SQUEEZE(SHA3_CONTEXT *CONTEXT, uint8_t *OUT, size_t OUT_LENGTH) {
+void CRYPTO_SHA3_SQUEEZE(SHA3_CONTEXT *CONTEXT, uint8_t *OUT, size_t OUT_LENGTH) {
     size_t i;
     if (!CONTEXT || (!OUT && OUT_LENGTH)) return;
-    if (!CONTEXT->FINALIZED) SHA3_FINALIZE(CONTEXT);
+    if (!CONTEXT->FINALIZED) CRYPTO_SHA3_FINALIZE(CONTEXT);
     for (i = 0; i < OUT_LENGTH; ++i) {
         if (CONTEXT->POS == CONTEXT->RATE) {
             sha3_keccak_f1600(CONTEXT->STATE);
@@ -92,19 +92,19 @@ void SHA3_SQUEEZE(SHA3_CONTEXT *CONTEXT, uint8_t *OUT, size_t OUT_LENGTH) {
     }
 }
 
-void SHA3_CLEAR(SHA3_CONTEXT *CONTEXT) {
+void CRYPTO_SHA3_CLEAR(SHA3_CONTEXT *CONTEXT) {
     if (CONTEXT) crypto_zeroize(CONTEXT, sizeof(*CONTEXT));
 }
 
 static void hash_fixed(uint8_t *out, size_t out_len, const uint8_t *in, size_t in_len, size_t rate) {
     SHA3_CONTEXT ctx;
     ctx_init(&ctx, rate, 0x06u);
-    SHA3_UPDATE(&ctx, in, in_len);
-    SHA3_SQUEEZE(&ctx, out, out_len);
-    SHA3_CLEAR(&ctx);
+    CRYPTO_SHA3_UPDATE(&ctx, in, in_len);
+    CRYPTO_SHA3_SQUEEZE(&ctx, out, out_len);
+    CRYPTO_SHA3_CLEAR(&ctx);
 }
 
-void SHA3_256(uint8_t OUT[SHA3_256_DIGEST_SIZE], const uint8_t *IN, size_t IN_LENGTH) { hash_fixed(OUT, 32u, IN, IN_LENGTH, 136u); }
-void SHA3_512(uint8_t OUT[SHA3_512_DIGEST_SIZE], const uint8_t *IN, size_t IN_LENGTH) { hash_fixed(OUT, 64u, IN, IN_LENGTH, 72u); }
-void SHAKE128(uint8_t *OUT, size_t OUT_LENGTH, const uint8_t *IN, size_t IN_LENGTH) { SHA3_CONTEXT c; SHAKE128_INIT(&c); SHA3_UPDATE(&c,IN,IN_LENGTH); SHA3_SQUEEZE(&c,OUT,OUT_LENGTH); SHA3_CLEAR(&c); }
-void SHAKE256(uint8_t *OUT, size_t OUT_LENGTH, const uint8_t *IN, size_t IN_LENGTH) { SHA3_CONTEXT c; SHAKE256_INIT(&c); SHA3_UPDATE(&c,IN,IN_LENGTH); SHA3_SQUEEZE(&c,OUT,OUT_LENGTH); SHA3_CLEAR(&c); }
+void CRYPTO_SHA3_256(uint8_t OUT[SHA3_256_DIGEST_SIZE], const uint8_t *IN, size_t IN_LENGTH) { hash_fixed(OUT, 32u, IN, IN_LENGTH, 136u); }
+void CRYPTO_SHA3_512(uint8_t OUT[SHA3_512_DIGEST_SIZE], const uint8_t *IN, size_t IN_LENGTH) { hash_fixed(OUT, 64u, IN, IN_LENGTH, 72u); }
+void CRYPTO_SHAKE128(uint8_t *OUT, size_t OUT_LENGTH, const uint8_t *IN, size_t IN_LENGTH) { SHA3_CONTEXT c; CRYPTO_SHAKE128_INIT(&c); CRYPTO_SHA3_UPDATE(&c,IN,IN_LENGTH); CRYPTO_SHA3_SQUEEZE(&c,OUT,OUT_LENGTH); CRYPTO_SHA3_CLEAR(&c); }
+void CRYPTO_SHAKE256(uint8_t *OUT, size_t OUT_LENGTH, const uint8_t *IN, size_t IN_LENGTH) { SHA3_CONTEXT c; CRYPTO_SHAKE256_INIT(&c); CRYPTO_SHA3_UPDATE(&c,IN,IN_LENGTH); CRYPTO_SHA3_SQUEEZE(&c,OUT,OUT_LENGTH); CRYPTO_SHA3_CLEAR(&c); }

@@ -23,6 +23,6 @@ enum {
     CRYPTO_ERROR_SIGNATURE_INVALID = -14
 };
 
-CRYPTO_API const char *CRYPTO_ERROR_STRING(CryptoError ERROR);
+const char *CRYPTO_ERROR_STRING(CryptoError ERROR);
 
 #endif

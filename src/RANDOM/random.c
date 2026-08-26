@@ -77,7 +77,7 @@ int random_os_bytes(uint8_t *out, size_t length) {
 }
 #endif
 
-CryptoError RANDOM_BYTES(uint8_t *out, size_t length) {
+CryptoError CRYPTO_RANDOM_BYTES(uint8_t *out, size_t length) {
     if (!out && length) return CRYPTO_ERROR_INVALID_ARGUMENT;
     return random_os_bytes(out, length) == 0 ? CRYPTO_SUCCESS : CRYPTO_ERROR_RANDOM_FAILED;
 }

@@ -3,5 +3,5 @@
 #include "TYPES.h"
 #include "ERROR.h"
 #include "CRYPTO_EXPORT.h"
-CRYPTO_API CryptoError RANDOM_BYTES(uint8_t *OUT, size_t LENGTH);
+CRYPTO_API CryptoError CRYPTO_RANDOM_BYTES(uint8_t *OUT, size_t LENGTH);
 #endif

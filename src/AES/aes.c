@@ -137,12 +137,12 @@ static CryptoError aes_parameters(AlgID alg, size_t *key_length, uint8_t *key_wo
     }
 }
 
-size_t AES_KEY_SIZE(AlgID ALG) {
+size_t CRYPTO_AES_KEY_SIZE(AlgID ALG) {
     size_t key_length = 0u;
     return aes_parameters(ALG, &key_length, NULL, NULL) == CRYPTO_SUCCESS ? key_length : 0u;
 }
 
-CryptoError AES_CONTEXT_INIT(AES_CONTEXT *CONTEXT, AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH) {
+CryptoError CRYPTO_AES_CONTEXT_INIT(AES_CONTEXT *CONTEXT, AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH) {
     size_t expected = 0u, bytes_generated, total_bytes, i;
     uint8_t key_words = 0u, rounds = 0u, rcon = 1u, temp[4] = {0};
     CryptoError err;
@@ -182,7 +182,7 @@ CryptoError AES_CONTEXT_INIT(AES_CONTEXT *CONTEXT, AlgID ALG, const uint8_t *KEY
     return CRYPTO_SUCCESS;
 }
 
-void AES_CONTEXT_CLEAR(AES_CONTEXT *CONTEXT) {
+void CRYPTO_AES_CONTEXT_CLEAR(AES_CONTEXT *CONTEXT) {
     if (CONTEXT) crypto_zeroize(CONTEXT, sizeof(*CONTEXT));
 }
 
@@ -190,7 +190,7 @@ static int aes_context_valid(const AES_CONTEXT *ctx) {
     return ctx && (ctx->ROUNDS == 10u || ctx->ROUNDS == 12u || ctx->ROUNDS == 14u);
 }
 
-CryptoError AES_ENCRYPT_BLOCK(const AES_CONTEXT *CONTEXT, const uint8_t INPUT[16], uint8_t OUTPUT[16]) {
+CryptoError CRYPTO_AES_ENCRYPT_BLOCK(const AES_CONTEXT *CONTEXT, const uint8_t INPUT[16], uint8_t OUTPUT[16]) {
     uint8_t state[16];
     uint8_t round;
     if (!aes_context_valid(CONTEXT) || !INPUT || !OUTPUT) return CRYPTO_ERROR_INVALID_ARGUMENT;
@@ -210,7 +210,7 @@ CryptoError AES_ENCRYPT_BLOCK(const AES_CONTEXT *CONTEXT, const uint8_t INPUT[16
     return CRYPTO_SUCCESS;
 }
 
-CryptoError AES_DECRYPT_BLOCK(const AES_CONTEXT *CONTEXT, const uint8_t INPUT[16], uint8_t OUTPUT[16]) {
+CryptoError CRYPTO_AES_DECRYPT_BLOCK(const AES_CONTEXT *CONTEXT, const uint8_t INPUT[16], uint8_t OUTPUT[16]) {
     uint8_t state[16];
     uint8_t round;
     if (!aes_context_valid(CONTEXT) || !INPUT || !OUTPUT) return CRYPTO_ERROR_INVALID_ARGUMENT;
@@ -236,10 +236,10 @@ static CryptoError aes_oneshot_init(AES_CONTEXT *ctx, AlgID alg, const uint8_t *
     if (!ctx || !key || (!input && input_length) || (!output && input_length))
         return CRYPTO_ERROR_INVALID_ARGUMENT;
     if (output_length < input_length) return CRYPTO_ERROR_BUFFER_TOO_SMALL;
-    return AES_CONTEXT_INIT(ctx, alg, key, key_length);
+    return CRYPTO_AES_CONTEXT_INIT(ctx, alg, key, key_length);
 }
 
-CryptoError AES_ECB_ENCRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
+CryptoError CRYPTO_AES_ECB_ENCRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
                             const uint8_t *INPUT, size_t INPUT_LENGTH,
                             uint8_t *OUTPUT, size_t OUTPUT_LENGTH) {
     AES_CONTEXT ctx;
@@ -249,14 +249,14 @@ CryptoError AES_ECB_ENCRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
     err = aes_oneshot_init(&ctx, ALG, KEY, KEY_LENGTH, INPUT, INPUT_LENGTH, OUTPUT, OUTPUT_LENGTH);
     if (err != CRYPTO_SUCCESS) return err;
     for (offset = 0u; offset < INPUT_LENGTH; offset += AES_BLOCK_SIZE) {
-        err = AES_ENCRYPT_BLOCK(&ctx, INPUT + offset, OUTPUT + offset);
+        err = CRYPTO_AES_ENCRYPT_BLOCK(&ctx, INPUT + offset, OUTPUT + offset);
         if (err != CRYPTO_SUCCESS) break;
     }
-    AES_CONTEXT_CLEAR(&ctx);
+    CRYPTO_AES_CONTEXT_CLEAR(&ctx);
     return err;
 }
 
-CryptoError AES_ECB_DECRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
+CryptoError CRYPTO_AES_ECB_DECRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
                             const uint8_t *INPUT, size_t INPUT_LENGTH,
                             uint8_t *OUTPUT, size_t OUTPUT_LENGTH) {
     AES_CONTEXT ctx;
@@ -266,14 +266,14 @@ CryptoError AES_ECB_DECRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
     err = aes_oneshot_init(&ctx, ALG, KEY, KEY_LENGTH, INPUT, INPUT_LENGTH, OUTPUT, OUTPUT_LENGTH);
     if (err != CRYPTO_SUCCESS) return err;
     for (offset = 0u; offset < INPUT_LENGTH; offset += AES_BLOCK_SIZE) {
-        err = AES_DECRYPT_BLOCK(&ctx, INPUT + offset, OUTPUT + offset);
+        err = CRYPTO_AES_DECRYPT_BLOCK(&ctx, INPUT + offset, OUTPUT + offset);
         if (err != CRYPTO_SUCCESS) break;
     }
-    AES_CONTEXT_CLEAR(&ctx);
+    CRYPTO_AES_CONTEXT_CLEAR(&ctx);
     return err;
 }
 
-CryptoError AES_CBC_ENCRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
+CryptoError CRYPTO_AES_CBC_ENCRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
                             const uint8_t IV[16], const uint8_t *INPUT, size_t INPUT_LENGTH,
                             uint8_t *OUTPUT, size_t OUTPUT_LENGTH) {
     AES_CONTEXT ctx;
@@ -286,17 +286,17 @@ CryptoError AES_CBC_ENCRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
     memcpy(chain, IV, 16u);
     for (offset = 0u; offset < INPUT_LENGTH; offset += 16u) {
         for (i = 0u; i < 16u; ++i) block[i] = (uint8_t)(INPUT[offset + i] ^ chain[i]);
-        err = AES_ENCRYPT_BLOCK(&ctx, block, OUTPUT + offset);
+        err = CRYPTO_AES_ENCRYPT_BLOCK(&ctx, block, OUTPUT + offset);
         if (err != CRYPTO_SUCCESS) break;
         memcpy(chain, OUTPUT + offset, 16u);
     }
     crypto_zeroize(block, sizeof(block));
     crypto_zeroize(chain, sizeof(chain));
-    AES_CONTEXT_CLEAR(&ctx);
+    CRYPTO_AES_CONTEXT_CLEAR(&ctx);
     return err;
 }
 
-CryptoError AES_CBC_DECRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
+CryptoError CRYPTO_AES_CBC_DECRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
                             const uint8_t IV[16], const uint8_t *INPUT, size_t INPUT_LENGTH,
                             uint8_t *OUTPUT, size_t OUTPUT_LENGTH) {
     AES_CONTEXT ctx;
@@ -309,7 +309,7 @@ CryptoError AES_CBC_DECRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
     memcpy(chain, IV, 16u);
     for (offset = 0u; offset < INPUT_LENGTH; offset += 16u) {
         memcpy(cipher_block, INPUT + offset, 16u);
-        err = AES_DECRYPT_BLOCK(&ctx, cipher_block, block);
+        err = CRYPTO_AES_DECRYPT_BLOCK(&ctx, cipher_block, block);
         if (err != CRYPTO_SUCCESS) break;
         for (i = 0u; i < 16u; ++i) OUTPUT[offset + i] = (uint8_t)(block[i] ^ chain[i]);
         memcpy(chain, cipher_block, 16u);
@@ -317,7 +317,7 @@ CryptoError AES_CBC_DECRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
     crypto_zeroize(cipher_block, sizeof(cipher_block));
     crypto_zeroize(block, sizeof(block));
     crypto_zeroize(chain, sizeof(chain));
-    AES_CONTEXT_CLEAR(&ctx);
+    CRYPTO_AES_CONTEXT_CLEAR(&ctx);
     return err;
 }
 
@@ -329,7 +329,7 @@ static void increment_counter128(uint8_t counter[16]) {
     }
 }
 
-CryptoError AES_CTR_CRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
+CryptoError CRYPTO_AES_CTR_CRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
                           const uint8_t INITIAL_COUNTER[16], const uint8_t *INPUT, size_t INPUT_LENGTH,
                           uint8_t *OUTPUT, size_t OUTPUT_LENGTH) {
     AES_CONTEXT ctx;
@@ -341,7 +341,7 @@ CryptoError AES_CTR_CRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
     if (err != CRYPTO_SUCCESS) return err;
     memcpy(counter, INITIAL_COUNTER, 16u);
     while (offset < INPUT_LENGTH) {
-        err = AES_ENCRYPT_BLOCK(&ctx, counter, stream);
+        err = CRYPTO_AES_ENCRYPT_BLOCK(&ctx, counter, stream);
         if (err != CRYPTO_SUCCESS) break;
         chunk = INPUT_LENGTH - offset;
         if (chunk > 16u) chunk = 16u;
@@ -351,6 +351,6 @@ CryptoError AES_CTR_CRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
     }
     crypto_zeroize(stream, sizeof(stream));
     crypto_zeroize(counter, sizeof(counter));
-    AES_CONTEXT_CLEAR(&ctx);
+    CRYPTO_AES_CONTEXT_CLEAR(&ctx);
     return err;
 }

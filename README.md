@@ -8,48 +8,48 @@ A portable C11 cryptography library that collects the algorithms and reusable pr
 
 ```text
 .
-├── CMakeLists.txt
-├── LICENSE
-├── THIRD_PARTY_NOTICES.md
-├── include/                 # public API only
-│   ├── CRYPTO.h
-│   ├── ALGID.h
-│   ├── ERROR.h
-│   ├── AES.h
-│   ├── CTR_DRBG.h
-│   ├── BIGNUM.h
-│   ├── PRIME.h
-│   ├── RSA.h
-│   ├── ELGAMAL.h
-│   ├── SHA3.h
-│   ├── HASH.h
-│   ├── RANDOM.h
-│   ├── ENDIAN.h
-│   ├── NTT.h
-│   ├── ML_KEM.h
-│   ├── ML_DSA.h
-│   └── SLH_DSA.h
-├── src/
-│   ├── AES/
-│   ├── BIGNUM/
-│   ├── CORE/
-│   ├── DRBG/
-│   ├── ELGAMAL/
-│   ├── ENDIAN/
-│   ├── HASH/
-│   ├── INTERNAL/
-│   ├── ML_KEM/
-│   ├── ML_DSA/
-│   ├── NTT/
-│   ├── PRIME/
-│   ├── RANDOM/
-│   ├── RSA/
-│   ├── SHA3/
-│   └── SLH_DSA/
-├── third_party/
-│   ├── mldsa-native/        # pinned FIPS 204 backend
-│   └── slhdsa-c/            # pinned FIPS 205 backend
-└── tests/
+????? CMakeLists.txt
+????? LICENSE
+????? THIRD_PARTY_NOTICES.md
+????? include/                 # public API only
+??  ????? CRYPTO.h
+??  ????? ALGID.h
+??  ????? ERROR.h
+??  ????? AES.h
+??  ????? CTR_DRBG.h
+??  ????? BIGNUM.h
+??  ????? PRIME.h
+??  ????? RSA.h
+??  ????? ELGAMAL.h
+??  ????? SHA3.h
+??  ????? HASH.h
+??  ????? RANDOM.h
+??  ????? ENDIAN.h
+??  ????? NTT.h
+??  ????? ML_KEM.h
+??  ????? ML_DSA.h
+??  ????? SLH_DSA.h
+????? src/
+??  ????? AES/
+??  ????? BIGNUM/
+??  ????? CORE/
+??  ????? DRBG/
+??  ????? ELGAMAL/
+??  ????? ENDIAN/
+??  ????? CRYPTO_HASH/
+??  ????? INTERNAL/
+??  ????? ML_KEM/
+??  ????? ML_DSA/
+??  ????? NTT/
+??  ????? PRIME/
+??  ????? RANDOM/
+??  ????? RSA/
+??  ????? SHA3/
+??  ????? SLH_DSA/
+????? third_party/
+??  ????? mldsa-native/        # pinned FIPS 204 backend
+??  ????? slhdsa-c/            # pinned FIPS 205 backend
+????? tests/
 ```
 
 All implementation/internal headers live below `src/`. Public consumers should include headers only from `include/`, usually just:
@@ -88,8 +88,8 @@ On Windows the shared library links `bcrypt` for `BCryptGenRandom`. Linux uses `
 |---|---:|---|
 | `ALG_HASH_SHA3_256` | `0x0101` | SHA3-256 |
 | `ALG_HASH_SHA3_512` | `0x0102` | SHA3-512 |
-| `ALG_HASH_SHAKE128` | `0x0111` | SHAKE128 |
-| `ALG_HASH_SHAKE256` | `0x0112` | SHAKE256 |
+| `ALG_HASH_SHAKE128` | `0x0111` | CRYPTO_SHAKE128 |
+| `ALG_HASH_SHAKE256` | `0x0112` | CRYPTO_SHAKE256 |
 | `ALG_ML_KEM_512` | `0x1001` | ML-KEM-512 |
 | `ALG_ML_KEM_768` | `0x1002` | ML-KEM-768 |
 | `ALG_ML_KEM_1024` | `0x1003` | ML-KEM-1024 |
@@ -121,11 +121,11 @@ On Windows the shared library links `bcrypt` for `BCryptGenRandom`. Linux uses `
 | `ALG_SLH_DSA_SHAKE_256S` | `0x8015` | SLH-DSA-SHAKE-256s |
 | `ALG_SLH_DSA_SHAKE_256F` | `0x8016` | SLH-DSA-SHAKE-256f |
 
-`ALGID_NAME()` returns a printable name for an identifier.
+`CRYPTO_ALGID_NAME()` returns a printable name for an identifier.
 
 ## AES
 
-AES supports 128-, 192-, and 256-bit keys through the same `AlgID`-selected API. `AES_KEY_SIZE()` returns the required key size for a selected AES identifier.
+AES supports 128-, 192-, and 256-bit keys through the same `AlgID`-selected API. `CRYPTO_AES_KEY_SIZE()` returns the required key size for a selected AES identifier.
 
 Low-level context/block API:
 
@@ -133,10 +133,10 @@ Low-level context/block API:
 AES_CONTEXT ctx;
 uint8_t out[AES_BLOCK_SIZE];
 
-CryptoError err = AES_CONTEXT_INIT(&ctx, ALG_AES_256, key, key_len);
+CryptoError err = CRYPTO_AES_CONTEXT_INIT(&ctx, ALG_AES_256, key, key_len);
 if (err == CRYPTO_SUCCESS)
-    err = AES_ENCRYPT_BLOCK(&ctx, plaintext_block, out);
-AES_CONTEXT_CLEAR(&ctx);
+    err = CRYPTO_AES_ENCRYPT_BLOCK(&ctx, plaintext_block, out);
+CRYPTO_AES_CONTEXT_CLEAR(&ctx);
 ```
 
 The portable AES core deliberately does not contain byte-indexed S-box or T-tables. The S-box and inverse S-box are computed algebraically in `GF(2^8)` using a fixed operation pattern, and finite-field multiplication performs a fixed eight iterations with masking instead of secret-dependent branches. This removes the classic cache-line leakage caused by `SBOX[secret_byte]`-style accesses.
@@ -145,16 +145,16 @@ This is **cache-timing hardening**, not a claim that the implementation is unive
 
 One-shot confidentiality-only modes are also provided:
 
-- `AES_ECB_ENCRYPT` / `AES_ECB_DECRYPT`
-- `AES_CBC_ENCRYPT` / `AES_CBC_DECRYPT`
-- `AES_CTR_CRYPT`
+- `CRYPTO_AES_ECB_ENCRYPT` / `CRYPTO_AES_ECB_DECRYPT`
+- `CRYPTO_AES_CBC_ENCRYPT` / `CRYPTO_AES_CBC_DECRYPT`
+- `CRYPTO_AES_CTR_CRYPT`
 
 ECB and CBC require `INPUT_LENGTH` to be a multiple of 16 bytes and **do not add or remove padding**. CTR accepts arbitrary lengths and uses a 128-bit big-endian counter increment. CBC and CTR require the caller to provide the IV/initial counter.
 
 For authenticated encryption, use the AEAD APIs:
 
-- `AES_GCM_ENCRYPT` / `AES_GCM_DECRYPT`
-- `AES_CCM_ENCRYPT` / `AES_CCM_DECRYPT`
+- `CRYPTO_AES_GCM_ENCRYPT` / `CRYPTO_AES_GCM_DECRYPT`
+- `CRYPTO_AES_CCM_ENCRYPT` / `CRYPTO_AES_CCM_DECRYPT`
 
 GCM accepts an explicit IV and AAD. A 12-byte IV is the recommended/common fast path. CCM accepts nonce lengths from 7 through 13 bytes and even tag lengths from 4 through 16 bytes. Both APIs return ciphertext and authentication tag separately. Decryption returns `CRYPTO_ERROR_AUTHENTICATION_FAILED` if the tag does not verify and clears the caller's plaintext output range on failure.
 
@@ -162,7 +162,7 @@ GCM accepts an explicit IV and AAD. A 12-byte IV is the recommended/common fast 
 uint8_t ciphertext[plaintext_len];
 uint8_t tag[16];
 
-CryptoError err = AES_GCM_ENCRYPT(
+CryptoError err = CRYPTO_AES_GCM_ENCRYPT(
     ALG_AES_256,
     key, 32,
     nonce, nonce_len,
@@ -184,13 +184,13 @@ The test suite includes AES-128/192/256 FIPS-197 known-answer vectors, SP 800-38
 
 Public operations:
 
-- `CTR_DRBG_INSTANTIATE`
-- `CTR_DRBG_INSTANTIATE_OS`
-- `CTR_DRBG_RESEED`
-- `CTR_DRBG_RESEED_OS`
-- `CTR_DRBG_GENERATE`
-- `CTR_DRBG_CLEAR`
-- `CTR_DRBG_SEED_SIZE`
+- `CRYPTO_CTR_DRBG_INSTANTIATE`
+- `CRYPTO_CTR_DRBG_INSTANTIATE_OS`
+- `CRYPTO_CTR_DRBG_RESEED`
+- `CRYPTO_CTR_DRBG_RESEED_OS`
+- `CRYPTO_CTR_DRBG_GENERATE`
+- `CRYPTO_CTR_DRBG_CLEAR`
+- `CRYPTO_CTR_DRBG_SEED_SIZE`
 
 Example using the OS entropy source and AES-256 with `Block_Cipher_df`:
 
@@ -198,27 +198,27 @@ Example using the OS entropy source and AES-256 with `Block_Cipher_df`:
 CTR_DRBG_CONTEXT drbg;
 uint8_t random_bytes[64];
 
-CryptoError err = CTR_DRBG_INSTANTIATE_OS(
+CryptoError err = CRYPTO_CTR_DRBG_INSTANTIATE_OS(
     &drbg,
     ALG_CTR_DRBG_AES_256_DF,
     (const uint8_t *)"application-v1", 14);
 
 if (err == CRYPTO_SUCCESS) {
-    err = CTR_DRBG_GENERATE(
+    err = CRYPTO_CTR_DRBG_GENERATE(
         &drbg,
         random_bytes, sizeof(random_bytes),
         NULL, 0,
         0);
 }
 
-CTR_DRBG_CLEAR(&drbg);
+CRYPTO_CTR_DRBG_CLEAR(&drbg);
 ```
 
-For `*_DF`, entropy, nonce, personalization, reseed material, and additional input are conditioned with `Block_Cipher_df` as required by the construction. The direct instantiate API requires at least the selected AES security strength of entropy and sufficient combined entropy+nonce input; `CTR_DRBG_INSTANTIATE_OS` obtains appropriate entropy/nonce bytes through `RANDOM_BYTES`.
+For `*_DF`, entropy, nonce, personalization, reseed material, and additional input are conditioned with `Block_Cipher_df` as required by the construction. The direct instantiate API requires at least the selected AES security strength of entropy and sufficient combined entropy+nonce input; `CRYPTO_CTR_DRBG_INSTANTIATE_OS` obtains appropriate entropy/nonce bytes through `CRYPTO_RANDOM_BYTES`.
 
 For `*_NO_DF`, instantiation requires a full-entropy input exactly equal to `seedlen = keylen + 128 bits`; no nonce is used. Personalization and additional input are zero-padded/XORed to `seedlen` and therefore may not exceed `seedlen`.
 
-`CTR_DRBG_GENERATE` limits one request to 65,536 bytes. The reseed interval is `2^48` requests; once exceeded, generation returns `CRYPTO_ERROR_RESEED_REQUIRED`. Setting the prediction-resistance argument requests a fresh OS-backed reseed before generation.
+`CRYPTO_CTR_DRBG_GENERATE` limits one request to 65,536 bytes. The reseed interval is `2^48` requests; once exceeded, generation returns `CRYPTO_ERROR_RESEED_REQUIRED`. Setting the prediction-resistance argument requests a fresh OS-backed reseed before generation.
 
 The DRBG counter state `V` is incremented with a fixed 16-byte loop rather than a carry-dependent early exit. The tests include a NIST CAVP AES-256 no-DF known-answer vector that checks instantiate state, generated bytes, final `Key`, final `V`, and the reseed counter, plus deterministic DF-path checks for AES-128/192/256.
 
@@ -236,7 +236,7 @@ The AES, GCM/CCM, CTR_DRBG, and post-quantum signature wrappers explicitly clear
 - DRBG OS entropy/nonce buffers after instantiate or reseed
 - ML-DSA key-generation seeds, signing randomness, and domain-separation temporary buffers
 - SLH-DSA key-generation seed material and per-signature additional randomness
-- the complete DRBG context when `CTR_DRBG_CLEAR()` is called
+- the complete DRBG context when `CRYPTO_CTR_DRBG_CLEAR()` is called
 
 Authentication-failure paths in GCM/CCM continue to clear the caller-visible plaintext output range.
 
@@ -246,9 +246,9 @@ The same public API selects the ML-KEM parameter set using `AlgID`:
 
 ```c
 AlgID alg = ALG_ML_KEM_768;
-size_t pk_len = ML_KEM_PUBLIC_KEY_SIZE(alg);
-size_t sk_len = ML_KEM_PRIVATE_KEY_SIZE(alg);
-size_t ct_len = ML_KEM_CIPHERTEXT_SIZE(alg);
+size_t pk_len = CRYPTO_ML_KEM_PUBLIC_KEY_SIZE(alg);
+size_t sk_len = CRYPTO_ML_KEM_PRIVATE_KEY_SIZE(alg);
+size_t ct_len = CRYPTO_ML_KEM_CIPHERTEXT_SIZE(alg);
 
 uint8_t *pk = malloc(pk_len);
 uint8_t *sk = malloc(sk_len);
@@ -256,11 +256,11 @@ uint8_t *ct = malloc(ct_len);
 uint8_t ss1[ML_KEM_SHARED_SECRET_BYTES];
 uint8_t ss2[ML_KEM_SHARED_SECRET_BYTES];
 
-CryptoError err = ML_KEM_KEYGEN(alg, pk, pk_len, sk, sk_len);
+CryptoError err = CRYPTO_ML_KEM_KEYGEN(alg, pk, pk_len, sk, sk_len);
 if (err == CRYPTO_SUCCESS)
-    err = ML_KEM_ENCAPS(alg, pk, pk_len, ss1, ct, ct_len);
+    err = CRYPTO_ML_KEM_ENCAPS(alg, pk, pk_len, ss1, ct, ct_len);
 if (err == CRYPTO_SUCCESS)
-    err = ML_KEM_DECAPS(alg, sk, sk_len, ct, ct_len, ss2);
+    err = CRYPTO_ML_KEM_DECAPS(alg, sk, sk_len, ct, ct_len, ss2);
 ```
 
 The three ML-KEM variants are built from the same implementation sources with separate parameter definitions and private symbol namespaces, then selected by the public dispatch layer.
@@ -269,9 +269,9 @@ The three ML-KEM variants are built from the same implementation sources with se
 
 ML-DSA follows FIPS 204 and exposes ML-DSA-44, ML-DSA-65, and ML-DSA-87 through one `AlgID`-selected API. Buffer sizes are queried before allocation with:
 
-- `ML_DSA_PUBLIC_KEY_SIZE`
-- `ML_DSA_PRIVATE_KEY_SIZE`
-- `ML_DSA_SIGNATURE_SIZE`
+- `CRYPTO_ML_DSA_PUBLIC_KEY_SIZE`
+- `CRYPTO_ML_DSA_PRIVATE_KEY_SIZE`
+- `CRYPTO_ML_DSA_SIGNATURE_SIZE`
 
 The three parameter sets use the following serialized sizes:
 
@@ -285,24 +285,24 @@ Example:
 
 ```c
 AlgID alg = ALG_ML_DSA_65;
-size_t pk_len = ML_DSA_PUBLIC_KEY_SIZE(alg);
-size_t sk_len = ML_DSA_PRIVATE_KEY_SIZE(alg);
-size_t sig_len = ML_DSA_SIGNATURE_SIZE(alg);
+size_t pk_len = CRYPTO_ML_DSA_PUBLIC_KEY_SIZE(alg);
+size_t sk_len = CRYPTO_ML_DSA_PRIVATE_KEY_SIZE(alg);
+size_t sig_len = CRYPTO_ML_DSA_SIGNATURE_SIZE(alg);
 
 uint8_t *pk = malloc(pk_len);
 uint8_t *sk = malloc(sk_len);
 uint8_t *sig = malloc(sig_len);
 
-CryptoError err = ML_DSA_KEYGEN(alg, pk, pk_len, sk, sk_len);
+CryptoError err = CRYPTO_ML_DSA_KEYGEN(alg, pk, pk_len, sk, sk_len);
 if (err == CRYPTO_SUCCESS)
-    err = ML_DSA_SIGN(alg, sk, sk_len, message, message_len,
+    err = CRYPTO_ML_DSA_SIGN(alg, sk, sk_len, message, message_len,
                       context, context_len, sig, sig_len);
 if (err == CRYPTO_SUCCESS)
-    err = ML_DSA_VERIFY(alg, pk, pk_len, message, message_len,
+    err = CRYPTO_ML_DSA_VERIFY(alg, pk, pk_len, message, message_len,
                         context, context_len, sig, sig_len);
 ```
 
-The FIPS 204 context string may be empty and is limited to 255 bytes. Key generation and randomized signing obtain randomness through the library's `RANDOM_BYTES` OS-CSPRNG abstraction. Verification failures return `CRYPTO_ERROR_SIGNATURE_INVALID`.
+The FIPS 204 context string may be empty and is limited to 255 bytes. Key generation and randomized signing obtain randomness through the library's `CRYPTO_RANDOM_BYTES` OS-CSPRNG abstraction. Verification failures return `CRYPTO_ERROR_SIGNATURE_INVALID`.
 
 The backend is the pinned `mldsa-native` implementation documented in `THIRD_PARTY_NOTICES.md`. A local multi-level adapter builds the same portable source for all three parameter sets with private namespaced symbols, while the public wrapper performs `AlgID` dispatch.
 
@@ -317,7 +317,7 @@ SLH-DSA follows FIPS 205. All twelve approved parameter sets are available dynam
 - SHAKE-192s / SHAKE-192f
 - SHAKE-256s / SHAKE-256f
 
-Use `SLH_DSA_PUBLIC_KEY_SIZE`, `SLH_DSA_PRIVATE_KEY_SIZE`, and `SLH_DSA_SIGNATURE_SIZE` to size buffers for the chosen `AlgID`, then call `SLH_DSA_KEYGEN`, `SLH_DSA_SIGN`, and `SLH_DSA_VERIFY`.
+Use `CRYPTO_SLH_DSA_PUBLIC_KEY_SIZE`, `CRYPTO_SLH_DSA_PRIVATE_KEY_SIZE`, and `CRYPTO_SLH_DSA_SIGNATURE_SIZE` to size buffers for the chosen `AlgID`, then call `CRYPTO_SLH_DSA_KEYGEN`, `CRYPTO_SLH_DSA_SIGN`, and `CRYPTO_SLH_DSA_VERIFY`.
 
 | Strength/variant | Public key | Private key | Signature |
 |---|---:|---:|---:|
@@ -328,7 +328,7 @@ Use `SLH_DSA_PUBLIC_KEY_SIZE`, `SLH_DSA_PRIVATE_KEY_SIZE`, and `SLH_DSA_SIGNATUR
 | 256s | 64 | 128 | 29792 |
 | 256f | 64 | 128 | 49856 |
 
-SHA2 and SHAKE variants at the same strength/speed setting have the same serialized sizes. The FIPS 205 context string is limited to 255 bytes. Key-generation seeds and per-signature additional randomness are drawn through `RANDOM_BYTES`; invalid signatures return `CRYPTO_ERROR_SIGNATURE_INVALID`.
+SHA2 and SHAKE variants at the same strength/speed setting have the same serialized sizes. The FIPS 205 context string is limited to 255 bytes. Key-generation seeds and per-signature additional randomness are drawn through `CRYPTO_RANDOM_BYTES`; invalid signatures return `CRYPTO_ERROR_SIGNATURE_INVALID`.
 
 The backend is the pinned portable `slhdsa-c` implementation. The test suite performs keygen/sign/verify plus tampered-signature rejection for every one of the 12 `AlgID` values.
 
@@ -336,15 +336,15 @@ The backend is the pinned portable `slhdsa-c` implementation. The test suite per
 
 ```c
 uint8_t digest[32];
-CryptoError err = HASH(
+CryptoError err = CRYPTO_HASH(
     ALG_HASH_SHA3_256,
     (const uint8_t *)"abc", 3,
     digest, sizeof(digest));
 ```
 
-For SHA3-256/512, `HASH_OUTPUT_SIZE()` returns 32/64. SHAKE is an XOF, so `HASH_OUTPUT_SIZE()` returns zero and the caller selects `OUTPUT_LENGTH`.
+For SHA3-256/512, `CRYPTO_HASH_OUTPUT_SIZE()` returns 32/64. SHAKE is an XOF, so `CRYPTO_HASH_OUTPUT_SIZE()` returns zero and the caller selects `OUTPUT_LENGTH`.
 
-The lower-level `SHA3_256`, `SHA3_512`, `SHAKE128`, `SHAKE256` and incremental SHAKE context APIs are also public.
+The lower-level `CRYPTO_SHA3_256`, `CRYPTO_SHA3_512`, `CRYPTO_SHAKE128`, `CRYPTO_SHAKE256` and incremental SHAKE context APIs are also public.
 
 ## Big numbers and primes
 
@@ -354,17 +354,17 @@ Byte conversion is explicit about byte order:
 
 ```c
 BIGNUM n;
-BIGNUM_INIT(&n);
-BIGNUM_FROM_BYTES_BE(&n, input, input_len);
-BIGNUM_TO_BYTES_BE(&n, output, output_len);
-BIGNUM_FREE(&n);
+CRYPTO_BIGNUM_INIT(&n);
+CRYPTO_BIGNUM_FROM_BYTES_BE(&n, input, input_len);
+CRYPTO_BIGNUM_TO_BYTES_BE(&n, output, output_len);
+CRYPTO_BIGNUM_FREE(&n);
 ```
 
 The common prime module provides OS-CSPRNG-backed Miller-Rabin prime generation:
 
-- `PRIME_IS_PROBABLE`
-- `PRIME_GENERATE`
-- `PRIME_GENERATE_SAFE`
+- `CRYPTO_PRIME_IS_PROBABLE`
+- `CRYPTO_PRIME_GENERATE`
+- `CRYPTO_PRIME_GENERATE_SAFE`
 
 RSA and ElGamal use this common prime/BigNum layer rather than native `int` arithmetic or `rand()`.
 
@@ -375,16 +375,16 @@ RSA keys contain `BIGNUM` members and support large modulus sizes such as 2048 b
 ```c
 RSA_PUBLIC_KEY pub;
 RSA_PRIVATE_KEY priv;
-RSA_PUBLIC_KEY_INIT(&pub);
-RSA_PRIVATE_KEY_INIT(&priv);
+CRYPTO_RSA_PUBLIC_KEY_INIT(&pub);
+CRYPTO_RSA_PRIVATE_KEY_INIT(&priv);
 
-CryptoError err = RSA_KEYGEN(ALG_RSA_RAW, &pub, &priv, 2048, 32);
+CryptoError err = CRYPTO_RSA_KEYGEN(ALG_RSA_RAW, &pub, &priv, 2048, 32);
 
-RSA_PUBLIC_KEY_FREE(&pub);
-RSA_PRIVATE_KEY_FREE(&priv);
+CRYPTO_RSA_PUBLIC_KEY_FREE(&pub);
+CRYPTO_RSA_PRIVATE_KEY_FREE(&priv);
 ```
 
-`RSA_ENCRYPT` and `RSA_DECRYPT` operate on `BIGNUM` values and reject messages outside the modulus range.
+`CRYPTO_RSA_ENCRYPT` and `CRYPTO_RSA_DECRYPT` operate on `BIGNUM` values and reject messages outside the modulus range.
 
 ## Portable integer/length types
 

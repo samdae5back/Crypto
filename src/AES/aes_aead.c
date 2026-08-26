@@ -112,7 +112,7 @@ static CryptoError gcm_tag(const AES_CONTEXT *ctx, const uint8_t h[16], const ui
     store64_be(lengths, aad_bits);
     store64_be(lengths + 8u, ct_bits);
     ghash_block(y, h, lengths);
-    if (AES_ENCRYPT_BLOCK(ctx, j0, s) != CRYPTO_SUCCESS) return CRYPTO_ERROR_INTERNAL;
+    if (CRYPTO_AES_ENCRYPT_BLOCK(ctx, j0, s) != CRYPTO_SUCCESS) return CRYPTO_ERROR_INTERNAL;
     for (i = 0; i < 16u; ++i) tag[i] = (uint8_t)(s[i] ^ y[i]);
     crypto_zeroize(y, sizeof(y));
     crypto_zeroize(lengths, sizeof(lengths));
@@ -126,7 +126,7 @@ static CryptoError gcm_ctr(const AES_CONTEXT *ctx, const uint8_t j0[16], const u
     memcpy(counter, j0, 16u);
     while (offset < length) {
         gcm_inc32(counter);
-        if (AES_ENCRYPT_BLOCK(ctx, counter, stream) != CRYPTO_SUCCESS) {
+        if (CRYPTO_AES_ENCRYPT_BLOCK(ctx, counter, stream) != CRYPTO_SUCCESS) {
             crypto_zeroize(counter, sizeof(counter));
             crypto_zeroize(stream, sizeof(stream));
             return CRYPTO_ERROR_INTERNAL;
@@ -141,7 +141,7 @@ static CryptoError gcm_ctr(const AES_CONTEXT *ctx, const uint8_t j0[16], const u
     return CRYPTO_SUCCESS;
 }
 
-CryptoError AES_GCM_ENCRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
+CryptoError CRYPTO_AES_GCM_ENCRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
                             const uint8_t *IV, size_t IV_LENGTH,
                             const uint8_t *AAD, size_t AAD_LENGTH,
                             const uint8_t *INPUT, size_t INPUT_LENGTH,
@@ -154,21 +154,21 @@ CryptoError AES_GCM_ENCRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
         return CRYPTO_ERROR_INVALID_ARGUMENT;
     if (IV_LENGTH == 0u || TAG_LENGTH < 4u || TAG_LENGTH > 16u) return CRYPTO_ERROR_INVALID_ARGUMENT;
     if (OUTPUT_LENGTH < INPUT_LENGTH) return CRYPTO_ERROR_BUFFER_TOO_SMALL;
-    err = AES_CONTEXT_INIT(&ctx, ALG, KEY, KEY_LENGTH);
+    err = CRYPTO_AES_CONTEXT_INIT(&ctx, ALG, KEY, KEY_LENGTH);
     if (err != CRYPTO_SUCCESS) return err;
-    err = AES_ENCRYPT_BLOCK(&ctx, h, h);
+    err = CRYPTO_AES_ENCRYPT_BLOCK(&ctx, h, h);
     if (err == CRYPTO_SUCCESS) err = gcm_make_j0(h, IV, IV_LENGTH, j0);
     if (err == CRYPTO_SUCCESS) err = gcm_ctr(&ctx, j0, INPUT, INPUT_LENGTH, OUTPUT);
     if (err == CRYPTO_SUCCESS) err = gcm_tag(&ctx, h, j0, AAD, AAD_LENGTH, OUTPUT, INPUT_LENGTH, full_tag);
     if (err == CRYPTO_SUCCESS) memcpy(TAG, full_tag, TAG_LENGTH);
-    AES_CONTEXT_CLEAR(&ctx);
+    CRYPTO_AES_CONTEXT_CLEAR(&ctx);
     crypto_zeroize(h, sizeof(h));
     crypto_zeroize(j0, sizeof(j0));
     crypto_zeroize(full_tag, sizeof(full_tag));
     return err;
 }
 
-CryptoError AES_GCM_DECRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
+CryptoError CRYPTO_AES_GCM_DECRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
                             const uint8_t *IV, size_t IV_LENGTH,
                             const uint8_t *AAD, size_t AAD_LENGTH,
                             const uint8_t *INPUT, size_t INPUT_LENGTH,
@@ -181,15 +181,15 @@ CryptoError AES_GCM_DECRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
         return CRYPTO_ERROR_INVALID_ARGUMENT;
     if (IV_LENGTH == 0u || TAG_LENGTH < 4u || TAG_LENGTH > 16u) return CRYPTO_ERROR_INVALID_ARGUMENT;
     if (OUTPUT_LENGTH < INPUT_LENGTH) return CRYPTO_ERROR_BUFFER_TOO_SMALL;
-    err = AES_CONTEXT_INIT(&ctx, ALG, KEY, KEY_LENGTH);
+    err = CRYPTO_AES_CONTEXT_INIT(&ctx, ALG, KEY, KEY_LENGTH);
     if (err != CRYPTO_SUCCESS) return err;
-    err = AES_ENCRYPT_BLOCK(&ctx, h, h);
+    err = CRYPTO_AES_ENCRYPT_BLOCK(&ctx, h, h);
     if (err == CRYPTO_SUCCESS) err = gcm_make_j0(h, IV, IV_LENGTH, j0);
     if (err == CRYPTO_SUCCESS) err = gcm_tag(&ctx, h, j0, AAD, AAD_LENGTH, INPUT, INPUT_LENGTH, full_tag);
     if (err == CRYPTO_SUCCESS && !constant_time_equal(full_tag, TAG, TAG_LENGTH)) err = CRYPTO_ERROR_AUTHENTICATION_FAILED;
     if (err == CRYPTO_SUCCESS) err = gcm_ctr(&ctx, j0, INPUT, INPUT_LENGTH, OUTPUT);
     if (err != CRYPTO_SUCCESS && OUTPUT && INPUT_LENGTH) crypto_zeroize(OUTPUT, INPUT_LENGTH);
-    AES_CONTEXT_CLEAR(&ctx);
+    CRYPTO_AES_CONTEXT_CLEAR(&ctx);
     crypto_zeroize(h, sizeof(h));
     crypto_zeroize(j0, sizeof(j0));
     crypto_zeroize(full_tag, sizeof(full_tag));
@@ -212,7 +212,7 @@ static int ccm_length_fits(size_t q, size_t length) {
 static CryptoError ccm_mac_block(const AES_CONTEXT *ctx, uint8_t state[16], const uint8_t block[16]) {
     uint8_t x[16];
     xor_block(x, state, block);
-    if (AES_ENCRYPT_BLOCK(ctx, x, state) != CRYPTO_SUCCESS) {
+    if (CRYPTO_AES_ENCRYPT_BLOCK(ctx, x, state) != CRYPTO_SUCCESS) {
         crypto_zeroize(x, sizeof(x));
         return CRYPTO_ERROR_INTERNAL;
     }
@@ -310,7 +310,7 @@ static CryptoError ccm_ctr(const AES_CONTEXT *ctx, const uint8_t *nonce, size_t 
     size_t block_index = 1u, offset = 0, chunk, i;
     while (offset < length) {
         ccm_counter_block(counter, nonce, nonce_length, block_index++);
-        if (AES_ENCRYPT_BLOCK(ctx, counter, stream) != CRYPTO_SUCCESS) {
+        if (CRYPTO_AES_ENCRYPT_BLOCK(ctx, counter, stream) != CRYPTO_SUCCESS) {
             crypto_zeroize(counter, sizeof(counter));
             crypto_zeroize(stream, sizeof(stream));
             return CRYPTO_ERROR_INTERNAL;
@@ -334,7 +334,7 @@ static CryptoError ccm_validate(const uint8_t *nonce, size_t nonce_length, size_
     return CRYPTO_SUCCESS;
 }
 
-CryptoError AES_CCM_ENCRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
+CryptoError CRYPTO_AES_CCM_ENCRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
                             const uint8_t *NONCE, size_t NONCE_LENGTH,
                             const uint8_t *AAD, size_t AAD_LENGTH,
                             const uint8_t *INPUT, size_t INPUT_LENGTH,
@@ -349,23 +349,23 @@ CryptoError AES_CCM_ENCRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
     err = ccm_validate(NONCE, NONCE_LENGTH, INPUT_LENGTH, TAG_LENGTH);
     if (err != CRYPTO_SUCCESS) return err;
     if (OUTPUT_LENGTH < INPUT_LENGTH) return CRYPTO_ERROR_BUFFER_TOO_SMALL;
-    err = AES_CONTEXT_INIT(&ctx, ALG, KEY, KEY_LENGTH);
+    err = CRYPTO_AES_CONTEXT_INIT(&ctx, ALG, KEY, KEY_LENGTH);
     if (err != CRYPTO_SUCCESS) return err;
     err = ccm_compute_mac(&ctx, NONCE, NONCE_LENGTH, AAD, AAD_LENGTH, INPUT, INPUT_LENGTH, TAG_LENGTH, mac);
     if (err == CRYPTO_SUCCESS) err = ccm_ctr(&ctx, NONCE, NONCE_LENGTH, INPUT, INPUT_LENGTH, OUTPUT);
     ccm_counter_block(ctr0, NONCE, NONCE_LENGTH, 0u);
-    if (err == CRYPTO_SUCCESS) err = AES_ENCRYPT_BLOCK(&ctx, ctr0, s0);
+    if (err == CRYPTO_SUCCESS) err = CRYPTO_AES_ENCRYPT_BLOCK(&ctx, ctr0, s0);
     if (err == CRYPTO_SUCCESS) {
         for (i = 0; i < TAG_LENGTH; ++i) TAG[i] = (uint8_t)(mac[i] ^ s0[i]);
     }
-    AES_CONTEXT_CLEAR(&ctx);
+    CRYPTO_AES_CONTEXT_CLEAR(&ctx);
     crypto_zeroize(mac, sizeof(mac));
     crypto_zeroize(ctr0, sizeof(ctr0));
     crypto_zeroize(s0, sizeof(s0));
     return err;
 }
 
-CryptoError AES_CCM_DECRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
+CryptoError CRYPTO_AES_CCM_DECRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
                             const uint8_t *NONCE, size_t NONCE_LENGTH,
                             const uint8_t *AAD, size_t AAD_LENGTH,
                             const uint8_t *INPUT, size_t INPUT_LENGTH,
@@ -380,18 +380,18 @@ CryptoError AES_CCM_DECRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
     err = ccm_validate(NONCE, NONCE_LENGTH, INPUT_LENGTH, TAG_LENGTH);
     if (err != CRYPTO_SUCCESS) return err;
     if (OUTPUT_LENGTH < INPUT_LENGTH) return CRYPTO_ERROR_BUFFER_TOO_SMALL;
-    err = AES_CONTEXT_INIT(&ctx, ALG, KEY, KEY_LENGTH);
+    err = CRYPTO_AES_CONTEXT_INIT(&ctx, ALG, KEY, KEY_LENGTH);
     if (err != CRYPTO_SUCCESS) return err;
     err = ccm_ctr(&ctx, NONCE, NONCE_LENGTH, INPUT, INPUT_LENGTH, OUTPUT);
     if (err == CRYPTO_SUCCESS) err = ccm_compute_mac(&ctx, NONCE, NONCE_LENGTH, AAD, AAD_LENGTH, OUTPUT, INPUT_LENGTH, TAG_LENGTH, mac);
     ccm_counter_block(ctr0, NONCE, NONCE_LENGTH, 0u);
-    if (err == CRYPTO_SUCCESS) err = AES_ENCRYPT_BLOCK(&ctx, ctr0, s0);
+    if (err == CRYPTO_SUCCESS) err = CRYPTO_AES_ENCRYPT_BLOCK(&ctx, ctr0, s0);
     if (err == CRYPTO_SUCCESS) {
         for (i = 0; i < TAG_LENGTH; ++i) expected[i] = (uint8_t)(mac[i] ^ s0[i]);
         if (!constant_time_equal(expected, TAG, TAG_LENGTH)) err = CRYPTO_ERROR_AUTHENTICATION_FAILED;
     }
     if (err != CRYPTO_SUCCESS && OUTPUT && INPUT_LENGTH) crypto_zeroize(OUTPUT, INPUT_LENGTH);
-    AES_CONTEXT_CLEAR(&ctx);
+    CRYPTO_AES_CONTEXT_CLEAR(&ctx);
     crypto_zeroize(mac, sizeof(mac));
     crypto_zeroize(ctr0, sizeof(ctr0));
     crypto_zeroize(s0, sizeof(s0));

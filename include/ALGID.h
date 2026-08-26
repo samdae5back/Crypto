@@ -51,6 +51,6 @@ enum {
     ALG_SLH_DSA_SHAKE_256F = 0x8016
 };
 
-CRYPTO_API const char *ALGID_NAME(AlgID ALG);
+const char *CRYPTO_ALGID_NAME(AlgID ALG);
 
 #endif

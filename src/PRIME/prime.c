@@ -28,7 +28,7 @@ int prime_small_division(const BIGNUM *n) {
     return 1;
 }
 
-int PRIME_IS_PROBABLE(const BIGNUM *value, uint32_t rounds) {
+int CRYPTO_PRIME_IS_PROBABLE(const BIGNUM *value, uint32_t rounds) {
     BIGNUM n_minus_1, d, n_minus_3, a, x, tmp;
     size_t s = 0u;
     uint32_t round;
@@ -40,9 +40,9 @@ int PRIME_IS_PROBABLE(const BIGNUM *value, uint32_t rounds) {
     if (!prime_small_division(value)) return 0;
     if (rounds == 0u) rounds = 32u;
 
-    BIGNUM_INIT(&n_minus_1); BIGNUM_INIT(&d); BIGNUM_INIT(&n_minus_3);
-    BIGNUM_INIT(&a); BIGNUM_INIT(&x); BIGNUM_INIT(&tmp);
-    if (bignum_sub_u32(&n_minus_1, value, 1u) != 0 || BIGNUM_COPY(&d, &n_minus_1) != CRYPTO_SUCCESS || bignum_sub_u32(&n_minus_3, value, 3u) != 0) goto done;
+    CRYPTO_BIGNUM_INIT(&n_minus_1); CRYPTO_BIGNUM_INIT(&d); CRYPTO_BIGNUM_INIT(&n_minus_3);
+    CRYPTO_BIGNUM_INIT(&a); CRYPTO_BIGNUM_INIT(&x); CRYPTO_BIGNUM_INIT(&tmp);
+    if (bignum_sub_u32(&n_minus_1, value, 1u) != 0 || CRYPTO_BIGNUM_COPY(&d, &n_minus_1) != CRYPTO_SUCCESS || bignum_sub_u32(&n_minus_3, value, 3u) != 0) goto done;
     while (d.LENGTH && !(d.LIMBS[0] & 1u)) {
         uint32_t carry = 0u;
         size_t i;
@@ -58,73 +58,73 @@ int PRIME_IS_PROBABLE(const BIGNUM *value, uint32_t rounds) {
     for (round = 0u; round < rounds; ++round) {
         size_t j;
         int witness = 1;
-        BIGNUM_FREE(&a); BIGNUM_INIT(&a);
-        if (BIGNUM_RANDOM_RANGE(&a, &n_minus_3) != CRYPTO_SUCCESS || bignum_add_u32(&a, 2u) != 0) goto done;
-        if (BIGNUM_MOD_EXP(&x, &a, &d, value) != CRYPTO_SUCCESS) goto done;
-        if ((x.LENGTH == 1u && x.LIMBS[0] == 1u) || BIGNUM_COMPARE(&x, &n_minus_1) == 0) continue;
+        CRYPTO_BIGNUM_FREE(&a); CRYPTO_BIGNUM_INIT(&a);
+        if (CRYPTO_BIGNUM_RANDOM_RANGE(&a, &n_minus_3) != CRYPTO_SUCCESS || bignum_add_u32(&a, 2u) != 0) goto done;
+        if (CRYPTO_BIGNUM_MOD_EXP(&x, &a, &d, value) != CRYPTO_SUCCESS) goto done;
+        if ((x.LENGTH == 1u && x.LIMBS[0] == 1u) || CRYPTO_BIGNUM_COMPARE(&x, &n_minus_1) == 0) continue;
         for (j = 1u; j < s; ++j) {
-            if (BIGNUM_MOD_MUL(&tmp, &x, &x, value) != CRYPTO_SUCCESS) goto done;
-            BIGNUM_FREE(&x); x = tmp; BIGNUM_INIT(&tmp);
-            if (BIGNUM_COMPARE(&x, &n_minus_1) == 0) { witness = 0; break; }
+            if (CRYPTO_BIGNUM_MOD_MUL(&tmp, &x, &x, value) != CRYPTO_SUCCESS) goto done;
+            CRYPTO_BIGNUM_FREE(&x); x = tmp; CRYPTO_BIGNUM_INIT(&tmp);
+            if (CRYPTO_BIGNUM_COMPARE(&x, &n_minus_1) == 0) { witness = 0; break; }
             if (x.LENGTH == 1u && x.LIMBS[0] == 1u) goto done;
         }
         if (witness) goto done;
     }
     result = 1;
 done:
-    BIGNUM_FREE(&n_minus_1); BIGNUM_FREE(&d); BIGNUM_FREE(&n_minus_3);
-    BIGNUM_FREE(&a); BIGNUM_FREE(&x); BIGNUM_FREE(&tmp);
+    CRYPTO_BIGNUM_FREE(&n_minus_1); CRYPTO_BIGNUM_FREE(&d); CRYPTO_BIGNUM_FREE(&n_minus_3);
+    CRYPTO_BIGNUM_FREE(&a); CRYPTO_BIGNUM_FREE(&x); CRYPTO_BIGNUM_FREE(&tmp);
     return result;
 }
 
-CryptoError PRIME_GENERATE(BIGNUM *out, size_t bits, uint32_t rounds) {
+CryptoError CRYPTO_PRIME_GENERATE(BIGNUM *out, size_t bits, uint32_t rounds) {
     BIGNUM candidate;
     size_t tries;
     if (!out || bits < 2u) return CRYPTO_ERROR_INVALID_ARGUMENT;
     if (rounds == 0u) rounds = 32u;
-    BIGNUM_INIT(&candidate);
+    CRYPTO_BIGNUM_INIT(&candidate);
     for (tries = 0u; tries < 1000000u; ++tries) {
-        if (BIGNUM_RANDOM_BITS(&candidate, bits, 1, 1) != CRYPTO_SUCCESS) {
-            BIGNUM_FREE(&candidate);
+        if (CRYPTO_BIGNUM_RANDOM_BITS(&candidate, bits, 1, 1) != CRYPTO_SUCCESS) {
+            CRYPTO_BIGNUM_FREE(&candidate);
             return CRYPTO_ERROR_RANDOM_FAILED;
         }
-        if (prime_small_division(&candidate) && PRIME_IS_PROBABLE(&candidate, rounds)) {
-            BIGNUM_FREE(out);
+        if (prime_small_division(&candidate) && CRYPTO_PRIME_IS_PROBABLE(&candidate, rounds)) {
+            CRYPTO_BIGNUM_FREE(out);
             *out = candidate;
             return CRYPTO_SUCCESS;
         }
-        BIGNUM_FREE(&candidate); BIGNUM_INIT(&candidate);
+        CRYPTO_BIGNUM_FREE(&candidate); CRYPTO_BIGNUM_INIT(&candidate);
     }
-    BIGNUM_FREE(&candidate);
+    CRYPTO_BIGNUM_FREE(&candidate);
     return CRYPTO_ERROR_PRIME_GENERATION_FAILED;
 }
 
-CryptoError PRIME_GENERATE_SAFE(BIGNUM *p_out, BIGNUM *q_out, size_t p_bits, uint32_t rounds) {
+CryptoError CRYPTO_PRIME_GENERATE_SAFE(BIGNUM *p_out, BIGNUM *q_out, size_t p_bits, uint32_t rounds) {
     BIGNUM qv, pv, tmp;
     size_t tries;
     if (!p_out || !q_out || p_bits < 3u) return CRYPTO_ERROR_INVALID_ARGUMENT;
     if (rounds == 0u) rounds = 32u;
-    BIGNUM_INIT(&qv); BIGNUM_INIT(&pv); BIGNUM_INIT(&tmp);
+    CRYPTO_BIGNUM_INIT(&qv); CRYPTO_BIGNUM_INIT(&pv); CRYPTO_BIGNUM_INIT(&tmp);
     for (tries = 0u; tries < 1000000u; ++tries) {
-        CryptoError e = PRIME_GENERATE(&qv, p_bits - 1u, rounds);
+        CryptoError e = CRYPTO_PRIME_GENERATE(&qv, p_bits - 1u, rounds);
         if (e != CRYPTO_SUCCESS) {
-            BIGNUM_FREE(&qv); BIGNUM_FREE(&pv); BIGNUM_FREE(&tmp);
+            CRYPTO_BIGNUM_FREE(&qv); CRYPTO_BIGNUM_FREE(&pv); CRYPTO_BIGNUM_FREE(&tmp);
             return e;
         }
         if (bignum_mul_u32(&tmp, &qv, 2u) != 0 || bignum_add_u32_copy(&pv, &tmp, 1u) != 0) {
-            BIGNUM_FREE(&qv); BIGNUM_FREE(&pv); BIGNUM_FREE(&tmp);
+            CRYPTO_BIGNUM_FREE(&qv); CRYPTO_BIGNUM_FREE(&pv); CRYPTO_BIGNUM_FREE(&tmp);
             return CRYPTO_ERROR_ARITHMETIC;
         }
-        BIGNUM_FREE(&tmp); BIGNUM_INIT(&tmp);
-        if (BIGNUM_BIT_LENGTH(&pv) == p_bits && PRIME_IS_PROBABLE(&pv, rounds)) {
-            BIGNUM_FREE(p_out); *p_out = pv; BIGNUM_INIT(&pv);
-            BIGNUM_FREE(q_out); *q_out = qv; BIGNUM_INIT(&qv);
-            BIGNUM_FREE(&tmp);
+        CRYPTO_BIGNUM_FREE(&tmp); CRYPTO_BIGNUM_INIT(&tmp);
+        if (CRYPTO_BIGNUM_BIT_LENGTH(&pv) == p_bits && CRYPTO_PRIME_IS_PROBABLE(&pv, rounds)) {
+            CRYPTO_BIGNUM_FREE(p_out); *p_out = pv; CRYPTO_BIGNUM_INIT(&pv);
+            CRYPTO_BIGNUM_FREE(q_out); *q_out = qv; CRYPTO_BIGNUM_INIT(&qv);
+            CRYPTO_BIGNUM_FREE(&tmp);
             return CRYPTO_SUCCESS;
         }
-        BIGNUM_FREE(&qv); BIGNUM_INIT(&qv);
-        BIGNUM_FREE(&pv); BIGNUM_INIT(&pv);
+        CRYPTO_BIGNUM_FREE(&qv); CRYPTO_BIGNUM_INIT(&qv);
+        CRYPTO_BIGNUM_FREE(&pv); CRYPTO_BIGNUM_INIT(&pv);
     }
-    BIGNUM_FREE(&qv); BIGNUM_FREE(&pv); BIGNUM_FREE(&tmp);
+    CRYPTO_BIGNUM_FREE(&qv); CRYPTO_BIGNUM_FREE(&pv); CRYPTO_BIGNUM_FREE(&tmp);
     return CRYPTO_ERROR_PRIME_GENERATION_FAILED;
 }

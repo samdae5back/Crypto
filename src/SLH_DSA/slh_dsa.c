@@ -22,22 +22,22 @@ static const slh_param_t *slh_dsa_parameters(AlgID alg) {
     }
 }
 
-size_t SLH_DSA_PUBLIC_KEY_SIZE(AlgID ALG) {
+size_t CRYPTO_SLH_DSA_PUBLIC_KEY_SIZE(AlgID ALG) {
     const slh_param_t *prm = slh_dsa_parameters(ALG);
     return prm ? slh_pk_sz(prm) : 0u;
 }
 
-size_t SLH_DSA_PRIVATE_KEY_SIZE(AlgID ALG) {
+size_t CRYPTO_SLH_DSA_PRIVATE_KEY_SIZE(AlgID ALG) {
     const slh_param_t *prm = slh_dsa_parameters(ALG);
     return prm ? slh_sk_sz(prm) : 0u;
 }
 
-size_t SLH_DSA_SIGNATURE_SIZE(AlgID ALG) {
+size_t CRYPTO_SLH_DSA_SIGNATURE_SIZE(AlgID ALG) {
     const slh_param_t *prm = slh_dsa_parameters(ALG);
     return prm ? slh_sig_sz(prm) : 0u;
 }
 
-CryptoError SLH_DSA_KEYGEN(AlgID ALG,
+CryptoError CRYPTO_SLH_DSA_KEYGEN(AlgID ALG,
                            uint8_t *PUBLIC_KEY, size_t PUBLIC_KEY_LENGTH,
                            uint8_t *PRIVATE_KEY, size_t PRIVATE_KEY_LENGTH) {
     const slh_param_t *prm = slh_dsa_parameters(ALG);
@@ -54,7 +54,7 @@ CryptoError SLH_DSA_KEYGEN(AlgID ALG,
         return CRYPTO_ERROR_BUFFER_TOO_SMALL;
     n = pk_length / 2u;
 
-    err = RANDOM_BYTES(seed, 3u * n);
+    err = CRYPTO_RANDOM_BYTES(seed, 3u * n);
     if (err != CRYPTO_SUCCESS) {
         crypto_zeroize(PUBLIC_KEY, pk_length);
         crypto_zeroize(PRIVATE_KEY, sk_length);
@@ -73,7 +73,7 @@ CryptoError SLH_DSA_KEYGEN(AlgID ALG,
     return CRYPTO_SUCCESS;
 }
 
-CryptoError SLH_DSA_SIGN(AlgID ALG,
+CryptoError CRYPTO_SLH_DSA_SIGN(AlgID ALG,
                          const uint8_t *PRIVATE_KEY, size_t PRIVATE_KEY_LENGTH,
                          const uint8_t *MESSAGE, size_t MESSAGE_LENGTH,
                          const uint8_t *CONTEXT, size_t CONTEXT_LENGTH,
@@ -93,7 +93,7 @@ CryptoError SLH_DSA_SIGN(AlgID ALG,
     if (SIGNATURE_LENGTH < sig_length) return CRYPTO_ERROR_BUFFER_TOO_SMALL;
     n = slh_pk_sz(prm) / 2u;
 
-    err = RANDOM_BYTES(addrnd, n);
+    err = CRYPTO_RANDOM_BYTES(addrnd, n);
     if (err != CRYPTO_SUCCESS) {
         crypto_zeroize(SIGNATURE, sig_length);
         crypto_zeroize(addrnd, sizeof(addrnd));
@@ -110,7 +110,7 @@ CryptoError SLH_DSA_SIGN(AlgID ALG,
     return CRYPTO_SUCCESS;
 }
 
-CryptoError SLH_DSA_VERIFY(AlgID ALG,
+CryptoError CRYPTO_SLH_DSA_VERIFY(AlgID ALG,
                            const uint8_t *PUBLIC_KEY, size_t PUBLIC_KEY_LENGTH,
                            const uint8_t *MESSAGE, size_t MESSAGE_LENGTH,
                            const uint8_t *CONTEXT, size_t CONTEXT_LENGTH,

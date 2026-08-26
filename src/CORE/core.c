@@ -1,12 +1,12 @@
 #include "ALGID.h"
 #include "ERROR.h"
 
-const char *ALGID_NAME(AlgID alg) {
+const char *CRYPTO_ALGID_NAME(AlgID alg) {
     switch (alg) {
         case ALG_HASH_SHA3_256: return "SHA3-256";
         case ALG_HASH_SHA3_512: return "SHA3-512";
-        case ALG_HASH_SHAKE128: return "SHAKE128";
-        case ALG_HASH_SHAKE256: return "SHAKE256";
+        case ALG_HASH_SHAKE128: return "CRYPTO_SHAKE128";
+        case ALG_HASH_SHAKE256: return "CRYPTO_SHAKE256";
         case ALG_ML_KEM_512: return "ML-KEM-512";
         case ALG_ML_KEM_768: return "ML-KEM-768";
         case ALG_ML_KEM_1024: return "ML-KEM-1024";

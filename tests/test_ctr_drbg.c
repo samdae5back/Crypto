@@ -41,24 +41,24 @@ static int test_nist_aes256_no_df(void) {
     CTR_DRBG_CONTEXT ctx;
     uint8_t output[64];
 
-    if (CTR_DRBG_SEED_SIZE(ALG_CTR_DRBG_AES_256_NO_DF) != 48u) return 1;
-    if (CTR_DRBG_INSTANTIATE(&ctx, ALG_CTR_DRBG_AES_256_NO_DF,
+    if (CRYPTO_CTR_DRBG_SEED_SIZE(ALG_CTR_DRBG_AES_256_NO_DF) != 48u) return 1;
+    if (CRYPTO_CTR_DRBG_INSTANTIATE(&ctx, ALG_CTR_DRBG_AES_256_NO_DF,
                              entropy, sizeof(entropy), NULL, 0u, NULL, 0u) != CRYPTO_SUCCESS) return 1;
     if (memcmp(ctx.KEY, key_after_instantiate, sizeof(key_after_instantiate)) != 0) return 1;
     if (memcmp(ctx.V, v_after_instantiate, sizeof(v_after_instantiate)) != 0) return 1;
     if (ctx.RESEED_COUNTER != 1u) return 1;
 
-    if (CTR_DRBG_GENERATE(&ctx, output, sizeof(output), NULL, 0u, 0) != CRYPTO_SUCCESS) return 1;
-    if (CTR_DRBG_GENERATE(&ctx, output, sizeof(output), NULL, 0u, 0) != CRYPTO_SUCCESS) return 1;
+    if (CRYPTO_CTR_DRBG_GENERATE(&ctx, output, sizeof(output), NULL, 0u, 0) != CRYPTO_SUCCESS) return 1;
+    if (CRYPTO_CTR_DRBG_GENERATE(&ctx, output, sizeof(output), NULL, 0u, 0) != CRYPTO_SUCCESS) return 1;
     if (memcmp(output, returned_bits, sizeof(returned_bits)) != 0) return 1;
     if (memcmp(ctx.KEY, final_key, sizeof(final_key)) != 0) return 1;
     if (memcmp(ctx.V, final_v, sizeof(final_v)) != 0) return 1;
     if (ctx.RESEED_COUNTER != 3u) return 1;
 
     ctx.RESEED_COUNTER = ((uint64_t)1u << 48) + 1u;
-    if (CTR_DRBG_GENERATE(&ctx, output, 16u, NULL, 0u, 0) != CRYPTO_ERROR_RESEED_REQUIRED) return 1;
+    if (CRYPTO_CTR_DRBG_GENERATE(&ctx, output, 16u, NULL, 0u, 0) != CRYPTO_ERROR_RESEED_REQUIRED) return 1;
 
-    CTR_DRBG_CLEAR(&ctx);
+    CRYPTO_CTR_DRBG_CLEAR(&ctx);
     if (!all_zero(&ctx, sizeof(ctx))) return 1;
     return 0;
 }
@@ -82,18 +82,18 @@ static int test_df_variants(void) {
         key_length = (j == 0u) ? 16u : (j == 1u ? 24u : 32u);
         security_length = key_length;
         nonce_length = (security_length + 1u) / 2u;
-        if (CTR_DRBG_SEED_SIZE(algs[j]) != key_length + 16u) return 1;
-        if (CTR_DRBG_INSTANTIATE(&c1, algs[j], entropy, security_length,
+        if (CRYPTO_CTR_DRBG_SEED_SIZE(algs[j]) != key_length + 16u) return 1;
+        if (CRYPTO_CTR_DRBG_INSTANTIATE(&c1, algs[j], entropy, security_length,
                                  nonce, nonce_length,
                                  (const uint8_t *)"crypto-test", 11u) != CRYPTO_SUCCESS) return 1;
-        if (CTR_DRBG_INSTANTIATE(&c2, algs[j], entropy, security_length,
+        if (CRYPTO_CTR_DRBG_INSTANTIATE(&c2, algs[j], entropy, security_length,
                                  nonce, nonce_length,
                                  (const uint8_t *)"crypto-test", 11u) != CRYPTO_SUCCESS) return 1;
-        if (CTR_DRBG_GENERATE(&c1, a, sizeof(a), additional, sizeof(additional), 0) != CRYPTO_SUCCESS) return 1;
-        if (CTR_DRBG_GENERATE(&c2, b, sizeof(b), additional, sizeof(additional), 0) != CRYPTO_SUCCESS) return 1;
+        if (CRYPTO_CTR_DRBG_GENERATE(&c1, a, sizeof(a), additional, sizeof(additional), 0) != CRYPTO_SUCCESS) return 1;
+        if (CRYPTO_CTR_DRBG_GENERATE(&c2, b, sizeof(b), additional, sizeof(additional), 0) != CRYPTO_SUCCESS) return 1;
         if (memcmp(a, b, sizeof(a)) != 0) return 1;
-        CTR_DRBG_CLEAR(&c1);
-        CTR_DRBG_CLEAR(&c2);
+        CRYPTO_CTR_DRBG_CLEAR(&c1);
+        CRYPTO_CTR_DRBG_CLEAR(&c2);
     }
     return 0;
 }
@@ -104,8 +104,8 @@ static int test_context_zeroization(void) {
         0x08,0x09,0x0a,0x0b,0x0c,0x0d,0x0e,0x0f
     };
     AES_CONTEXT ctx;
-    if (AES_CONTEXT_INIT(&ctx, ALG_AES_128, key, sizeof(key)) != CRYPTO_SUCCESS) return 1;
-    AES_CONTEXT_CLEAR(&ctx);
+    if (CRYPTO_AES_CONTEXT_INIT(&ctx, ALG_AES_128, key, sizeof(key)) != CRYPTO_SUCCESS) return 1;
+    CRYPTO_AES_CONTEXT_CLEAR(&ctx);
     return all_zero(&ctx, sizeof(ctx)) ? 0 : 1;
 }
 
