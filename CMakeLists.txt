@@ -18,7 +18,7 @@ endif()
 set(MLDSA_NATIVE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mldsa-native)
 set(SLHDSA_C_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/slhdsa-c)
 
-if(NOT EXISTS "${MLDSA_NATIVE_DIR}/examples/monolithic_build_multilevel/mldsa_native_all.c" OR
+if(NOT EXISTS "${MLDSA_NATIVE_DIR}/mldsa/mldsa_native.c" OR
    NOT EXISTS "${SLHDSA_C_DIR}/slh_dsa.c")
     message(FATAL_ERROR "PQ signature submodules are missing. Run: git submodule update --init --recursive")
 endif()
@@ -92,22 +92,15 @@ add_mlkem_variant(crypto_mlkem512 512 2 3 2 10 4)
 add_mlkem_variant(crypto_mlkem768 768 3 2 2 10 4)
 add_mlkem_variant(crypto_mlkem1024 1024 4 2 2 11 5)
 
-# mldsa-native provides an upstream-supported monolithic multi-level build for
-# FIPS 204 ML-DSA-44/65/87. Randomized public APIs are disabled because this
-# library supplies entropy through RANDOM_BYTES and calls the deterministic
-# internal entry points with explicit random seeds.
-add_library(crypto_mldsa OBJECT
-    ${MLDSA_NATIVE_DIR}/examples/monolithic_build_multilevel/mldsa_native_all.c
-)
+# Build the pinned mldsa-native source three times inside one local adapter TU.
+# This avoids depending on symlinks used by the upstream example directory,
+# which makes checkout/build behavior consistent on Windows as well.
+add_library(crypto_mldsa OBJECT src/ML_DSA/mldsa_backend.c)
 set_target_properties(crypto_mldsa PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_include_directories(crypto_mldsa PRIVATE
-    ${MLDSA_NATIVE_DIR}/examples/monolithic_build_multilevel
-    ${MLDSA_NATIVE_DIR}/examples/monolithic_build_multilevel/mldsa_native
-)
+target_include_directories(crypto_mldsa PRIVATE ${MLDSA_NATIVE_DIR}/mldsa)
 target_compile_definitions(crypto_mldsa PRIVATE MLD_CONFIG_NO_RANDOMIZED_API)
 
-# slhdsa-c is a portable FIPS 205 implementation whose parameter objects cover
-# all 12 approved SHA2/SHAKE, 128/192/256, small/fast parameter sets.
+# slhdsa-c exposes all twelve FIPS 205 parameter objects from one portable build.
 set(SLHDSA_VENDOR_SOURCES
     ${SLHDSA_C_DIR}/sha2_256.c
     ${SLHDSA_C_DIR}/sha2_512.c
@@ -151,8 +144,8 @@ target_include_directories(Crypto
         $<INSTALL_INTERFACE:include>
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
-        ${MLDSA_NATIVE_DIR}/examples/monolithic_build_multilevel
-        ${MLDSA_NATIVE_DIR}/examples/monolithic_build_multilevel/mldsa_native
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/ML_DSA
+        ${MLDSA_NATIVE_DIR}/mldsa
         ${SLHDSA_C_DIR}
 )
 target_compile_definitions(Crypto PRIVATE MLD_CONFIG_NO_RANDOMIZED_API)
