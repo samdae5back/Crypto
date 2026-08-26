@@ -1,0 +1,8 @@
+[submodule "third_party/mldsa-native"]
+	path = third_party/mldsa-native
+	url = https://github.com/pq-code-package/mldsa-native.git
+	branch = main
+[submodule "third_party/slhdsa-c"]
+	path = third_party/slhdsa-c
+	url = https://github.com/pq-code-package/slhdsa-c.git
+	branch = main

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(Crypto VERSION 0.5.0 LANGUAGES C)
+project(Crypto VERSION 0.6.0 LANGUAGES C)
 
 option(BUILD_SHARED_LIBS "Build Crypto as a shared library" ON)
 option(CRYPTO_BUILD_TESTS "Build Crypto tests" ON)
@@ -13,6 +13,14 @@ set(CMAKE_C_EXTENSIONS OFF)
 if(NOT WIN32)
     set(CMAKE_C_VISIBILITY_PRESET hidden)
     set(CMAKE_VISIBILITY_INLINES_HIDDEN YES)
+endif()
+
+set(MLDSA_NATIVE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mldsa-native)
+set(SLHDSA_C_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/slhdsa-c)
+
+if(NOT EXISTS "${MLDSA_NATIVE_DIR}/mldsa/mldsa_native.c" OR
+   NOT EXISTS "${SLHDSA_C_DIR}/slh_dsa.c")
+    message(FATAL_ERROR "PQ signature submodules are missing. Run: git submodule update --init --recursive")
 endif()
 
 set(CRYPTO_SOURCES
@@ -31,6 +39,8 @@ set(CRYPTO_SOURCES
     src/ENDIAN/endian.c
     src/NTT/ntt.c
     src/ML_KEM/api.c
+    src/ML_DSA/ml_dsa.c
+    src/SLH_DSA/slh_dsa.c
 )
 
 set(MLKEM_VARIANT_SOURCES
@@ -82,10 +92,47 @@ add_mlkem_variant(crypto_mlkem512 512 2 3 2 10 4)
 add_mlkem_variant(crypto_mlkem768 768 3 2 2 10 4)
 add_mlkem_variant(crypto_mlkem1024 1024 4 2 2 11 5)
 
+# Build the pinned mldsa-native source three times inside one local adapter TU.
+# This avoids depending on symlinks used by the upstream example directory,
+# which makes checkout/build behavior consistent on Windows as well.
+add_library(crypto_mldsa OBJECT src/ML_DSA/mldsa_backend.c)
+set_target_properties(crypto_mldsa PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(crypto_mldsa PRIVATE ${MLDSA_NATIVE_DIR}/mldsa)
+target_compile_definitions(crypto_mldsa PRIVATE
+    MLD_CONFIG_NO_RANDOMIZED_API
+    MLD_CONFIG_MULTILEVEL_BUILD
+    MLD_CONFIG_NAMESPACE_PREFIX=mldsa
+)
+
+# slhdsa-c exposes all twelve FIPS 205 parameter objects from one portable build.
+set(SLHDSA_VENDOR_SOURCES
+    ${SLHDSA_C_DIR}/sha2_256.c
+    ${SLHDSA_C_DIR}/sha2_512.c
+    ${SLHDSA_C_DIR}/sha3_api.c
+    ${SLHDSA_C_DIR}/sha3_f1600.c
+    ${SLHDSA_C_DIR}/slh_dsa.c
+    ${SLHDSA_C_DIR}/slh_prehash.c
+    ${SLHDSA_C_DIR}/slh_sha2.c
+    ${SLHDSA_C_DIR}/slh_shake.c
+)
+add_library(crypto_slhdsa OBJECT ${SLHDSA_VENDOR_SOURCES})
+set_target_properties(crypto_slhdsa PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(crypto_slhdsa PRIVATE ${SLHDSA_C_DIR})
+
+if(MSVC)
+    target_compile_options(crypto_mldsa PRIVATE /W4)
+    target_compile_options(crypto_slhdsa PRIVATE /W4)
+else()
+    target_compile_options(crypto_mldsa PRIVATE -Wall -Wextra -pedantic)
+    target_compile_options(crypto_slhdsa PRIVATE -Wall -Wextra -pedantic)
+endif()
+
 add_library(Crypto ${CRYPTO_SOURCES}
     $<TARGET_OBJECTS:crypto_mlkem512>
     $<TARGET_OBJECTS:crypto_mlkem768>
     $<TARGET_OBJECTS:crypto_mlkem1024>
+    $<TARGET_OBJECTS:crypto_mldsa>
+    $<TARGET_OBJECTS:crypto_slhdsa>
 )
 add_library(Crypto::Crypto ALIAS Crypto)
 
@@ -101,6 +148,14 @@ target_include_directories(Crypto
         $<INSTALL_INTERFACE:include>
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/ML_DSA
+        ${MLDSA_NATIVE_DIR}/mldsa
+        ${SLHDSA_C_DIR}
+)
+target_compile_definitions(Crypto PRIVATE
+    MLD_CONFIG_NO_RANDOMIZED_API
+    MLD_CONFIG_MULTILEVEL_BUILD
+    MLD_CONFIG_NAMESPACE_PREFIX=mldsa
 )
 
 if(BUILD_SHARED_LIBS)
@@ -136,4 +191,8 @@ if(CRYPTO_BUILD_TESTS)
     add_executable(ctr_drbg_tests tests/test_ctr_drbg.c)
     target_link_libraries(ctr_drbg_tests PRIVATE Crypto)
     add_test(NAME ctr_drbg_tests COMMAND ctr_drbg_tests)
+
+    add_executable(pq_signature_tests tests/test_pq_signatures.c)
+    target_link_libraries(pq_signature_tests PRIVATE Crypto)
+    add_test(NAME pq_signature_tests COMMAND pq_signature_tests)
 endif()

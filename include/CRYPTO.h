@@ -15,4 +15,6 @@
 #include "ENDIAN.h"
 #include "NTT.h"
 #include "ML_KEM.h"
+#include "ML_DSA.h"
+#include "SLH_DSA.h"
 #endif
