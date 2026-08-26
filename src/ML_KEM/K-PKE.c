@@ -1,5 +1,5 @@
-#include <stdio.h>
-#include <string.h> //memcpy ÇÔ¼ö
+ï»¿#include <stdio.h>
+#include <string.h> //memcpy í•¨ìˆ˜
 #include "hash.h"
 #include "NTT_.h"
 #include "auxiliary.h"
@@ -13,14 +13,14 @@ void K_PKE_KeyGen(unsigned char* d, unsigned char* ek_pke, unsigned char* dk_pke
 	unsigned char* buffer_char = NULL;
 	int* buffer_int = NULL;
 
-	//G °è»ê À§ÇØ ¹öÆÛ¿¡ ¸Ş¸ğ¸® ÇÒ´ç
+	//G ê³„ì‚° ìœ„í•´ ë²„í¼ì— ë©”ëª¨ë¦¬ í• ë‹¹
 	buffer_char = (unsigned char*)malloc(sizeof(unsigned char) * 33);
 	if (buffer_char == NULL) {
 		perror("Failed to allocate memory");
 		exit(EXIT_FAILURE);
 	}
 
-	//G ÇÔ¼ö »ç¿ëÇØ¼­ ÇØ½Ã°ª »ı¼º
+	//G í•¨ìˆ˜ ì‚¬ìš©í•´ì„œ í•´ì‹œê°’ ìƒì„±
 	memcpy(buffer_char, d, 32);
 	buffer_char[32] = k;
 	unsigned char rho[32] = { 0 };
@@ -29,7 +29,7 @@ void K_PKE_KeyGen(unsigned char* d, unsigned char* ek_pke, unsigned char* dk_pke
 
 	free(buffer_char);
 
-	//A °è»ê À§ÇØ ¹öÆÛ¿¡ ¸Ş¸ğ¸® ÇÒ´ç
+	//A ê³„ì‚° ìœ„í•´ ë²„í¼ì— ë©”ëª¨ë¦¬ í• ë‹¹
 	buffer_char = (unsigned char*)malloc(sizeof(unsigned char) * 34);
 	if (buffer_char == NULL) {
 		perror("Failed to allocate memory");
@@ -63,7 +63,7 @@ void K_PKE_KeyGen(unsigned char* d, unsigned char* ek_pke, unsigned char* dk_pke
 
 	free(buffer_char);
 
-	//s, e °è»ê À§ÇØ ¹öÆÛ¿¡ ¸Ş¸ğ¸® ÇÒ´ç
+	//s, e ê³„ì‚° ìœ„í•´ ë²„í¼ì— ë©”ëª¨ë¦¬ í• ë‹¹
 	buffer_char = (unsigned char*)malloc(sizeof(unsigned char) * 64 * n_1);
 	if (buffer_char == NULL) {
 		perror("Failed to allocate memory");
@@ -71,7 +71,7 @@ void K_PKE_KeyGen(unsigned char* d, unsigned char* ek_pke, unsigned char* dk_pke
 	}
 
 	//generate s
-	int s[k][n] = { 0 };
+	int s[MLKEM_MAX_K][MLKEM_N] = { 0 };
 	for (int i = 0;i < k;i++) {
 		PRF(n_1, sigma, N, buffer_char);
 		SamplePolyCBD(buffer_char, s[i], 64 * n_1);
@@ -79,7 +79,7 @@ void K_PKE_KeyGen(unsigned char* d, unsigned char* ek_pke, unsigned char* dk_pke
 	}
 
 	//generate e
-	int e[k][n] = { 0 };
+	int e[MLKEM_MAX_K][MLKEM_N] = { 0 };
 	for (int i = 0;i < k;i++) {
 		PRF(n_1, sigma, N, buffer_char);
 		SamplePolyCBD(buffer_char, e[i], 64 * n_1);
@@ -88,41 +88,41 @@ void K_PKE_KeyGen(unsigned char* d, unsigned char* ek_pke, unsigned char* dk_pke
 
 	free(buffer_char);
 
-	//NTT¿¬»ê À§ÇØ zetaºÒ·¯¿À±â
+	//NTTì—°ì‚° ìœ„í•´ zetaë¶ˆëŸ¬ì˜¤ê¸°
 	int* zeta = GenZeta();
 
-	//s_hat, e_hat ¼±¾ğ ¹× °è»ê
-	int s_hat[k][n] = { 0 };
-	int e_hat[k][n] = { 0 };
+	//s_hat, e_hat ì„ ì–¸ ë° ê³„ì‚°
+	int s_hat[MLKEM_MAX_K][MLKEM_N] = { 0 };
+	int e_hat[MLKEM_MAX_K][MLKEM_N] = { 0 };
 	for (int i = 0;i < k;i++) {
 		NTT(s[i], s_hat[i], zeta);
 		NTT(e[i], e_hat[i], zeta);
 	}
 
-	//t_hat °è»ê À§ÇØ ¹öÆÛ¿¡ ¸Ş¸ğ¸® ÇÒ´ç
+	//t_hat ê³„ì‚° ìœ„í•´ ë²„í¼ì— ë©”ëª¨ë¦¬ í• ë‹¹
 	buffer_int = (int*)malloc(sizeof(int) * n);
 	if (buffer_int == NULL) {
 		perror("Failed to allocate memory");
 		exit(EXIT_FAILURE);
 	}
 
-	//t_hat ¼±¾ğ ¹× °è»ê
-	int t_hat[k][n] = { 0 };
+	//t_hat ì„ ì–¸ ë° ê³„ì‚°
+	int t_hat[MLKEM_MAX_K][MLKEM_N] = { 0 };
 	for (int i = 0;i < k;i++) {
 		for (int l = 0;l < n;l++) {
 			t_hat[i][l] = e_hat[i][l];
 		}
 		for (int j = 0;j < k;j++) {
-			//°¢ Çà, ¿­ ¸¶´Ù A_hat*s_hat °è»ê
+			//ê° í–‰, ì—´ ë§ˆë‹¤ A_hat*s_hat ê³„ì‚°
 			Multiply_NTT(A[i][j], s_hat[j], buffer_int, zeta);
-			//t_hatÀÇ °¢ ´ÙÇ×½Ä Â÷¼öº°·Î ¿¬»ê
+			//t_hatì˜ ê° ë‹¤í•­ì‹ ì°¨ìˆ˜ë³„ë¡œ ì—°ì‚°
 			for (int l = 0;l < n;l++) {
 				t_hat[i][l] = (t_hat[i][l] + buffer_int[l]) % q;
 			}
 		}
 	}
 
-	//¸Ş¸ğ¸® ÇÒ´ç ÇØÁ¦
+	//ë©”ëª¨ë¦¬ í• ë‹¹ í•´ì œ
 	for (int i = 0;i < k;i++) {
 		for (int j = 0;j < k;j++) {
 			free(A[i][j]);
@@ -132,14 +132,14 @@ void K_PKE_KeyGen(unsigned char* d, unsigned char* ek_pke, unsigned char* dk_pke
 	free(A);
 	free(buffer_int);
 
-	//°¢ Å°¿¡ Á¤º¸ ÀÔ·Â
+	//ê° í‚¤ì— ì •ë³´ ì…ë ¥
 	for (int i = 0;i < k;i++) {
 		ByteEncode(t_hat[i], 12, ek_pke + (i * 384));
 		ByteEncode(s_hat[i], 12, dk_pke + (i * 384));
 	}
 	memcpy(ek_pke + (k * 384), rho, 32);
 
-	//°á°ú Ãâ·Â
+	//ê²°ê³¼ ì¶œë ¥
 	//printf("\nK-PKE KeyGen Succeed\n");
 
 	return;
@@ -151,7 +151,7 @@ void K_PKE_Enc(unsigned char* ek_pke, unsigned char* message, unsigned char* ran
 	unsigned char* buffer_char = NULL;
 	int* buffer_int = NULL;
 
-	//°ø°³Å°¿¡¼­ Á¤º¸ º¹»ç
+	//ê³µê°œí‚¤ì—ì„œ ì •ë³´ ë³µì‚¬
 	int** t_hat = (int**)malloc(sizeof(int*) * k);
 	if (t_hat == NULL) {
 		perror("Failed to allocate memory");
@@ -169,7 +169,7 @@ void K_PKE_Enc(unsigned char* ek_pke, unsigned char* message, unsigned char* ran
 	unsigned char rho[32] = { 0 };
 	memcpy(rho, ek_pke + 384 * k, 32);
 
-	//A °è»ê À§ÇØ ¹öÆÛ¿¡ ¸Ş¸ğ¸® ÇÒ´ç
+	//A ê³„ì‚° ìœ„í•´ ë²„í¼ì— ë©”ëª¨ë¦¬ í• ë‹¹
 	buffer_char = (unsigned char*)malloc(sizeof(unsigned char) * 34);
 	if (buffer_char == NULL) {
 		perror("Failed to allocate memory");
@@ -203,15 +203,15 @@ void K_PKE_Enc(unsigned char* ek_pke, unsigned char* message, unsigned char* ran
 
 	free(buffer_char);
 
-	//y °è»ê À§ÇØ ¹öÆÛ¿¡ ¸Ş¸ğ¸® ÇÒ´ç
+	//y ê³„ì‚° ìœ„í•´ ë²„í¼ì— ë©”ëª¨ë¦¬ í• ë‹¹
 	buffer_char = (unsigned char*)malloc(sizeof(unsigned char) * 64 * n_1);
 	if (buffer_char == NULL) {
-		perror("Failed to allocate memory"); // ¿À·ù ¸Ş½ÃÁö Ãâ·Â
-		exit(EXIT_FAILURE);// ¸Ş¸ğ¸® ÇÒ´ç ½ÇÆĞ ½Ã ´õ ÀÌ»ó ÁøÇà ºÒ°¡, ÇÁ·Î±×·¥ Á¾·á ¶Ç´Â ¿À·ù Ã³¸®
+		perror("Failed to allocate memory"); // ì˜¤ë¥˜ ë©”ì‹œì§€ ì¶œë ¥
+		exit(EXIT_FAILURE);// ë©”ëª¨ë¦¬ í• ë‹¹ ì‹¤íŒ¨ ì‹œ ë” ì´ìƒ ì§„í–‰ ë¶ˆê°€, í”„ë¡œê·¸ë¨ ì¢…ë£Œ ë˜ëŠ” ì˜¤ë¥˜ ì²˜ë¦¬
 	}
 
 	//generate y
-	int y[k][n] = { 0 };
+	int y[MLKEM_MAX_K][MLKEM_N] = { 0 };
 	for (int i = 0;i < k;i++) {
 		PRF(n_1, randomness, N, buffer_char);
 		SamplePolyCBD(buffer_char, y[i], 64 * n_1);
@@ -220,15 +220,15 @@ void K_PKE_Enc(unsigned char* ek_pke, unsigned char* message, unsigned char* ran
 
 	free(buffer_char);
 
-	//e_1, e_2 °è»ê À§ÇØ ¹öÆÛ¿¡ ¸Ş¸ğ¸® ÇÒ´ç
+	//e_1, e_2 ê³„ì‚° ìœ„í•´ ë²„í¼ì— ë©”ëª¨ë¦¬ í• ë‹¹
 	buffer_char = (unsigned char*)malloc(sizeof(unsigned char) * 64 * n_2);
 	if (buffer_char == NULL) {
-		perror("Failed to allocate memory"); // ¿À·ù ¸Ş½ÃÁö Ãâ·Â
-		exit(EXIT_FAILURE);// ¸Ş¸ğ¸® ÇÒ´ç ½ÇÆĞ ½Ã ´õ ÀÌ»ó ÁøÇà ºÒ°¡, ÇÁ·Î±×·¥ Á¾·á ¶Ç´Â ¿À·ù Ã³¸®
+		perror("Failed to allocate memory"); // ì˜¤ë¥˜ ë©”ì‹œì§€ ì¶œë ¥
+		exit(EXIT_FAILURE);// ë©”ëª¨ë¦¬ í• ë‹¹ ì‹¤íŒ¨ ì‹œ ë” ì´ìƒ ì§„í–‰ ë¶ˆê°€, í”„ë¡œê·¸ë¨ ì¢…ë£Œ ë˜ëŠ” ì˜¤ë¥˜ ì²˜ë¦¬
 	}
 
 	//generate e_1
-	int e_1[k][n] = { 0 };
+	int e_1[MLKEM_MAX_K][MLKEM_N] = { 0 };
 	for (int i = 0;i < k;i++) {
 		PRF(n_2, randomness, N, buffer_char);
 		SamplePolyCBD(buffer_char, e_1[i], 64 * n_2);
@@ -242,16 +242,16 @@ void K_PKE_Enc(unsigned char* ek_pke, unsigned char* message, unsigned char* ran
 
 	free(buffer_char);
 
-	//NTT ¿¬»ê À§ÇØ zeta°¡Á®¿À±â
+	//NTT ì—°ì‚° ìœ„í•´ zetaê°€ì ¸ì˜¤ê¸°
 	int* zeta = GenZeta();
 
-	//y_hat °è»ê
-	int y_hat[k][n] = { 0 };
+	//y_hat ê³„ì‚°
+	int y_hat[MLKEM_MAX_K][MLKEM_N] = { 0 };
 	for (int i = 0;i < k;i++) {
 		NTT(y[i], y_hat[i], zeta);
 	}
 
-	//A^t_hat*y_hat °è»ê À§ÇØ ¹öÆÛ¿¡ ¸Ş¸ğ¸® ÇÒ´ç
+	//A^t_hat*y_hat ê³„ì‚° ìœ„í•´ ë²„í¼ì— ë©”ëª¨ë¦¬ í• ë‹¹
 	buffer_int = (int*)malloc(sizeof(int) * n);
 	if (buffer_int == NULL) {
 		perror("Failed to allocate memory");
@@ -259,27 +259,27 @@ void K_PKE_Enc(unsigned char* ek_pke, unsigned char* message, unsigned char* ran
 	}
 
 
-	//u °è»ê, µµÁß¿¡ NTT º¯È¯ Àü °ª ¹Ş±â À§ÇØ u_hat ¼±¾ğ
-	int u[k][n] = { 0 };
-	int u_hat[k][n] = { 0 };
+	//u ê³„ì‚°, ë„ì¤‘ì— NTT ë³€í™˜ ì „ ê°’ ë°›ê¸° ìœ„í•´ u_hat ì„ ì–¸
+	int u[MLKEM_MAX_K][MLKEM_N] = { 0 };
+	int u_hat[MLKEM_MAX_K][MLKEM_N] = { 0 };
 	for (int i = 0;i < k;i++) {
 		for (int j = 0;j < k;j++) {
-			//°¢ Çà, ¿­ ¸¶´Ù A^t_hat*y_hat °è»ê
+			//ê° í–‰, ì—´ ë§ˆë‹¤ A^t_hat*y_hat ê³„ì‚°
 			Multiply_NTT(A[j][i], y_hat[j], buffer_int, zeta);
-			//u_hatÇàÀÇ °¢ ´ÙÇ×½Ä Â÷¼öº°·Î ¿¬»ê
+			//u_hatí–‰ì˜ ê° ë‹¤í•­ì‹ ì°¨ìˆ˜ë³„ë¡œ ì—°ì‚°
 			for (int l = 0;l < n;l++) {
 				u_hat[i][l] = (u_hat[i][l] + buffer_int[l]) % q;
 			}
 		}
-		//u_hat¿¡¼­ u·Î NTT_inverse ¿¬»ê
+		//u_hatì—ì„œ uë¡œ NTT_inverse ì—°ì‚°
 		NTT_inv(u_hat[i], u[i], zeta);
-		//e_1 ´õÇÏ±â
+		//e_1 ë”í•˜ê¸°
 		for (int j = 0;j < n;j++) {
 			u[i][j] = (u[i][j] + e_1[i][j]) % q;
 		}
 	}
 
-	//¸Ş¸ğ¸® ÇÒ´ç ÇØÁ¦
+	//ë©”ëª¨ë¦¬ í• ë‹¹ í•´ì œ
 	for (int i = 0;i < k;i++) {
 		for (int j = 0;j < k;j++) {
 			free(A[i][j]);
@@ -289,32 +289,32 @@ void K_PKE_Enc(unsigned char* ek_pke, unsigned char* message, unsigned char* ran
 	free(A);
 	free(buffer_int);
 
-	//mu °è»ê À§ÇØ ¹öÆÛ¿¡ ¸Ş¸ğ¸® ÇÒ´ç
+	//mu ê³„ì‚° ìœ„í•´ ë²„í¼ì— ë©”ëª¨ë¦¬ í• ë‹¹
 	buffer_int = (int*)malloc(sizeof(int) * n);
 	if (buffer_int == NULL) {
-		perror("Failed to allocate memory"); // ¿À·ù ¸Ş½ÃÁö Ãâ·Â
-		exit(EXIT_FAILURE);// ¸Ş¸ğ¸® ÇÒ´ç ½ÇÆĞ ½Ã ´õ ÀÌ»ó ÁøÇà ºÒ°¡, ÇÁ·Î±×·¥ Á¾·á ¶Ç´Â ¿À·ù Ã³¸®
+		perror("Failed to allocate memory"); // ì˜¤ë¥˜ ë©”ì‹œì§€ ì¶œë ¥
+		exit(EXIT_FAILURE);// ë©”ëª¨ë¦¬ í• ë‹¹ ì‹¤íŒ¨ ì‹œ ë” ì´ìƒ ì§„í–‰ ë¶ˆê°€, í”„ë¡œê·¸ë¨ ì¢…ë£Œ ë˜ëŠ” ì˜¤ë¥˜ ì²˜ë¦¬
 	}
 
-	//mu ¼±¾ğ ¹× °è»ê
+	//mu ì„ ì–¸ ë° ê³„ì‚°
 	int mu[n] = { 0 };
 	ByteDecode(message, 1, buffer_int);
 	Decomp(buffer_int, 1, mu, 256);
 
 	free(buffer_int);
 
-	//v °è»ê, µµÁß¿¡ NTT º¯È¯ Àü °ª ¹Ş±â À§ÇØ v_hat ¼±¾ğ
+	//v ê³„ì‚°, ë„ì¤‘ì— NTT ë³€í™˜ ì „ ê°’ ë°›ê¸° ìœ„í•´ v_hat ì„ ì–¸
 	int v[n] = { 0 };
 	int v_hat[n] = { 0 };
 
-	//t_hat* y_hat °è»ê À§ÇØ ¹öÆÛ¿¡ ¸Ş¸ğ¸® ÇÒ´ç
+	//t_hat* y_hat ê³„ì‚° ìœ„í•´ ë²„í¼ì— ë©”ëª¨ë¦¬ í• ë‹¹
 	buffer_int = (int*)malloc(sizeof(int) * n);
 	if (buffer_int == NULL) {
-		perror("Failed to allocate memory"); // ¿À·ù ¸Ş½ÃÁö Ãâ·Â
-		exit(EXIT_FAILURE);// ¸Ş¸ğ¸® ÇÒ´ç ½ÇÆĞ ½Ã ´õ ÀÌ»ó ÁøÇà ºÒ°¡, ÇÁ·Î±×·¥ Á¾·á ¶Ç´Â ¿À·ù Ã³¸®
+		perror("Failed to allocate memory"); // ì˜¤ë¥˜ ë©”ì‹œì§€ ì¶œë ¥
+		exit(EXIT_FAILURE);// ë©”ëª¨ë¦¬ í• ë‹¹ ì‹¤íŒ¨ ì‹œ ë” ì´ìƒ ì§„í–‰ ë¶ˆê°€, í”„ë¡œê·¸ë¨ ì¢…ë£Œ ë˜ëŠ” ì˜¤ë¥˜ ì²˜ë¦¬
 	}
 
-	//buffer_intÀ» ¹öÆÛ·Î È°¿ëÇÏ¿© t_hat*y_hat °è»ê
+	//buffer_intì„ ë²„í¼ë¡œ í™œìš©í•˜ì—¬ t_hat*y_hat ê³„ì‚°
 	for (int i = 0;i < k;i++) {
 		Multiply_NTT(t_hat[i], y_hat[i], buffer_int, zeta);
 		for (int j = 0;j < 256;j++) {
@@ -327,22 +327,22 @@ void K_PKE_Enc(unsigned char* ek_pke, unsigned char* message, unsigned char* ran
 	}
 	free(t_hat);
 
-	//v_hat¿¡¼­ v·Î NTT_inverse ¿¬»ê
+	//v_hatì—ì„œ vë¡œ NTT_inverse ì—°ì‚°
 	NTT_inv(v_hat, v, zeta);
 
-	//e_2, mu ´õÇÏ±â
+	//e_2, mu ë”í•˜ê¸°
 	for (int i = 0;i < n;i++) {
 		v[i] = (v[i] + e_2[i] + mu[i]) % q;
 	}
 
-	//¾ÏÈ£¹® Ãâ·Â À§ÇØ ¹öÆÛ¿¡ ¸Ş¸ğ¸® ÇÒ´ç
+	//ì•”í˜¸ë¬¸ ì¶œë ¥ ìœ„í•´ ë²„í¼ì— ë©”ëª¨ë¦¬ í• ë‹¹
 	buffer_int = (int*)malloc(sizeof(int) * n);
 	if (buffer_int == NULL) {
-		perror("Failed to allocate memory"); // ¿À·ù ¸Ş½ÃÁö Ãâ·Â
-		exit(EXIT_FAILURE);// ¸Ş¸ğ¸® ÇÒ´ç ½ÇÆĞ ½Ã ´õ ÀÌ»ó ÁøÇà ºÒ°¡, ÇÁ·Î±×·¥ Á¾·á ¶Ç´Â ¿À·ù Ã³¸®
+		perror("Failed to allocate memory"); // ì˜¤ë¥˜ ë©”ì‹œì§€ ì¶œë ¥
+		exit(EXIT_FAILURE);// ë©”ëª¨ë¦¬ í• ë‹¹ ì‹¤íŒ¨ ì‹œ ë” ì´ìƒ ì§„í–‰ ë¶ˆê°€, í”„ë¡œê·¸ë¨ ì¢…ë£Œ ë˜ëŠ” ì˜¤ë¥˜ ì²˜ë¦¬
 	}
 
-	//¾ÏÈ£¹®¿¡ °ª ÀúÀå
+	//ì•”í˜¸ë¬¸ì— ê°’ ì €ì¥
 	for (int i = 0;i < k;i++) {
 		Comp(u[i], d_u, buffer_int, n);
 		ByteEncode(buffer_int, d_u, ciphertext + i * 32 * d_u);
@@ -352,7 +352,7 @@ void K_PKE_Enc(unsigned char* ek_pke, unsigned char* message, unsigned char* ran
 
 	free(buffer_int);
 
-	//°á°ú Ãâ·Â
+	//ê²°ê³¼ ì¶œë ¥
 	//printf("\nK-PKE Encryption Succeed\n");
 
 	return;
@@ -363,21 +363,21 @@ void K_PKE_Dec(unsigned char* dk_pke, unsigned char* ciphertext, unsigned char* 
 	int* buffer_int = NULL;
 	int* buffer_int_hat = NULL;
 
-	//c_1, c_2 ¼±¾ğ
-	unsigned char c_1[32 * d_u * k] = { 0 };
-	unsigned char c_2[32 * d_v] = { 0 };
+	//c_1, c_2 ì„ ì–¸
+	unsigned char c_1[MLKEM_MAX_CIPHERTEXT_BYTES] = { 0 };
+	unsigned char c_2[MLKEM_MAX_CIPHERTEXT_BYTES] = { 0 };
 
-	//c_1, c_2¿¡ ciphertextº¹»ç
+	//c_1, c_2ì— ciphertextë³µì‚¬
 	memcpy(c_1, ciphertext, 32 * d_u * k);
 	memcpy(c_2, ciphertext + 32 * d_u * k, 32 * d_v);
 
-	//u ¼±¾ğ
-	int u[k][n] = { 0 };
+	//u ì„ ì–¸
+	int u[MLKEM_MAX_K][MLKEM_N] = { 0 };
 
-	//u_ °è»ê À§ÇØ ¹öÆÛ¿¡ ¸Ş¸ğ¸® ÇÒ´ç
+	//u_ ê³„ì‚° ìœ„í•´ ë²„í¼ì— ë©”ëª¨ë¦¬ í• ë‹¹
 	buffer_int = (int*)malloc(sizeof(int) * n);
 
-	//u ¿¡ c_1 º¯È¯
+	//u ì— c_1 ë³€í™˜
 	for (int i = 0;i < k;i++) {
 		ByteDecode(c_1 + i * 32 * d_u, d_u, buffer_int);
 		Decomp(buffer_int, d_u, u[i], n);
@@ -385,46 +385,46 @@ void K_PKE_Dec(unsigned char* dk_pke, unsigned char* ciphertext, unsigned char* 
 
 	free(buffer_int);
 
-	//v ¼±¾ğ
+	//v ì„ ì–¸
 	int v_[n] = { 0 };
 
-	//v_ °è»ê À§ÇØ ¹öÆÛ¿¡ ¸Ş¸ğ¸® ÇÒ´ç
+	//v_ ê³„ì‚° ìœ„í•´ ë²„í¼ì— ë©”ëª¨ë¦¬ í• ë‹¹
 	buffer_int = (int*)malloc(sizeof(int) * n);
 	if (buffer_int == NULL) {
 		perror("Failed to allocate memory");
 		exit(EXIT_FAILURE);
 	}
 
-	//v_ ¿¡ c_2 º¯È¯
+	//v_ ì— c_2 ë³€í™˜
 	ByteDecode(c_2, d_v, buffer_int);
 	Decomp(buffer_int, d_v, v_, n);
 
 	free(buffer_int);
 
 
-	//s_hat ¼±¾ğ
-	int s_hat[k][n] = { 0 };
+	//s_hat ì„ ì–¸
+	int s_hat[MLKEM_MAX_K][MLKEM_N] = { 0 };
 
-	//s_hat ¿¡ dk_pke º¯È¯
+	//s_hat ì— dk_pke ë³€í™˜
 	for (int i = 0;i < k;i++) {
 		ByteDecode(dk_pke + i * 384, 12, s_hat[i]);
 	}
 
-	//w ¼±¾ğ, 0À¸·Î ÃÊ±âÈ­
+	//w ì„ ì–¸, 0ìœ¼ë¡œ ì´ˆê¸°í™”
 	int w[n] = { 0 };
 
-	//NTT¿¬»êÀ§ÇØ¼­ zetaºÒ·¯¿À±â
+	//NTTì—°ì‚°ìœ„í•´ì„œ zetaë¶ˆëŸ¬ì˜¤ê¸°
 	int* zeta = GenZeta();
 
-	//NTT ¿¬»ê À§ÇØ u_hat=NTT(u) ¼±¾ğ, u_hat °è»ê
-	int u_hat[k][n] = { 0 };
+	//NTT ì—°ì‚° ìœ„í•´ u_hat=NTT(u) ì„ ì–¸, u_hat ê³„ì‚°
+	int u_hat[MLKEM_MAX_K][MLKEM_N] = { 0 };
 
 	for (int i = 0;i < k;i++) {
 
 		NTT(u[i], u_hat[i], zeta);
 	}
 
-	//w °è»ê À§ÇØ ¹öÆÛ¿¡ ¸Ş¸ğ¸® ÇÒ´ç
+	//w ê³„ì‚° ìœ„í•´ ë²„í¼ì— ë©”ëª¨ë¦¬ í• ë‹¹
 	buffer_int = (int*)malloc(sizeof(int) * n);
 	buffer_int_hat = (int*)malloc(sizeof(int) * n);
 	if (buffer_int == NULL || buffer_int_hat == NULL) {
@@ -434,9 +434,9 @@ void K_PKE_Dec(unsigned char* dk_pke, unsigned char* ciphertext, unsigned char* 
 
 
 	for (int i = 0;i < k;i++) {
-		//s_hat^t*u_hat °è»ê
+		//s_hat^t*u_hat ê³„ì‚°
 		Multiply_NTT(s_hat[i], u_hat[i], buffer_int_hat, zeta);
-		//NTT inverse °è»ê ÈÄ w¿¡ ´õÇÔ
+		//NTT inverse ê³„ì‚° í›„ wì— ë”í•¨
 		NTT_inv(buffer_int_hat, buffer_int, zeta);
 		for (int j = 0;j < n;j++) {
 			w[j] = (w[j] + buffer_int[j]) % q;
@@ -446,25 +446,25 @@ void K_PKE_Dec(unsigned char* dk_pke, unsigned char* ciphertext, unsigned char* 
 	free(buffer_int);
 	free(buffer_int_hat);
 
-	//w °è»ê
+	//w ê³„ì‚°
 	for (int i = 0;i < n;i++) {
 		w[i] = (v_[i] - w[i] + q) % q;
 	}
 
-	//m_ °è»ê À§ÇØ ¹öÆÛ¿¡ ¸Ş¸ğ¸® ÇÒ´ç
+	//m_ ê³„ì‚° ìœ„í•´ ë²„í¼ì— ë©”ëª¨ë¦¬ í• ë‹¹
 	buffer_int = (int*)malloc(sizeof(int) * n);
 	if (buffer_int == NULL) {
 		perror("Failed to allocate memory");
 		exit(EXIT_FAILURE);
 	}
 
-	//m_ °è»ê
+	//m_ ê³„ì‚°
 	Comp(w, 1, buffer_int, n);
 	ByteEncode(buffer_int, 1, message_);
 
 	free(buffer_int);
 
-	//°á°ú Ãâ·Â
+	//ê²°ê³¼ ì¶œë ¥
 	//printf("\nK-PKE Decryption Succeed\n");
 	return;
 }

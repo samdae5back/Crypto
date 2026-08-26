@@ -43,54 +43,13 @@ set(CRYPTO_SOURCES
     src/SLH_DSA/slh_dsa.c
 )
 
-set(MLKEM_VARIANT_SOURCES
+list(APPEND CRYPTO_SOURCES
     src/ML_KEM/K-PKE.c
     src/ML_KEM/ML-KEM.c
     src/ML_KEM/NTT_.c
     src/ML_KEM/auxiliary.c
     src/ML_KEM/hash.c
 )
-
-function(add_mlkem_variant target suffix kval eta1 eta2 du dv)
-    add_library(${target} OBJECT ${MLKEM_VARIANT_SOURCES})
-    set_target_properties(${target} PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    target_include_directories(${target} PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/ML_KEM
-    )
-    target_compile_definitions(${target} PRIVATE
-        MLKEM_Q=3329 MLKEM_N=256 MLKEM_K=${kval} MLKEM_ETA1=${eta1} MLKEM_ETA2=${eta2} MLKEM_DU=${du} MLKEM_DV=${dv}
-        zeta=zeta_${suffix}
-        GenZeta=GenZeta_${suffix} bit_rev=bit_rev_${suffix}
-        NTT=NTT_${suffix} NTT_inv=NTT_inv_${suffix}
-        Multiply_basic=Multiply_basic_${suffix} Multiply_NTT=Multiply_NTT_${suffix}
-        exp_int=exp_int_${suffix} Bit2Byte=Bit2Byte_${suffix} Byte2Bit=Byte2Bit_${suffix}
-        ByteEncode=ByteEncode_${suffix} ByteDecode=ByteDecode_${suffix}
-        SampleNTT=SampleNTT_${suffix} SamplePolyCBD=SamplePolyCBD_${suffix}
-        Comp=Comp_${suffix} Decomp=Decomp_${suffix}
-        RBG=RBG_${suffix} sha3_256_hash=sha3_256_hash_${suffix}
-        sha3_512_hash=sha3_512_hash_${suffix} shake_256_hash=shake_256_hash_${suffix}
-        PRF=PRF_${suffix} H=H_${suffix} J=J_${suffix} G=G_${suffix}
-        XOF_init=XOF_init_${suffix} XOF_absorb=XOF_absorb_${suffix}
-        XOF_squeeze=XOF_squeeze_${suffix} XOF_clear=XOF_clear_${suffix}
-        K_PKE_KeyGen=K_PKE_KeyGen_${suffix} K_PKE_Enc=K_PKE_Enc_${suffix} K_PKE_Dec=K_PKE_Dec_${suffix}
-        ML_KEM_KeyGen_internal=ML_KEM_KeyGen_internal_${suffix}
-        ML_KEM_Encaps_internal=ML_KEM_Encaps_internal_${suffix}
-        ML_KEM_Decaps_internal=ML_KEM_Decaps_internal_${suffix}
-        ML_KEM_KeyGen=ML_KEM_KeyGen_${suffix}
-        ML_KEM_Encaps=ML_KEM_Encaps_${suffix}
-        ML_KEM_Decaps=ML_KEM_Decaps_${suffix}
-    )
-    if(MSVC)
-        target_compile_options(${target} PRIVATE /W4)
-    else()
-        target_compile_options(${target} PRIVATE -Wall -Wextra -pedantic)
-    endif()
-endfunction()
-
-add_mlkem_variant(crypto_mlkem512 512 2 3 2 10 4)
-add_mlkem_variant(crypto_mlkem768 768 3 2 2 10 4)
-add_mlkem_variant(crypto_mlkem1024 1024 4 2 2 11 5)
 
 # Build the pinned mldsa-native source three times inside one local adapter TU.
 # This avoids depending on symlinks used by the upstream example directory,
@@ -128,9 +87,6 @@ else()
 endif()
 
 add_library(Crypto ${CRYPTO_SOURCES}
-    $<TARGET_OBJECTS:crypto_mlkem512>
-    $<TARGET_OBJECTS:crypto_mlkem768>
-    $<TARGET_OBJECTS:crypto_mlkem1024>
     $<TARGET_OBJECTS:crypto_mldsa>
     $<TARGET_OBJECTS:crypto_slhdsa>
 )

@@ -1,4 +1,4 @@
-#include <stdio.h>
+ï»¿#include <stdio.h>
 #include <string.h>
 #include "NTT_.h"
 #include "hash.h"
@@ -9,28 +9,28 @@
 
 void ML_KEM_KeyGen_internal(unsigned char* d, unsigned char* z, unsigned char* ek, unsigned char* dk) {
 
-	//ek¿¡ Å° º¹»ç, dk ¾Õ ºÎºĞ¿¡ Å° º¹»ç
+	//ekì— í‚¤ ë³µì‚¬, dk ì• ë¶€ë¶„ì— í‚¤ ë³µì‚¬
 	K_PKE_KeyGen(d, ek, dk);
 
-	//dk Áß°£¿¡ ek º¹»ç
+	//dk ì¤‘ê°„ì— ek ë³µì‚¬
 	memcpy(dk + 384 * k, ek, 384 * k + 32);
 
-	//¹öÆÛ¿¡ ÇØ½¬°ª ¹Ş±â
+	//ë²„í¼ì— í•´ì‰¬ê°’ ë°›ê¸°
 	unsigned char* buffer_char = (unsigned char*)malloc(sizeof(unsigned char) * 32);
 	if (buffer_char == NULL) {
-		perror("Failed to allocate memory"); // ¿À·ù ¸Ş½ÃÁö Ãâ·Â
-		exit(EXIT_FAILURE);// ¸Ş¸ğ¸® ÇÒ´ç ½ÇÆĞ ½Ã ´õ ÀÌ»ó ÁøÇà ºÒ°¡, ÇÁ·Î±×·¥ Á¾·á ¶Ç´Â ¿À·ù Ã³¸®
+		perror("Failed to allocate memory"); // ì˜¤ë¥˜ ë©”ì‹œì§€ ì¶œë ¥
+		exit(EXIT_FAILURE);// ë©”ëª¨ë¦¬ í• ë‹¹ ì‹¤íŒ¨ ì‹œ ë” ì´ìƒ ì§„í–‰ ë¶ˆê°€, í”„ë¡œê·¸ë¨ ì¢…ë£Œ ë˜ëŠ” ì˜¤ë¥˜ ì²˜ë¦¬
 	}
 	H(ek, 384 * k + 32, buffer_char);
 
-	//ÇØ½¬°ª dk¿¡ º¹»ç
+	//í•´ì‰¬ê°’ dkì— ë³µì‚¬
 	memcpy(dk + 768 * k + 32, buffer_char, 32);
 	free(buffer_char);
 
-	//z°ª dk¿¡ º¹»ç
+	//zê°’ dkì— ë³µì‚¬
 	memcpy(dk + 768 * k + 64, z, 32);
 
-	//°á°ú Ãâ·Â
+	//ê²°ê³¼ ì¶œë ¥
 	//printf("\nML-KEM Internal Key Generatinon Succeed\n");
 
 	return;
@@ -40,27 +40,27 @@ void ML_KEM_Encaps_internal(unsigned char* ek, unsigned char* m, unsigned char* 
 
 	unsigned char* buffer_char = NULL;
 
-	//G °è»ê À§ÇØ ¹öÆÛ¿¡ ¸Ş¸ğ¸® ÇÒ´ç
+	//G ê³„ì‚° ìœ„í•´ ë²„í¼ì— ë©”ëª¨ë¦¬ í• ë‹¹
 	buffer_char = (unsigned char*)malloc(sizeof(unsigned char) * 384 * k + 32);
 	if (buffer_char == NULL) {
-		perror("Failed to allocate memory"); // ¿À·ù ¸Ş½ÃÁö Ãâ·Â
-		exit(EXIT_FAILURE);// ¸Ş¸ğ¸® ÇÒ´ç ½ÇÆĞ ½Ã ´õ ÀÌ»ó ÁøÇà ºÒ°¡, ÇÁ·Î±×·¥ Á¾·á ¶Ç´Â ¿À·ù Ã³¸®
+		perror("Failed to allocate memory"); // ì˜¤ë¥˜ ë©”ì‹œì§€ ì¶œë ¥
+		exit(EXIT_FAILURE);// ë©”ëª¨ë¦¬ í• ë‹¹ ì‹¤íŒ¨ ì‹œ ë” ì´ìƒ ì§„í–‰ ë¶ˆê°€, í”„ë¡œê·¸ë¨ ì¢…ë£Œ ë˜ëŠ” ì˜¤ë¥˜ ì²˜ë¦¬
 	}
 
-	//GÀÇ ÀÔ·Â »ı¼º
+	//Gì˜ ì…ë ¥ ìƒì„±
 	memcpy(buffer_char, m, 32);
 	H(ek, 384 * k + 32, buffer_char + 32);
 
-	//G °è»ê
+	//G ê³„ì‚°
 	unsigned char r[32] = { 0 };
 	G(buffer_char, 64, SharedSecretKey, r);
 
 	free(buffer_char);
 
-	//ciphertext °è»ê
+	//ciphertext ê³„ì‚°
 	K_PKE_Enc(ek, m, r, ciphertext);
 
-	//°á°ú Ãâ·Â
+	//ê²°ê³¼ ì¶œë ¥
 	//printf("\nML-KEM Internal Encapsulation Succeed\n");
 	return;
 }
@@ -69,31 +69,31 @@ void ML_KEM_Decaps_internal(unsigned char* dk, unsigned char* ciphertext, unsign
 
 	unsigned char* buffer_char = NULL;
 
-	//ek, dk ÃßÃâ
-	unsigned char ek_pke[384 * k + 32] = { 0 };
-	unsigned char dk_pke[384 * k] = { 0 };
+	//ek, dk ì¶”ì¶œ
+	unsigned char ek_pke[MLKEM_MAX_PUBLIC_KEY_BYTES] = { 0 };
+	unsigned char dk_pke[MLKEM_MAX_PUBLIC_KEY_BYTES] = { 0 };
 
 	memcpy(dk_pke, dk, 384 * k);
 	memcpy(ek_pke, dk + 384 * k, 384 * k + 32);
 
-	//h, z ÃßÃâ
+	//h, z ì¶”ì¶œ
 	unsigned char h[32] = { 0 };
 	unsigned char z[32] = { 0 };
 
 	memcpy(h, dk + 768 * k + 32, 32);
 	memcpy(z, dk + 768 * k + 64, 32);
 
-	//m_ »ı¼º
+	//m_ ìƒì„±
 	unsigned char m_[32] = { 0 };
 	K_PKE_Dec(dk_pke, ciphertext, m_);
 
-	//GÀÇ °è»ê À§ÇØ ¹öÆÛ¿¡ ¸Ş¸ğ¸® ÇÒ´ç
+	//Gì˜ ê³„ì‚° ìœ„í•´ ë²„í¼ì— ë©”ëª¨ë¦¬ í• ë‹¹
 	buffer_char = (unsigned char*)malloc(sizeof(unsigned char) * 64);
 	if (buffer_char == NULL) {
 		perror("Failed to allocate memory");
 		exit(EXIT_FAILURE);
 	}
-	//G °è»êÇÏ¿© SharedSecretKey_, r »ı¼º
+	//G ê³„ì‚°í•˜ì—¬ SharedSecretKey_, r ìƒì„±
 	unsigned char r[32] = { 0 };
 
 	memcpy(buffer_char, m_, 32);
@@ -103,7 +103,7 @@ void ML_KEM_Decaps_internal(unsigned char* dk, unsigned char* ciphertext, unsign
 
 	free(buffer_char);
 
-	//J °è»ê À§ÇØ ¹öÆÛ¿¡ ¸Ş¸ğ¸® ÇÒ´ç
+	//J ê³„ì‚° ìœ„í•´ ë²„í¼ì— ë©”ëª¨ë¦¬ í• ë‹¹
 	buffer_char = (unsigned char*)malloc(sizeof(unsigned char) * 32 * (d_u * k + d_v + 1));
 	if (buffer_char == NULL) {
 		perror("Failed to allocate memory");
@@ -113,14 +113,14 @@ void ML_KEM_Decaps_internal(unsigned char* dk, unsigned char* ciphertext, unsign
 	memcpy(buffer_char, m_, 32);
 	memcpy(buffer_char + 32, ciphertext, 32);
 
-	//°ÅÁş Å° »ı¼º
+	//ê±°ì§“ í‚¤ ìƒì„±
 	unsigned char SharedSecretKey__false[32] = { 0 };
 	J(buffer_char, 32, SharedSecretKey__false);
 
 	free(buffer_char);
 
-	//ciphertext_ »ı¼º
-	unsigned char ciphertext_[32 * (d_u * k + d_v)] = { 0 };
+	//ciphertext_ ìƒì„±
+	unsigned char ciphertext_[MLKEM_MAX_CIPHERTEXT_BYTES] = { 0 };
 	K_PKE_Enc(ek_pke, m_, r, ciphertext_);
 
 	for (int i = 0;i < 32 * (d_u * k + d_v);i++) {
@@ -131,24 +131,24 @@ void ML_KEM_Decaps_internal(unsigned char* dk, unsigned char* ciphertext, unsign
 		}
 	}
 
-	//°á°ú Ãâ·Â
+	//ê²°ê³¼ ì¶œë ¥
 	//printf("\nML-KEM Internal Decapsulation Succeed\n");
 	return;
 }
 
 void ML_KEM_KeyGen(unsigned char* ek, unsigned char* dk) {
-	//d »ı¼º
+	//d ìƒì„±
 	unsigned char d[32] = { 0 };
 	RBG(d, 32);
 
-	//z »ı¼º
+	//z ìƒì„±
 	unsigned char z[32] = { 0 };
 	RBG(z, 32);
 
-	//ek, dk »ı¼º
+	//ek, dk ìƒì„±
 	ML_KEM_KeyGen_internal(d, z, ek, dk);
 	
-	//°á°ú Ãâ·Â
+	//ê²°ê³¼ ì¶œë ¥
 	//printf("\nML-KEM Key Generatinon Succeed\n");
 
 	return;
@@ -156,13 +156,13 @@ void ML_KEM_KeyGen(unsigned char* ek, unsigned char* dk) {
 
 void ML_KEM_Encaps(unsigned char* ek, unsigned char* SharedSecretKey, unsigned char* c) {
 
-	//m »ı¼º
+	//m ìƒì„±
 	unsigned char m[32] = { 0 };
 	RBG(m, 32);
 
 	ML_KEM_Encaps_internal(ek, m, SharedSecretKey, c);
 
-	//°á°ú Ãâ·Â
+	//ê²°ê³¼ ì¶œë ¥
 	//printf("\nML-KEM Encapsulation Succeed\n");
 
 	return;
@@ -172,6 +172,6 @@ void ML_KEM_Decaps(unsigned char* dk, unsigned char* c, unsigned char* SharedSec
 
 	ML_KEM_Decaps_internal(dk, c, SharedSecretKey_);
 
-	//°á°ú Ãâ·Â
+	//ê²°ê³¼ ì¶œë ¥
 	//printf("\nML-KEM Decapsulation Succeed\n");
 }
