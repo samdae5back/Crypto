@@ -98,7 +98,11 @@ add_mlkem_variant(crypto_mlkem1024 1024 4 2 2 11 5)
 add_library(crypto_mldsa OBJECT src/ML_DSA/mldsa_backend.c)
 set_target_properties(crypto_mldsa PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(crypto_mldsa PRIVATE ${MLDSA_NATIVE_DIR}/mldsa)
-target_compile_definitions(crypto_mldsa PRIVATE MLD_CONFIG_NO_RANDOMIZED_API)
+target_compile_definitions(crypto_mldsa PRIVATE
+    MLD_CONFIG_NO_RANDOMIZED_API
+    MLD_CONFIG_MULTILEVEL_BUILD
+    MLD_CONFIG_NAMESPACE_PREFIX=mldsa
+)
 
 # slhdsa-c exposes all twelve FIPS 205 parameter objects from one portable build.
 set(SLHDSA_VENDOR_SOURCES
@@ -148,7 +152,11 @@ target_include_directories(Crypto
         ${MLDSA_NATIVE_DIR}/mldsa
         ${SLHDSA_C_DIR}
 )
-target_compile_definitions(Crypto PRIVATE MLD_CONFIG_NO_RANDOMIZED_API)
+target_compile_definitions(Crypto PRIVATE
+    MLD_CONFIG_NO_RANDOMIZED_API
+    MLD_CONFIG_MULTILEVEL_BUILD
+    MLD_CONFIG_NAMESPACE_PREFIX=mldsa
+)
 
 if(BUILD_SHARED_LIBS)
     target_compile_definitions(Crypto PUBLIC CRYPTO_SHARED PRIVATE CRYPTO_BUILDING_LIBRARY)
