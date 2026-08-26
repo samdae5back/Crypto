@@ -2,7 +2,7 @@
 
 A portable C11 cryptography library that collects the algorithms and reusable primitives in this repository behind one CMake target and one public include directory.
 
-> **Status:** educational/reference implementation. In particular, `ALG_RSA_RAW` is textbook/raw RSA without OAEP/PSS padding and must not be used directly as a production encryption/signature scheme.
+> **Status:** educational/reference implementation. In particular, `ALG_RSA_RAW` is textbook/raw RSA without OAEP/PSS padding and must not be used directly as a production encryption/signature scheme. The portable AES implementation uses lookup tables and is not designed to provide cache-timing resistance; use a platform/hardware-backed constant-time implementation for high-assurance production use.
 
 ## Layout
 
@@ -14,6 +14,7 @@ A portable C11 cryptography library that collects the algorithms and reusable pr
 │   ├── CRYPTO.h
 │   ├── ALGID.h
 │   ├── ERROR.h
+│   ├── AES.h
 │   ├── BIGNUM.h
 │   ├── PRIME.h
 │   ├── RSA.h
@@ -25,6 +26,7 @@ A portable C11 cryptography library that collects the algorithms and reusable pr
 │   ├── NTT.h
 │   └── ML_KEM.h
 ├── src/
+│   ├── AES/
 │   ├── BIGNUM/
 │   ├── CORE/
 │   ├── ELGAMAL/
@@ -81,8 +83,48 @@ On Windows the shared library links `bcrypt` for `BCryptGenRandom`. Linux uses `
 | `ALG_RSA_RAW` | `0x2001` | raw RSA |
 | `ALG_ELGAMAL_SAFE_PRIME` | `0x3001` | safe-prime ElGamal |
 | `ALG_NTT_GENERIC` | `0x4001` | generic radix-2 cyclic NTT |
+| `ALG_AES_128` | `0x5001` | AES-128 |
+| `ALG_AES_192` | `0x5002` | AES-192 |
+| `ALG_AES_256` | `0x5003` | AES-256 |
 
 `ALGID_NAME()` returns a printable name for an identifier.
+
+## AES
+
+AES supports 128-, 192-, and 256-bit keys through the same `AlgID`-selected API. `AES_KEY_SIZE()` returns the required key size for a selected AES identifier.
+
+Low-level context/block API:
+
+```c
+AES_CONTEXT ctx;
+uint8_t out[AES_BLOCK_SIZE];
+
+CryptoError err = AES_CONTEXT_INIT(&ctx, ALG_AES_256, key, key_len);
+if (err == CRYPTO_SUCCESS)
+    err = AES_ENCRYPT_BLOCK(&ctx, plaintext_block, out);
+AES_CONTEXT_CLEAR(&ctx);
+```
+
+One-shot modes are also provided:
+
+- `AES_ECB_ENCRYPT` / `AES_ECB_DECRYPT`
+- `AES_CBC_ENCRYPT` / `AES_CBC_DECRYPT`
+- `AES_CTR_CRYPT`
+
+ECB and CBC require `INPUT_LENGTH` to be a multiple of 16 bytes and **do not add or remove padding**. CTR accepts arbitrary lengths and uses a 128-bit big-endian counter increment. CBC and CTR require the caller to provide the IV/initial counter.
+
+```c
+CryptoError err = AES_CBC_ENCRYPT(
+    ALG_AES_128,
+    key, 16,
+    iv,
+    plaintext, plaintext_len,
+    ciphertext, ciphertext_len);
+```
+
+These APIs provide confidentiality only. ECB should generally be avoided, and CBC/CTR must be combined with an appropriate authentication construction when integrity/authenticity is required. No implicit padding, MAC, or AEAD behavior is added by these functions.
+
+The test suite includes AES-128/192/256 FIPS-197 known-answer vectors and SP 800-38A CBC/CTR vectors.
 
 ## ML-KEM dynamic dispatch
 

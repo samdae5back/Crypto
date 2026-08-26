@@ -3,6 +3,7 @@
 #include "TYPES.h"
 #include "ALGID.h"
 #include "ERROR.h"
+#include "AES.h"
 #include "BIGNUM.h"
 #include "PRIME.h"
 #include "RSA.h"
