@@ -140,9 +140,13 @@ install(EXPORT CryptoTargets NAMESPACE Crypto:: DESTINATION ${CMAKE_INSTALL_LIBD
 
 if(CRYPTO_BUILD_TESTS)
     enable_testing()
-    add_executable(crypto_tests tests/test_crypto.c)
-    target_link_libraries(crypto_tests PRIVATE Crypto)
-    add_test(NAME crypto_tests COMMAND crypto_tests)
+    add_executable(crypto_unittest tests/test_crypto.c)
+    target_link_libraries(crypto_unittest PRIVATE Crypto)
+    add_test(NAME crypto_unittest COMMAND crypto_unittest)
+
+    add_executable(crypto_kat tests/test_kat.c)
+    target_link_libraries(crypto_kat PRIVATE Crypto)
+    add_test(NAME crypto_kat COMMAND crypto_kat)
 
     add_executable(ctr_drbg_tests tests/test_ctr_drbg.c)
     target_link_libraries(ctr_drbg_tests PRIVATE Crypto)
