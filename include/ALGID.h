@@ -1,0 +1,28 @@
+#ifndef CRYPTO_ALGID_H
+#define CRYPTO_ALGID_H
+
+#include "CRYPTO_EXPORT.h"
+
+typedef int AlgID;
+
+enum {
+    ALG_NONE = 0,
+
+    ALG_HASH_SHA3_256 = 0x0101,
+    ALG_HASH_SHA3_512 = 0x0102,
+    ALG_HASH_SHAKE128 = 0x0111,
+    ALG_HASH_SHAKE256 = 0x0112,
+
+    ALG_ML_KEM_512  = 0x1001,
+    ALG_ML_KEM_768  = 0x1002,
+    ALG_ML_KEM_1024 = 0x1003,
+
+    ALG_RSA_RAW = 0x2001,
+    ALG_ELGAMAL_SAFE_PRIME = 0x3001,
+
+    ALG_NTT_GENERIC = 0x4001
+};
+
+CRYPTO_API const char *ALGID_NAME(AlgID ALG);
+
+#endif

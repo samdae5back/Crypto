@@ -1,0 +1,29 @@
+#ifndef CRYPTO_PUBLIC_SHA3_H
+#define CRYPTO_PUBLIC_SHA3_H
+
+#include "TYPES.h"
+#include "CRYPTO_EXPORT.h"
+
+#define SHA3_256_DIGEST_SIZE 32u
+#define SHA3_512_DIGEST_SIZE 64u
+
+typedef struct {
+    uint64_t STATE[25];
+    size_t RATE;
+    size_t POS;
+    uint8_t DOMAIN;
+    uint8_t FINALIZED;
+} SHA3_CONTEXT;
+
+CRYPTO_API void SHA3_256(uint8_t OUT[SHA3_256_DIGEST_SIZE], const uint8_t *IN, size_t IN_LENGTH);
+CRYPTO_API void SHA3_512(uint8_t OUT[SHA3_512_DIGEST_SIZE], const uint8_t *IN, size_t IN_LENGTH);
+CRYPTO_API void SHAKE128(uint8_t *OUT, size_t OUT_LENGTH, const uint8_t *IN, size_t IN_LENGTH);
+CRYPTO_API void SHAKE256(uint8_t *OUT, size_t OUT_LENGTH, const uint8_t *IN, size_t IN_LENGTH);
+CRYPTO_API void SHAKE128_INIT(SHA3_CONTEXT *CONTEXT);
+CRYPTO_API void SHAKE256_INIT(SHA3_CONTEXT *CONTEXT);
+CRYPTO_API void SHA3_UPDATE(SHA3_CONTEXT *CONTEXT, const uint8_t *IN, size_t IN_LENGTH);
+CRYPTO_API void SHA3_FINALIZE(SHA3_CONTEXT *CONTEXT);
+CRYPTO_API void SHA3_SQUEEZE(SHA3_CONTEXT *CONTEXT, uint8_t *OUT, size_t OUT_LENGTH);
+CRYPTO_API void SHA3_CLEAR(SHA3_CONTEXT *CONTEXT);
+
+#endif

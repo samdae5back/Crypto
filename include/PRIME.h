@@ -1,0 +1,13 @@
+#ifndef CRYPTO_PRIME_H
+#define CRYPTO_PRIME_H
+
+#include "TYPES.h"
+#include "ERROR.h"
+#include "BIGNUM.h"
+#include "CRYPTO_EXPORT.h"
+
+CRYPTO_API int PRIME_IS_PROBABLE(const BIGNUM *VALUE, uint32_t ROUNDS);
+CRYPTO_API CryptoError PRIME_GENERATE(BIGNUM *OUT, size_t BITS, uint32_t ROUNDS);
+CRYPTO_API CryptoError PRIME_GENERATE_SAFE(BIGNUM *P, BIGNUM *Q, size_t P_BITS, uint32_t ROUNDS);
+
+#endif
