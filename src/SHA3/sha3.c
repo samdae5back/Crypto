@@ -1,5 +1,6 @@
 #include "SHA3.h"
 #include "sha3_internal.h"
+#include "INTERNAL/secure_zero.h"
 #include <string.h>
 
 static uint64_t rol64(uint64_t x, unsigned n) { return n ? ((x << n) | (x >> (64u - n))) : x; }
@@ -30,11 +31,14 @@ void sha3_keccak_f1600(uint64_t s[25]) {
         for (y = 0; y < 5; ++y) for (x = 0; x < 5; ++x)
             s[x+5*y] = b[x+5*y] ^ ((~b[(x+1)%5+5*y]) & b[(x+2)%5+5*y]);
         s[0] ^= rc[round];
+        crypto_zeroize(c, sizeof(c));
+        crypto_zeroize(d, sizeof(d));
+        crypto_zeroize(b, sizeof(b));
     }
 }
 
 static void ctx_init(SHA3_CONTEXT *ctx, size_t rate, uint8_t domain) {
-    memset(ctx, 0, sizeof(*ctx));
+    crypto_zeroize(ctx, sizeof(*ctx));
     ctx->RATE = rate;
     ctx->DOMAIN = domain;
 }
@@ -89,11 +93,7 @@ void SHA3_SQUEEZE(SHA3_CONTEXT *CONTEXT, uint8_t *OUT, size_t OUT_LENGTH) {
 }
 
 void SHA3_CLEAR(SHA3_CONTEXT *CONTEXT) {
-    if (CONTEXT) {
-        volatile uint8_t *p = (volatile uint8_t *)CONTEXT;
-        size_t i;
-        for (i = 0; i < sizeof(*CONTEXT); ++i) p[i] = 0;
-    }
+    if (CONTEXT) crypto_zeroize(CONTEXT, sizeof(*CONTEXT));
 }
 
 static void hash_fixed(uint8_t *out, size_t out_len, const uint8_t *in, size_t in_len, size_t rate) {
