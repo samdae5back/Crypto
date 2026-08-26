@@ -13,6 +13,9 @@ const char *ALGID_NAME(AlgID alg) {
         case ALG_RSA_RAW: return "RSA-RAW";
         case ALG_ELGAMAL_SAFE_PRIME: return "ELGAMAL-SAFE-PRIME";
         case ALG_NTT_GENERIC: return "NTT-GENERIC";
+        case ALG_AES_128: return "AES-128";
+        case ALG_AES_192: return "AES-192";
+        case ALG_AES_256: return "AES-256";
         case ALG_NONE: return "NONE";
         default: return "UNKNOWN";
     }
