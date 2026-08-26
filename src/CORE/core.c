@@ -22,6 +22,21 @@ const char *ALGID_NAME(AlgID alg) {
         case ALG_CTR_DRBG_AES_128_NO_DF: return "CTR-DRBG-AES-128-NO-DF";
         case ALG_CTR_DRBG_AES_192_NO_DF: return "CTR-DRBG-AES-192-NO-DF";
         case ALG_CTR_DRBG_AES_256_NO_DF: return "CTR-DRBG-AES-256-NO-DF";
+        case ALG_ML_DSA_44: return "ML-DSA-44";
+        case ALG_ML_DSA_65: return "ML-DSA-65";
+        case ALG_ML_DSA_87: return "ML-DSA-87";
+        case ALG_SLH_DSA_SHA2_128S: return "SLH-DSA-SHA2-128s";
+        case ALG_SLH_DSA_SHA2_128F: return "SLH-DSA-SHA2-128f";
+        case ALG_SLH_DSA_SHA2_192S: return "SLH-DSA-SHA2-192s";
+        case ALG_SLH_DSA_SHA2_192F: return "SLH-DSA-SHA2-192f";
+        case ALG_SLH_DSA_SHA2_256S: return "SLH-DSA-SHA2-256s";
+        case ALG_SLH_DSA_SHA2_256F: return "SLH-DSA-SHA2-256f";
+        case ALG_SLH_DSA_SHAKE_128S: return "SLH-DSA-SHAKE-128s";
+        case ALG_SLH_DSA_SHAKE_128F: return "SLH-DSA-SHAKE-128f";
+        case ALG_SLH_DSA_SHAKE_192S: return "SLH-DSA-SHAKE-192s";
+        case ALG_SLH_DSA_SHAKE_192F: return "SLH-DSA-SHAKE-192f";
+        case ALG_SLH_DSA_SHAKE_256S: return "SLH-DSA-SHAKE-256s";
+        case ALG_SLH_DSA_SHAKE_256F: return "SLH-DSA-SHAKE-256f";
         case ALG_NONE: return "NONE";
         default: return "UNKNOWN";
     }
@@ -43,6 +58,7 @@ const char *CRYPTO_ERROR_STRING(CryptoError error) {
         case CRYPTO_ERROR_INTERNAL: return "internal error";
         case CRYPTO_ERROR_AUTHENTICATION_FAILED: return "authentication tag verification failed";
         case CRYPTO_ERROR_RESEED_REQUIRED: return "DRBG reseed required";
+        case CRYPTO_ERROR_SIGNATURE_INVALID: return "digital signature verification failed";
         default: return "unknown error";
     }
 }
