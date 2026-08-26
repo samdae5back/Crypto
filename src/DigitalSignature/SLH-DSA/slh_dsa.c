@@ -1,8 +1,8 @@
 #include "SLH_DSA.h"
 #include "RANDOM.h"
-#include "INTERNAL/secure_zero.h"
+#include "Util/Core/secure_zero.h"
 /* Use an explicit path: Windows treats this like the public SLH_DSA.h name. */
-#include "../../third_party/slhdsa-c/slh_dsa.h"
+#include "../../../third_party/slhdsa-c/slh_dsa.h"
 
 static const slh_param_t *slh_dsa_parameters(AlgID alg) {
     switch (alg) {

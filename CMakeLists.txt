@@ -24,37 +24,37 @@ if(NOT EXISTS "${MLDSA_NATIVE_DIR}/mldsa/mldsa_native.c" OR
 endif()
 
 set(CRYPTO_SOURCES
-    src/CORE/core.c
-    src/INTERNAL/secure_zero.c
-    src/AES/aes.c
-    src/AES/aes_aead.c
-    src/DRBG/ctr_drbg.c
-    src/BIGNUM/bignum.c
-    src/PRIME/prime.c
-    src/RSA/rsa.c
-    src/ELGAMAL/elgamal.c
-    src/SHA3/sha3.c
-    src/HASH/hash.c
-    src/RANDOM/random.c
-    src/ENDIAN/endian.c
-    src/NTT/ntt.c
-    src/ML_KEM/api.c
-    src/ML_DSA/ml_dsa.c
-    src/SLH_DSA/slh_dsa.c
+    src/Util/Core/core.c
+    src/Util/Core/secure_zero.c
+    src/BlockCipher/AES/aes.c
+    src/BlockCipher/AES/aes_aead.c
+    src/RandomNumberGeneration/CTR_DRBG/ctr_drbg.c
+    src/Util/Bignum/bignum.c
+    src/Util/Prime/prime.c
+    src/AsymmetricCipher/RSA/rsa.c
+    src/AsymmetricCipher/ElGamal/elgamal.c
+    src/HashFunction/SHA3/sha3.c
+    src/HashFunction.c
+    src/RandomNumberGeneration/Noise/random.c
+    src/Util/Endian/endian.c
+    src/Util/NTT/ntt.c
+    src/KeyEncapsulation/ML-KEM/api.c
+    src/DigitalSignature/ML-DSA/ml_dsa.c
+    src/DigitalSignature/SLH-DSA/slh_dsa.c
 )
 
 list(APPEND CRYPTO_SOURCES
-    src/ML_KEM/K-PKE.c
-    src/ML_KEM/ML-KEM.c
-    src/ML_KEM/NTT_.c
-    src/ML_KEM/auxiliary.c
-    src/ML_KEM/hash.c
+    src/KeyEncapsulation/ML-KEM/K-PKE.c
+    src/KeyEncapsulation/ML-KEM/ML-KEM.c
+    src/KeyEncapsulation/ML-KEM/NTT_.c
+    src/KeyEncapsulation/ML-KEM/auxiliary.c
+    src/KeyEncapsulation/ML-KEM/hash.c
 )
 
 # Build the pinned mldsa-native source three times inside one local adapter TU.
 # This avoids depending on symlinks used by the upstream example directory,
 # which makes checkout/build behavior consistent on Windows as well.
-add_library(crypto_mldsa OBJECT src/ML_DSA/mldsa_backend.c)
+add_library(crypto_mldsa OBJECT src/DigitalSignature/ML-DSA/mldsa_backend.c)
 set_target_properties(crypto_mldsa PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(crypto_mldsa PRIVATE ${MLDSA_NATIVE_DIR}/mldsa)
 target_compile_definitions(crypto_mldsa PRIVATE
@@ -109,7 +109,7 @@ target_include_directories(Crypto
         $<INSTALL_INTERFACE:include>
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/ML_DSA
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/DigitalSignature/ML-DSA
         ${MLDSA_NATIVE_DIR}/mldsa
         ${SLHDSA_C_DIR}
 )

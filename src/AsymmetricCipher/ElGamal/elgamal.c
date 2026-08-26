@@ -1,7 +1,7 @@
 #include "ELGAMAL.h"
 #include "PRIME.h"
 #include "elgamal_internal.h"
-#include "../BIGNUM/bignum_internal.h"
+#include "Util/Bignum/bignum_internal.h"
 
 void CRYPTO_ELGAMAL_PUBLIC_KEY_INIT(ELGAMAL_PUBLIC_KEY *key) {
     if (!key) return;

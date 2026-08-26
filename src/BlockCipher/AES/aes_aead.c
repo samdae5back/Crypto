@@ -1,5 +1,5 @@
 #include "AES.h"
-#include "INTERNAL/secure_zero.h"
+#include "Util/Core/secure_zero.h"
 
 #include <string.h>
 

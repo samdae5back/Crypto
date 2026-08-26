@@ -1,7 +1,7 @@
 #include "CTR_DRBG.h"
 #include "AES.h"
 #include "RANDOM.h"
-#include "INTERNAL/secure_zero.h"
+#include "Util/Core/secure_zero.h"
 
 #include <stdlib.h>
 #include <string.h>

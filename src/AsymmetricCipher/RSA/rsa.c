@@ -1,7 +1,7 @@
 #include "RSA.h"
 #include "PRIME.h"
 #include "rsa_internal.h"
-#include "../BIGNUM/bignum_internal.h"
+#include "Util/Bignum/bignum_internal.h"
 
 #include <stdint.h>
 

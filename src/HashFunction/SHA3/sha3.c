@@ -1,6 +1,6 @@
 #include "SHA3.h"
 #include "sha3_internal.h"
-#include "INTERNAL/secure_zero.h"
+#include "Util/Core/secure_zero.h"
 #include <string.h>
 
 static uint64_t rol64(uint64_t x, unsigned n) { return n ? ((x << n) | (x >> (64u - n))) : x; }

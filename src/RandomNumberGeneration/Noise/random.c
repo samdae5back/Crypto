@@ -1,6 +1,6 @@
 #include "RANDOM.h"
 #include "random_internal.h"
-#include "../INTERNAL/crypto_types.h"
+#include "Util/Core/crypto_types.h"
 
 #if defined(_WIN32)
 #ifndef WIN32_LEAN_AND_MEAN

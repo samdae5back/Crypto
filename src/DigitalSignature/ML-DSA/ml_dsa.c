@@ -1,6 +1,6 @@
 #include "ML_DSA.h"
 #include "RANDOM.h"
-#include "INTERNAL/secure_zero.h"
+#include "Util/Core/secure_zero.h"
 #include "mldsa_native_all.h"
 
 #include <string.h>
