@@ -1,34 +1,33 @@
 cmake_minimum_required(VERSION 3.10)
-project(ML-KEM C)
+project(ML_KEM C)
 
 set(CMAKE_C_STANDARD 11)
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -pedantic")
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS OFF)
 
-file(GLOB_RECURSE SOURCES "source/*.c" "source/*.h")
-file(GLOB_RECURSE TESTS "test/*.c")
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../common ${CMAKE_CURRENT_BINARY_DIR}/common)
 
-add_executable(${PROJECT_NAME} ${SOURCES})
+add_executable(ML-KEM
+    test.c
+    K-PKE.c
+    KAT.c
+    ML-KEM.c
+    NTT_.c
+    auxiliary.c
+    hash.c
+)
 
-find_package(OpenSSL REQUIRED COMPONENTS SSL Crypto)
-if (OpenSSL_FOUND)
-    include_directories(${OpenSSL_INCLUDE_DIRS})
-    message(STATUS "Project Name: ${PROJECT_NAME}")
-    target_link_libraries(${PROJECT_NAME} PRIVATE OpenSSL::SSL OpenSSL::Crypto)
-    message(STATUS "Found OpenSSL library")
+target_include_directories(ML-KEM PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_LIST_DIR}/../common
+)
+target_link_libraries(ML-KEM PRIVATE crypto_common)
+
+if(MSVC)
+    target_compile_options(ML-KEM PRIVATE /W4)
 else()
-    message(FATAL_ERROR "OpenSSL library not found")
+    target_compile_options(ML-KEM PRIVATE -Wall -Wextra -pedantic)
 endif()
 
-if (BUILD_TESTING)
-    enable_testing()
-    add_executable(runTests ${TESTS} ${SOURCES})
-    target_link_libraries(runTests PRIVATE OpenSSL::SSL OpenSSL::Crypto)
-    add_test(NAME UnitTests COMMAND runTests)
-endif()
-
-install(TARGETS ${PROJECT_NAME} DESTINATION bin)
-install(DIRECTORY source/ DESTINATION include)
-
-# 설치 규칙 (선택 사항)
-install(TARGETS ${PROJECT_NAME} DESTINATION bin)
-install(DIRECTORY source/ DESTINATION include) # 헤더 파일 설치
+# The KAT runner opens this file by relative path.
+configure_file(ml_kem_512.kat ml_kem_512.kat COPYONLY)
