@@ -466,97 +466,152 @@ static void LSH_512_512_Return(unsigned char out[64], const unsigned char in[128
 	lsh512_return(out, in, 64);
 }
 
-CryptoError crypto_lsh_hash(
-	uint8_t *OUTPUT, size_t OUTPUT_LENGTH,
-	const uint8_t *INPUT, size_t INPUT_LENGTH,
+CryptoError crypto_lsh_init(
+	crypto_lsh_context *CONTEXT,
 	AlgID ALG)
 {
-	unsigned char state[128];
-	unsigned char block[256];
-	size_t block_length;
-	int use_lsh512;
-
-	(void)OUTPUT_LENGTH;
-	memset(state, 0, sizeof(state));
+	if (CONTEXT == NULL) {
+		return CRYPTO_ERROR_INVALID_ARGUMENT;
+	}
+	crypto_zeroize(CONTEXT, sizeof(*CONTEXT));
 	switch (ALG) {
 	case ALG_HASH_LSH_256_224:
-		LSH_256_224_Preprocess(state);
-		block_length = 128u;
-		use_lsh512 = 0;
+		LSH_256_224_Preprocess(CONTEXT->STATE);
+		CONTEXT->BLOCK_LENGTH = 128u;
 		break;
 	case ALG_HASH_LSH_256_256:
-		LSH_256_256_Preprocess(state);
-		block_length = 128u;
-		use_lsh512 = 0;
+		LSH_256_256_Preprocess(CONTEXT->STATE);
+		CONTEXT->BLOCK_LENGTH = 128u;
 		break;
 	case ALG_HASH_LSH_512_224:
-		LSH_512_224_Preprocess(state);
-		block_length = 256u;
-		use_lsh512 = 1;
+		LSH_512_224_Preprocess(CONTEXT->STATE);
+		CONTEXT->BLOCK_LENGTH = 256u;
+		CONTEXT->USE_LSH512 = 1u;
 		break;
 	case ALG_HASH_LSH_512_256:
-		LSH_512_256_Preprocess(state);
-		block_length = 256u;
-		use_lsh512 = 1;
+		LSH_512_256_Preprocess(CONTEXT->STATE);
+		CONTEXT->BLOCK_LENGTH = 256u;
+		CONTEXT->USE_LSH512 = 1u;
 		break;
 	case ALG_HASH_LSH_512_384:
-		LSH_512_384_Preprocess(state);
-		block_length = 256u;
-		use_lsh512 = 1;
+		LSH_512_384_Preprocess(CONTEXT->STATE);
+		CONTEXT->BLOCK_LENGTH = 256u;
+		CONTEXT->USE_LSH512 = 1u;
 		break;
 	case ALG_HASH_LSH_512_512:
-		LSH_512_512_Preprocess(state);
-		block_length = 256u;
-		use_lsh512 = 1;
+		LSH_512_512_Preprocess(CONTEXT->STATE);
+		CONTEXT->BLOCK_LENGTH = 256u;
+		CONTEXT->USE_LSH512 = 1u;
 		break;
 	default:
-		crypto_zeroize(state, sizeof(state));
+		crypto_zeroize(CONTEXT, sizeof(*CONTEXT));
 		return CRYPTO_ERROR_INVALID_ALG_ID;
 	}
+	return CRYPTO_SUCCESS;
+}
 
-	while (INPUT_LENGTH >= block_length) {
-		if (use_lsh512) {
-			LSH_512_CompressBlock(state, INPUT);
-		} else {
-			LSH_256_CompressBlock(state, INPUT);
+CryptoError crypto_lsh_update(
+	crypto_lsh_context *CONTEXT,
+	const uint8_t *INPUT, size_t INPUT_LENGTH)
+{
+	size_t available;
+	size_t copied;
+
+	if (CONTEXT == NULL || (INPUT == NULL && INPUT_LENGTH != 0u)) {
+		return CRYPTO_ERROR_INVALID_ARGUMENT;
+	}
+	if (CONTEXT->BLOCK_LENGTH != 128u && CONTEXT->BLOCK_LENGTH != 256u) {
+		return CRYPTO_ERROR_INVALID_ARGUMENT;
+	}
+
+	if (CONTEXT->BUFFER_LENGTH != 0u) {
+		available = CONTEXT->BLOCK_LENGTH - CONTEXT->BUFFER_LENGTH;
+		copied = INPUT_LENGTH < available ? INPUT_LENGTH : available;
+		if (copied != 0u) {
+			memcpy(CONTEXT->BLOCK + CONTEXT->BUFFER_LENGTH, INPUT, copied);
+			CONTEXT->BUFFER_LENGTH += copied;
+			INPUT += copied;
+			INPUT_LENGTH -= copied;
 		}
-		INPUT += block_length;
-		INPUT_LENGTH -= block_length;
+		if (CONTEXT->BUFFER_LENGTH == CONTEXT->BLOCK_LENGTH) {
+			if (CONTEXT->USE_LSH512 != 0u) {
+				LSH_512_CompressBlock(CONTEXT->STATE, CONTEXT->BLOCK);
+			} else {
+				LSH_256_CompressBlock(CONTEXT->STATE, CONTEXT->BLOCK);
+			}
+			CONTEXT->BUFFER_LENGTH = 0u;
+		}
 	}
 
-	memset(block, 0, sizeof(block));
+	while (INPUT_LENGTH >= CONTEXT->BLOCK_LENGTH) {
+		if (CONTEXT->USE_LSH512 != 0u) {
+			LSH_512_CompressBlock(CONTEXT->STATE, INPUT);
+		} else {
+			LSH_256_CompressBlock(CONTEXT->STATE, INPUT);
+		}
+		INPUT += CONTEXT->BLOCK_LENGTH;
+		INPUT_LENGTH -= CONTEXT->BLOCK_LENGTH;
+	}
 	if (INPUT_LENGTH != 0u) {
-		memcpy(block, INPUT, INPUT_LENGTH);
+		memcpy(CONTEXT->BLOCK, INPUT, INPUT_LENGTH);
+		CONTEXT->BUFFER_LENGTH = INPUT_LENGTH;
 	}
-	block[INPUT_LENGTH] = 0x80u;
-	if (use_lsh512) {
-		LSH_512_CompressBlock(state, block);
-	} else {
-		LSH_256_CompressBlock(state, block);
-	}
+	return CRYPTO_SUCCESS;
+}
 
+void crypto_lsh_finalize(crypto_lsh_context *CONTEXT)
+{
+	if (CONTEXT == NULL ||
+	    (CONTEXT->BLOCK_LENGTH != 128u && CONTEXT->BLOCK_LENGTH != 256u)) {
+		return;
+	}
+	memset(CONTEXT->BLOCK + CONTEXT->BUFFER_LENGTH, 0,
+	       CONTEXT->BLOCK_LENGTH - CONTEXT->BUFFER_LENGTH);
+	CONTEXT->BLOCK[CONTEXT->BUFFER_LENGTH] = 0x80u;
+	if (CONTEXT->USE_LSH512 != 0u) {
+		LSH_512_CompressBlock(CONTEXT->STATE, CONTEXT->BLOCK);
+	} else {
+		LSH_256_CompressBlock(CONTEXT->STATE, CONTEXT->BLOCK);
+	}
+	crypto_zeroize(CONTEXT->BLOCK, sizeof(CONTEXT->BLOCK));
+	CONTEXT->BUFFER_LENGTH = 0u;
+}
+
+void crypto_lsh_squeeze(
+	const crypto_lsh_context *CONTEXT,
+	uint8_t *OUTPUT,
+	AlgID ALG)
+{
+	if (CONTEXT == NULL || OUTPUT == NULL) {
+		return;
+	}
 	switch (ALG) {
 	case ALG_HASH_LSH_256_224:
-		LSH_256_224_Return(OUTPUT, state);
+		LSH_256_224_Return(OUTPUT, CONTEXT->STATE);
 		break;
 	case ALG_HASH_LSH_256_256:
-		LSH_256_256_Return(OUTPUT, state);
+		LSH_256_256_Return(OUTPUT, CONTEXT->STATE);
 		break;
 	case ALG_HASH_LSH_512_224:
-		LSH_512_224_Return(OUTPUT, state);
+		LSH_512_224_Return(OUTPUT, CONTEXT->STATE);
 		break;
 	case ALG_HASH_LSH_512_256:
-		LSH_512_256_Return(OUTPUT, state);
+		LSH_512_256_Return(OUTPUT, CONTEXT->STATE);
 		break;
 	case ALG_HASH_LSH_512_384:
-		LSH_512_384_Return(OUTPUT, state);
+		LSH_512_384_Return(OUTPUT, CONTEXT->STATE);
+		break;
+	case ALG_HASH_LSH_512_512:
+		LSH_512_512_Return(OUTPUT, CONTEXT->STATE);
 		break;
 	default:
-		LSH_512_512_Return(OUTPUT, state);
 		break;
 	}
+}
 
-	crypto_zeroize(block, sizeof(block));
-	crypto_zeroize(state, sizeof(state));
-	return CRYPTO_SUCCESS;
+void crypto_lsh_clear(crypto_lsh_context *CONTEXT)
+{
+	if (CONTEXT != NULL) {
+		crypto_zeroize(CONTEXT, sizeof(*CONTEXT));
+	}
 }

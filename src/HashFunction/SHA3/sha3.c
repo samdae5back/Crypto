@@ -95,6 +95,38 @@ static uint8_t get_byte(
     return (uint8_t)(context->state[lane] >> shift);
 }
 
+CryptoError crypto_sha3_init(
+    crypto_sha3_context *CONTEXT,
+    AlgID ALG) {
+    if (CONTEXT == NULL) {
+        return CRYPTO_ERROR_INVALID_ARGUMENT;
+    }
+    switch (ALG) {
+        case ALG_HASH_SHA3_224:
+            sha3_context_init(CONTEXT, 144u, 0x06u);
+            break;
+        case ALG_HASH_SHA3_256:
+            sha3_context_init(CONTEXT, 136u, 0x06u);
+            break;
+        case ALG_HASH_SHA3_384:
+            sha3_context_init(CONTEXT, 104u, 0x06u);
+            break;
+        case ALG_HASH_SHA3_512:
+            sha3_context_init(CONTEXT, 72u, 0x06u);
+            break;
+        case ALG_HASH_SHAKE128:
+            sha3_context_init(CONTEXT, 168u, 0x1fu);
+            break;
+        case ALG_HASH_SHAKE256:
+            sha3_context_init(CONTEXT, 136u, 0x1fu);
+            break;
+        default:
+            crypto_zeroize(CONTEXT, sizeof(*CONTEXT));
+            return CRYPTO_ERROR_INVALID_ALG_ID;
+    }
+    return CRYPTO_SUCCESS;
+}
+
 void crypto_shake128_init(crypto_sha3_context *CONTEXT) {
     if (CONTEXT != NULL) {
         sha3_context_init(CONTEXT, 168u, 0x1fu);
@@ -206,32 +238,4 @@ void crypto_shake256(
     crypto_sha3_update(&context, INPUT, INPUT_LENGTH);
     crypto_sha3_squeeze(&context, OUTPUT, OUTPUT_LENGTH);
     crypto_sha3_clear(&context);
-}
-
-CryptoError crypto_sha3_hash(
-    uint8_t *OUTPUT, size_t OUTPUT_LENGTH,
-    const uint8_t *INPUT, size_t INPUT_LENGTH,
-    AlgID ALG) {
-    switch (ALG) {
-        case ALG_HASH_SHA3_224:
-            sha3_fixed(OUTPUT, 28u, INPUT, INPUT_LENGTH, 144u);
-            return CRYPTO_SUCCESS;
-        case ALG_HASH_SHA3_256:
-            crypto_sha3_256(OUTPUT, INPUT, INPUT_LENGTH);
-            return CRYPTO_SUCCESS;
-        case ALG_HASH_SHA3_384:
-            sha3_fixed(OUTPUT, 48u, INPUT, INPUT_LENGTH, 104u);
-            return CRYPTO_SUCCESS;
-        case ALG_HASH_SHA3_512:
-            crypto_sha3_512(OUTPUT, INPUT, INPUT_LENGTH);
-            return CRYPTO_SUCCESS;
-        case ALG_HASH_SHAKE128:
-            crypto_shake128(OUTPUT, OUTPUT_LENGTH, INPUT, INPUT_LENGTH);
-            return CRYPTO_SUCCESS;
-        case ALG_HASH_SHAKE256:
-            crypto_shake256(OUTPUT, OUTPUT_LENGTH, INPUT, INPUT_LENGTH);
-            return CRYPTO_SUCCESS;
-        default:
-            return CRYPTO_ERROR_INVALID_ALG_ID;
-    }
 }
