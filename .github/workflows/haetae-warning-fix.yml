@@ -34,8 +34,6 @@ jobs:
                   raise RuntimeError(f"expected {expected} occurrence(s), found {count}: {old!r}")
               return text.replace(old, new)
 
-          # rANS: shift is ceil(log2(freq)); the encoder contract has scale_bits <= 16,
-          # so shift - 1 is representable by uint16_t.
           path = "src/DigitalSignature/HAETAE/haetae_rans_byte.h"
           text = read(path)
           text = replace_exact(
@@ -44,9 +42,6 @@ jobs:
               "        s->rcp_shift = (uint16_t)(shift - 1u);")
           write(path, text)
 
-          # Encoding tables: the generated negative decimal reciprocals are signed spellings
-          # of fixed uint32_t bit patterns. Rewrite only RansEncSymbol initializer lines to
-          # explicit UINT32_C hex values; all other table fields remain byte-for-byte numeric.
           path = "src/DigitalSignature/HAETAE/haetae_encoding.c"
           text = read(path)
           lines = text.splitlines(keepends=True)
@@ -56,15 +51,16 @@ jobs:
               if line.startswith("static const RansEncSymbol "):
                   table_lines += 1
                   def unsigned_literal(match):
-                      nonlocal reciprocal_rewrites
                       value = int(match.group(1))
                       if value > 0x80000000:
                           raise RuntimeError("negative initializer outside int32_t range")
-                      reciprocal_rewrites += 1
                       return f"UINT32_C(0x{((-value) & 0xffffffff):08X})"
-                  lines[index] = re.sub(r"(?<![A-Za-z0-9_])-([0-9]+)", unsigned_literal, line)
+                  lines[index], count = re.subn(
+                      r"(?<![A-Za-z0-9_])-([0-9]+)", unsigned_literal, line)
+                  reciprocal_rewrites += count
           if table_lines != 6 or reciprocal_rewrites == 0:
-              raise RuntimeError(f"unexpected rANS table shape: lines={table_lines}, rewrites={reciprocal_rewrites}")
+              raise RuntimeError(
+                  f"unexpected rANS table shape: lines={table_lines}, rewrites={reciprocal_rewrites}")
           text = "".join(lines)
           marker = "#define RANS_RCP_FREQ_HALF UINT32_C(0x80000000)\n"
           assertions = (
@@ -75,7 +71,8 @@ jobs:
               + "               \"encoded z1 length must fit uint16_t\");\n"
           )
           text = replace_exact(text, marker, assertions)
-          text = replace_exact(text, "    return size_encoded;", "    return (uint16_t)size_encoded;", expected=2)
+          text = replace_exact(
+              text, "    return size_encoded;", "    return (uint16_t)size_encoded;", expected=2)
 
           def widen_decode_symbol(text, function_name):
               start = text.index(f"uint16_t {function_name}(")
@@ -89,8 +86,6 @@ jobs:
           text = widen_decode_symbol(text, "crypto_haetae_decode_hb_z1")
           write(path, text)
 
-          # Signature decoding: future parameter tables must still prove these encoded
-          # lengths fit the uint16_t decoder interface before narrowing.
           path = "src/DigitalSignature/HAETAE/haetae_packing.c"
           text = read(path)
           old = (
@@ -113,9 +108,6 @@ jobs:
           text = replace_exact(text, old, new)
           write(path, text)
 
-          # ETA packing functions document bounded coefficient domains. Make those
-          # contract-backed byte conversions explicit, but deliberately leave
-          # crypto_haetae_poly_decomposed_pack untouched for separate invariant review.
           path = "src/DigitalSignature/HAETAE/haetae_poly.c"
           text = read(path)
 
@@ -128,17 +120,19 @@ jobs:
                   active_end = len(block)
               active = block[:active_end]
               tail = block[active_end:]
-              pattern = re.compile(r"^(\s*t\[[0-7]\]\s*=\s*)([^;]*a->coeffs[^;]*);$", re.M)
-              active, count = pattern.subn(lambda m: f"{m.group(1)}(uint8_t)({m.group(2)});", active)
+              pattern = re.compile(
+                  r"^(\s*t\[[0-7]\]\s*=\s*)([^;]*a->coeffs[^;]*);$", re.M)
+              active, count = pattern.subn(
+                  lambda m: f"{m.group(1)}(uint8_t)({m.group(2)});", active)
               if count != expected:
-                  raise RuntimeError(f"{function_name}: expected {expected} casts, got {count}")
+                  raise RuntimeError(
+                      f"{function_name}: expected {expected} casts, got {count}")
               return text[:start] + active + tail + text[end:]
 
           text = cast_active_eta_assignments(text, "crypto_haetae_polyeta_pack", 4)
           text = cast_active_eta_assignments(text, "crypto_haetae_poly2eta_pack", 8)
           write(path, text)
 
-          # Nonce construction is bounded by the declared maximum K/M parameters.
           path = "src/DigitalSignature/HAETAE/haetae_polyvec.c"
           text = read(path)
           include_marker = "#include \"haetae_polyvec.h\"\n"
@@ -161,20 +155,19 @@ jobs:
           text = replace_exact(text, old, new)
           write(path, text)
 
-          # The modular helpers consume values already held in uint32_t; widening their
-          # parameter removes needless narrowing. sample_gauss returns a size_t count.
           path = "src/DigitalSignature/HAETAE/haetae_sampler.c"
           text = read(path)
           text = replace_exact(text, "static int mod3(uint8_t  t)", "static int mod3(uint32_t t)")
-          text = replace_exact(text, "static int mod3_leq26(uint8_t  t)", "static int mod3_leq26(uint32_t t)")
-          text = replace_exact(text, "static int mod3_leq8(uint8_t  t)", "static int mod3_leq8(uint32_t t)")
+          text = replace_exact(
+              text, "static int mod3_leq26(uint8_t  t)", "static int mod3_leq26(uint32_t t)")
+          text = replace_exact(
+              text, "static int mod3_leq8(uint8_t  t)", "static int mod3_leq8(uint32_t t)")
           text = replace_exact(
               text,
               "int crypto_haetae_sample_gauss(uint64_t *r, crypto_haetae_fp96_76 *sqsum, const uint8_t  *buf, const size_t buflen, const size_t len, const int dont_write_last)",
               "size_t crypto_haetae_sample_gauss(uint64_t *r, crypto_haetae_fp96_76 *sqsum, const uint8_t  *buf, const size_t buflen, const size_t len, const int dont_write_last)")
           write(path, text)
 
-          # Guardrail: the three deferred sites must remain untouched by this change.
           deferred = {
               "src/DigitalSignature/HAETAE/haetae_fft.c": "return r >> 16;",
               "src/DigitalSignature/HAETAE/haetae_reduce.c": "return t;",
@@ -182,7 +175,14 @@ jobs:
           }
           for deferred_path, needle in deferred.items():
               if needle not in read(deferred_path):
-                  raise RuntimeError(f"deferred review site changed unexpectedly: {deferred_path}")
+                  raise RuntimeError(
+                      f"deferred review site changed unexpectedly: {deferred_path}")
+      - name: Validate Linux HAETAE build
+        shell: bash
+        run: |
+          cmake -S . -B build -DBUILD_SHARED_LIBS=ON -DCRYPTO_BUILD_TESTS=ON
+          cmake --build build -j2
+          ctest --test-dir build -L haetae --output-on-failure
       - name: Commit warning fixes
         shell: bash
         run: |
@@ -191,5 +191,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/DigitalSignature/HAETAE .github/workflows/haetae-warning-fix.yml
           git commit -m "fix(haetae): make range-proven MSVC conversions explicit" \
-            -m "Resolve the C4244/C4245/C4267 sites whose bounds or bit patterns are already proven. Keep three arithmetic/encoding conversions unchanged pending deeper review: _mulrnd16 in haetae_fft.c, crypto_haetae_freeze and nearby signed-shift arithmetic in haetae_reduce.c, and crypto_haetae_poly_decomposed_pack in haetae_poly.c."
+            -m "Resolve C4244/C4245/C4267 sites whose bounds or uint32_t bit patterns are already proven. Keep deeper-review sites unchanged: _mulrnd16 in haetae_fft.c; crypto_haetae_freeze plus nearby signed-right-shift arithmetic in haetae_reduce.c; and crypto_haetae_poly_decomposed_pack in haetae_poly.c. These require separate range/portability analysis before narrowing is made explicit."
           git push origin HEAD:fix/haetae-proven-msvc-warnings
