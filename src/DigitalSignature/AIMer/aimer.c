@@ -5,8 +5,10 @@
 
 #include "aimer_internal.h"
 #include "aimer_params.h"
+#include "Backend/aimer_aim2.h"
 #include "Backend/aimer_backend.h"
 #include "RandomNumberGeneration/KAT/pqc_kat_rng_internal.h"
+#include "Util/Core/memory_internal.h"
 #include "Util/Core/secure_zero.h"
 
 #include <string.h>
@@ -33,6 +35,24 @@ static const crypto_aimer_params *crypto_aimer_get_params(AlgID alg) {
         }
     }
     return NULL;
+}
+
+static CryptoError crypto_aimer_validate_private_key(
+    const uint8_t *private_key, const crypto_aimer_params *params) {
+    uint8_t expected_ciphertext[CRYPTO_AIMER_MAX_FIELD_BYTES];
+    const uint8_t *iv = private_key + params->field_bytes;
+    const uint8_t *stored_ciphertext = iv + params->iv_bytes;
+    CryptoError result;
+
+    result = crypto_aimer_aim2(
+        expected_ciphertext, private_key, iv, params);
+    if (result == CRYPTO_SUCCESS &&
+        !crypto_constant_time_equal(
+            expected_ciphertext, stored_ciphertext, params->field_bytes)) {
+        result = CRYPTO_ERROR_INVALID_KEY;
+    }
+    crypto_zeroize(expected_ciphertext, sizeof(expected_ciphertext));
+    return result;
 }
 
 size_t crypto_aimer_public_key_size_internal(AlgID alg) {
@@ -64,6 +84,11 @@ CryptoError crypto_aimer_keygen_internal(
     if (public_key_length < params->public_key_bytes ||
         private_key_length < params->private_key_bytes) {
         return CRYPTO_ERROR_BUFFER_TOO_SMALL;
+    }
+    if (crypto_ranges_overlap(
+            public_key, params->public_key_bytes,
+            private_key, params->private_key_bytes)) {
+        return CRYPTO_ERROR_INVALID_ARGUMENT;
     }
 
     error = crypto_pqc_random_bytes_internal(plaintext, params->field_bytes);
@@ -108,6 +133,22 @@ CryptoError crypto_aimer_sign_internal(
     }
     if (signature_length < params->signature_bytes) {
         return CRYPTO_ERROR_BUFFER_TOO_SMALL;
+    }
+    if (crypto_ranges_overlap(
+            signature, params->signature_bytes,
+            private_key, private_key_length) ||
+        crypto_ranges_overlap(
+            signature, params->signature_bytes,
+            message, message_length) ||
+        crypto_ranges_overlap(
+            signature, params->signature_bytes,
+            context, context_length)) {
+        return CRYPTO_ERROR_INVALID_ARGUMENT;
+    }
+    error = crypto_aimer_validate_private_key(private_key, params);
+    if (error != CRYPTO_SUCCESS) {
+        crypto_zeroize(signature, params->signature_bytes);
+        return error;
     }
 
     prefix[0] = (uint8_t)context_length;

@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 #include "aimer_aim2.h"
 #include "aimer_field.h"
@@ -154,14 +155,22 @@ static void generate_matrices_L_and_U(crypto_aimer_gf *matrix_L, crypto_aimer_gf
   crypto_aimer_hash_clear(&ctx);
 }
 
-void crypto_aimer_aim2_generate_linear(crypto_aimer_gf *matrix_A, crypto_aimer_gf vector_b, const uint8_t *iv,
-                          const crypto_aimer_params *alg)
+CryptoError crypto_aimer_aim2_generate_linear(
+    crypto_aimer_gf *matrix_A, crypto_aimer_gf vector_b,
+    const uint8_t *iv, const crypto_aimer_params *alg)
 {
-  crypto_aimer_gf matrix_L[CRYPTO_AIMER_MAX_INPUT_SBOXES * CRYPTO_AIMER_MAX_FIELD_BITS];
-  crypto_aimer_gf matrix_U[CRYPTO_AIMER_MAX_INPUT_SBOXES * CRYPTO_AIMER_MAX_FIELD_BITS];
+  const size_t matrix_cells = alg->multiplications * alg->field_bits;
+  const size_t matrix_bytes = matrix_cells * sizeof(crypto_aimer_gf);
+  crypto_aimer_gf *matrices = malloc(2u * matrix_bytes);
+  crypto_aimer_gf *matrix_L;
+  crypto_aimer_gf *matrix_U;
   size_t ell;
   size_t i;
 
+  if (matrices == NULL)
+    return CRYPTO_ERROR_ALLOCATION_FAILED;
+  matrix_L = matrices;
+  matrix_U = matrices + matrix_cells;
   generate_matrices_L_and_U(matrix_L, matrix_U, vector_b, iv, alg);
 
   for (ell = 0; ell < alg->input_sboxes; ell++)
@@ -173,13 +182,21 @@ void crypto_aimer_aim2_generate_linear(crypto_aimer_gf *matrix_A, crypto_aimer_g
                      matrix_cell_const((const crypto_aimer_gf *)matrix_L, ell, 0, alg), alg);
     }
   }
+
+  crypto_zeroize(matrices, 2u * matrix_bytes);
+  free(matrices);
+  return CRYPTO_SUCCESS;
 }
 
-void crypto_aimer_aim2(uint8_t *ct, const uint8_t *pt, const uint8_t *iv,
-          const crypto_aimer_params *alg)
+CryptoError crypto_aimer_aim2(
+    uint8_t *ct, const uint8_t *pt, const uint8_t *iv,
+    const crypto_aimer_params *alg)
 {
-  crypto_aimer_gf matrix_L[CRYPTO_AIMER_MAX_INPUT_SBOXES * CRYPTO_AIMER_MAX_FIELD_BITS];
-  crypto_aimer_gf matrix_U[CRYPTO_AIMER_MAX_INPUT_SBOXES * CRYPTO_AIMER_MAX_FIELD_BITS];
+  const size_t matrix_cells = alg->multiplications * alg->field_bits;
+  const size_t matrix_bytes = matrix_cells * sizeof(crypto_aimer_gf);
+  crypto_aimer_gf *matrices = malloc(2u * matrix_bytes);
+  crypto_aimer_gf *matrix_L;
+  crypto_aimer_gf *matrix_U;
   crypto_aimer_gf vector_b = {0,};
   crypto_aimer_gf state[CRYPTO_AIMER_MAX_INPUT_SBOXES];
   crypto_aimer_gf pt_gf = {0,};
@@ -189,6 +206,10 @@ void crypto_aimer_aim2(uint8_t *ct, const uint8_t *pt, const uint8_t *iv,
     crypto_aimer_aim2_sbox_exponents_for_alg(alg);
   size_t i;
 
+  if (matrices == NULL)
+    return CRYPTO_ERROR_ALLOCATION_FAILED;
+  matrix_L = matrices;
+  matrix_U = matrices + matrix_cells;
   crypto_aimer_field_from_bytes(pt_gf, pt, alg);
   generate_matrices_L_and_U(matrix_L, matrix_U, vector_b, iv, alg);
 
@@ -209,12 +230,13 @@ void crypto_aimer_aim2(uint8_t *ct, const uint8_t *pt, const uint8_t *iv,
   crypto_aimer_field_add(ct_gf, state[0], pt_gf);
   crypto_aimer_field_to_bytes(ct, ct_gf, alg);
 
-  crypto_zeroize(matrix_L, sizeof(matrix_L));
-  crypto_zeroize(matrix_U, sizeof(matrix_U));
+  crypto_zeroize(matrices, 2u * matrix_bytes);
+  free(matrices);
   crypto_zeroize(vector_b, sizeof(vector_b));
   crypto_zeroize(state, sizeof(state));
   crypto_zeroize(pt_gf, sizeof(pt_gf));
   crypto_zeroize(ct_gf, sizeof(ct_gf));
+  return CRYPTO_SUCCESS;
 }
 
 void crypto_aimer_aim2_sbox_outputs(crypto_aimer_gf *sbox_outputs, const crypto_aimer_gf pt, const crypto_aimer_params *alg)

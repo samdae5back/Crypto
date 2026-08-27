@@ -267,7 +267,24 @@ static CryptoError run_phase_1(uint8_t *sig, uint8_t *commits, uint8_t *nodes,
     crypto_zeroize(root_seeds, sizeof(root_seeds));
     return CRYPTO_ERROR_ALLOCATION_FAILED;
   }
-  crypto_aimer_aim2_generate_linear(matrix_A, vector_b, sk + alg->field_bytes, alg);
+  {
+    const CryptoError matrix_error = crypto_aimer_aim2_generate_linear(
+      matrix_A, vector_b, sk + alg->field_bytes, alg);
+    if (matrix_error != CRYPTO_SUCCESS)
+    {
+      crypto_zeroize(matrix_A,
+                     sizeof(crypto_aimer_gf) * alg->multiplications *
+                       alg->field_bits);
+      free(matrix_A);
+      crypto_zeroize(pt_gf, sizeof(pt_gf));
+      crypto_zeroize(ct_gf, sizeof(ct_gf));
+      crypto_zeroize(sbox_outputs, sizeof(sbox_outputs));
+      crypto_zeroize(vector_b, sizeof(vector_b));
+      crypto_zeroize(mu, sizeof(mu));
+      crypto_zeroize(root_seeds, sizeof(root_seeds));
+      return matrix_error;
+    }
+  }
 
   crypto_aimer_hash_init_prefix(&ctx, alg, CRYPTO_AIMER_HASH_PREFIX_3);
   crypto_aimer_hash_absorb(&ctx, sk, alg->field_bytes);
@@ -429,7 +446,12 @@ CryptoError crypto_aimer_backend_keypair(uint8_t *pk, uint8_t *sk,
   if (pk == NULL || sk == NULL || pt == NULL || iv == NULL || alg == NULL)
     return CRYPTO_ERROR_INVALID_ARGUMENT;
 
-  crypto_aimer_aim2(pk + alg->iv_bytes, pt, iv, alg);
+  {
+    const CryptoError error =
+      crypto_aimer_aim2(pk + alg->iv_bytes, pt, iv, alg);
+    if (error != CRYPTO_SUCCESS)
+      return error;
+  }
 
   memcpy(pk, iv, alg->iv_bytes);
   memcpy(sk, pt, alg->field_bytes);
@@ -571,7 +593,15 @@ CryptoError crypto_aimer_backend_verify(const uint8_t *sig, size_t siglen,
 
   crypto_aimer_field_from_bytes(ct_gf, pk + alg->iv_bytes, alg);
 
-  crypto_aimer_aim2_generate_linear(matrix_A, vector_b, pk, alg);
+  {
+    const CryptoError matrix_error =
+      crypto_aimer_aim2_generate_linear(matrix_A, vector_b, pk, alg);
+    if (matrix_error != CRYPTO_SUCCESS)
+    {
+      error = matrix_error;
+      goto cleanup;
+    }
+  }
 
   crypto_aimer_hash_init(&ctx_e, alg);
   crypto_aimer_hash_absorb(&ctx_e, signature_h2_const(sig, alg), alg->commit_bytes);
