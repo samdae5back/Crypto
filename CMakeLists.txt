@@ -162,6 +162,13 @@ set_target_properties(Crypto PROPERTIES
     WINDOWS_EXPORT_ALL_SYMBOLS OFF
 )
 
+if(WIN32 AND BUILD_SHARED_LIBS)
+    # MinGW otherwise emits libcrypto.dll, which collides with the common
+    # LibreSSL/OpenSSL runtime name in the Windows system search path.  Match
+    # MSVC's prefix-free crypto.dll name for every Windows toolchain.
+    set_target_properties(Crypto PROPERTIES PREFIX "")
+endif()
+
 target_include_directories(Crypto
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/inc>

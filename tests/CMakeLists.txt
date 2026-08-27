@@ -1,8 +1,8 @@
 function(crypto_add_public_test TARGET_NAME TEST_NAME SOURCE_FILE TEST_LABELS)
     add_executable(${TARGET_NAME} ${SOURCE_FILE})
     target_link_libraries(${TARGET_NAME} PRIVATE Crypto)
-    # Keep shared-library tests beside the Crypto DLL on Windows. Otherwise
-    # the loader can resolve an unrelated system libcrypto.dll first.
+    # Keep shared-library tests beside the Crypto DLL on Windows so loading
+    # does not depend on PATH or another machine-wide runtime installation.
     set_target_properties(${TARGET_NAME} PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}")
     crypto_configure_portable_warnings(${TARGET_NAME})
