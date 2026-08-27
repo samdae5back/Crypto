@@ -16,11 +16,13 @@
 int main(void) {
     CRYPTO_BIGNUM value;
     CRYPTO_CTR_DRBG_CONTEXT drbg;
+    CRYPTO_HASH_CONTEXT hash;
     AlgID alg = ALG_HASH_SHA2_256;
     CryptoError error = CRYPTO_SUCCESS;
 
     (void)value;
     (void)drbg;
+    (void)hash;
     (void)alg;
     (void)error;
     return 0;

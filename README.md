@@ -23,7 +23,7 @@ src/BlockCipher/AES
 src/DigitalSignature/{ML-DSA,SLH-DSA}
 src/HashFunction/{SHA2,SHA3,LSH}
 src/KeyEncapsulation/ML-KEM
-src/RandomNumberGeneration/{CTR_DRBG,Noise}
+src/RandomNumberGeneration/{CTR_DRBG,KAT,Noise}
 src/Util/{Bignum,Bit,Core,Endian,NTT,Prime}
 cmake/                            platform export policy
 tests/                            unit, KAT, and public-header tests
@@ -143,6 +143,30 @@ Supported hash identifiers are:
 For SHAKE, `OUTPUT_LENGTH` selects the requested XOF output length. Fixed-output
 hashes require a buffer at least as large as their standard digest.
 
+Messages can also be supplied incrementally through the same runtime-selected
+interface. Finalization finishes input absorption; output is then retrieved by
+the squeeze operation:
+
+```c
+CRYPTO_HASH_CONTEXT context;
+uint8_t digest[CRYPTO_SHA2_256_DIGEST_BYTES];
+
+CryptoError error = CRYPTO_HASH_INIT(&context, ALG_HASH_SHA2_256);
+if (error == CRYPTO_SUCCESS)
+    error = CRYPTO_HASH_UPDATE(&context, first_part, first_part_length);
+if (error == CRYPTO_SUCCESS)
+    error = CRYPTO_HASH_UPDATE(&context, second_part, second_part_length);
+if (error == CRYPTO_SUCCESS)
+    error = CRYPTO_HASH_FINALIZE(&context);
+if (error == CRYPTO_SUCCESS)
+    error = CRYPTO_HASH_SQUEEZE(&context, digest, sizeof(digest));
+CRYPTO_HASH_CLEAR(&context);
+```
+
+Fixed-output algorithms permit one squeeze and write exactly their standard
+digest size. SHAKE permits repeated squeezes; concatenating their outputs gives
+the same byte stream as one request for the combined length.
+
 ## Other supported families
 
 - CTR_DRBG with AES-128/192/256, with and without `Block_Cipher_df`
@@ -172,6 +196,8 @@ The shared-library build applies the allowlist with the native platform model:
 
 This keeps the exported ABI limited to the documented `CRYPTO_` functions while
 allowing static builds to retain normal archive behavior.
+Restricted AIX exports require CMake 3.17 or newer because that release added
+the supported switch for disabling CMake's automatic all-symbol export list.
 
 ## Tests
 
@@ -183,7 +209,15 @@ When `CRYPTO_BUILD_TESTS` is enabled, CMake generates:
 - AES mode known-answer tests for every supported key size
 - SHA-2, SHA-3, SHAKE, and LSH known-answer tests
 - CTR_DRBG known-answer and derivation-function tests
-- ML-KEM and post-quantum signature tests
+- operation tests for ML-KEM and both post-quantum signature families
+- 100-record KATs for all 3 ML-KEM, 3 ML-DSA, and 12 SLH-DSA parameter sets
+
+The PQC KAT executables link a test-exclusive static module. Calling its
+private KAT initializer routes subsequent PQC randomness through AES-256
+CTR-DRBG without a derivation function, initialized from each vector's 48-byte
+seed. The normal shared/static `Crypto` target has no KAT control API and
+continues to obtain PQC randomness from the operating system. Each parameter
+set is a separate CTest so the slower SLH-DSA cases can run in parallel.
 
 ## Bundled implementation notices
 

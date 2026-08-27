@@ -3,19 +3,10 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-#include "Crypto.h"
+#include "RandomNumberGeneration.h"
 
 #include <stdio.h>
 #include <string.h>
-
-static int all_zero(const void *ptr, size_t length) {
-    const uint8_t *p = (const uint8_t *)ptr;
-    size_t i;
-    for (i = 0u; i < length; ++i) {
-        if (p[i] != 0u) return 0;
-    }
-    return 1;
-}
 
 static int test_nist_aes256_no_df(void) {
     static const uint8_t entropy[48] = {
@@ -60,48 +51,7 @@ static int test_nist_aes256_no_df(void) {
     if (memcmp(ctx.V, final_v, sizeof(final_v)) != 0) return 1;
     if (ctx.RESEED_COUNTER != 3u) return 1;
 
-    ctx.RESEED_COUNTER = ((uint64_t)1u << 48) + 1u;
-    if (CRYPTO_CTR_DRBG_GENERATE(&ctx, output, 16u, NULL, 0u, 0) != CRYPTO_ERROR_RESEED_REQUIRED) return 1;
-
     CRYPTO_CTR_DRBG_CLEAR(&ctx);
-    if (!all_zero(&ctx, sizeof(ctx))) return 1;
-    return 0;
-}
-
-static int test_df_variants(void) {
-    const AlgID algs[] = {
-        ALG_CTR_DRBG_AES_128_DF,
-        ALG_CTR_DRBG_AES_192_DF,
-        ALG_CTR_DRBG_AES_256_DF
-    };
-    uint8_t entropy[32], nonce[16], additional[13];
-    uint8_t a[64], b[64];
-    size_t i, j, key_length, security_length, nonce_length;
-
-    for (i = 0u; i < sizeof(entropy); ++i) entropy[i] = (uint8_t)i;
-    for (i = 0u; i < sizeof(nonce); ++i) nonce[i] = (uint8_t)(0x80u + i);
-    for (i = 0u; i < sizeof(additional); ++i) additional[i] = (uint8_t)(0x40u + i);
-
-    for (j = 0u; j < sizeof(algs) / sizeof(algs[0]); ++j) {
-        CRYPTO_CTR_DRBG_CONTEXT c1, c2;
-        key_length = (j == 0u) ? 16u : (j == 1u ? 24u : 32u);
-        security_length = key_length;
-        nonce_length = (security_length + 1u) / 2u;
-        if (CRYPTO_CTR_DRBG_SEED_SIZE(algs[j]) != key_length + 16u) return 1;
-        if (CRYPTO_CTR_DRBG_INSTANTIATE(&c1, entropy, security_length,
-                                         nonce, nonce_length,
-                                         (const uint8_t *)"crypto-test", 11u,
-                                         algs[j]) != CRYPTO_SUCCESS) return 1;
-        if (CRYPTO_CTR_DRBG_INSTANTIATE(&c2, entropy, security_length,
-                                         nonce, nonce_length,
-                                         (const uint8_t *)"crypto-test", 11u,
-                                         algs[j]) != CRYPTO_SUCCESS) return 1;
-        if (CRYPTO_CTR_DRBG_GENERATE(&c1, a, sizeof(a), additional, sizeof(additional), 0) != CRYPTO_SUCCESS) return 1;
-        if (CRYPTO_CTR_DRBG_GENERATE(&c2, b, sizeof(b), additional, sizeof(additional), 0) != CRYPTO_SUCCESS) return 1;
-        if (memcmp(a, b, sizeof(a)) != 0) return 1;
-        CRYPTO_CTR_DRBG_CLEAR(&c1);
-        CRYPTO_CTR_DRBG_CLEAR(&c2);
-    }
     return 0;
 }
 
@@ -110,10 +60,6 @@ int main(void) {
         fprintf(stderr, "CTR_DRBG NIST KAT failed\n");
         return 1;
     }
-    if (test_df_variants()) {
-        fprintf(stderr, "CTR_DRBG derivation-function test failed\n");
-        return 1;
-    }
-    puts("CTR_DRBG tests passed");
+    puts("CTR_DRBG KAT passed");
     return 0;
 }

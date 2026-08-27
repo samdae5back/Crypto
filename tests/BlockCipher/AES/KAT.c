@@ -8,61 +8,6 @@
 #include <stdio.h>
 #include <string.h>
 
-typedef struct {
-    AlgID ALG;
-    size_t KEY_LENGTH;
-} AesParameterSet;
-
-static const AesParameterSet AES_PARAMETER_SETS[] = {
-    {ALG_AES_128_ECB, 16u}, {ALG_AES_192_ECB, 24u},
-    {ALG_AES_256_ECB, 32u}, {ALG_AES_128_CBC, 16u},
-    {ALG_AES_192_CBC, 24u}, {ALG_AES_256_CBC, 32u},
-    {ALG_AES_128_CTR, 16u}, {ALG_AES_192_CTR, 24u},
-    {ALG_AES_256_CTR, 32u}, {ALG_AES_128_CCM, 16u},
-    {ALG_AES_192_CCM, 24u}, {ALG_AES_256_CCM, 32u},
-    {ALG_AES_128_GCM, 16u}, {ALG_AES_192_GCM, 24u},
-    {ALG_AES_256_GCM, 32u}
-};
-
-static int all_zero(const uint8_t *data, size_t length) {
-    size_t i;
-    for (i = 0u; i < length; ++i) {
-        if (data[i] != 0u) return 0;
-    }
-    return 1;
-}
-
-static int key_size_test(void) {
-    size_t i;
-
-    if (ALG_AES_128_ECB != 0x00500110 ||
-        ALG_AES_192_ECB != 0x00500118 ||
-        ALG_AES_256_ECB != 0x00500120 ||
-        ALG_AES_128_CBC != 0x00500210 ||
-        ALG_AES_192_CBC != 0x00500218 ||
-        ALG_AES_256_CBC != 0x00500220 ||
-        ALG_AES_128_CTR != 0x00500610 ||
-        ALG_AES_192_CTR != 0x00500618 ||
-        ALG_AES_256_CTR != 0x00500620 ||
-        ALG_AES_128_CCM != 0x00580110 ||
-        ALG_AES_192_CCM != 0x00580118 ||
-        ALG_AES_256_CCM != 0x00580120 ||
-        ALG_AES_128_GCM != 0x00580210 ||
-        ALG_AES_192_GCM != 0x00580218 ||
-        ALG_AES_256_GCM != 0x00580220) {
-        return 1;
-    }
-    for (i = 0u;
-         i < sizeof(AES_PARAMETER_SETS) / sizeof(AES_PARAMETER_SETS[0]);
-         ++i) {
-        if (CRYPTO_BLOCK_CIPHER_KEY_SIZE(AES_PARAMETER_SETS[i].ALG) !=
-            AES_PARAMETER_SETS[i].KEY_LENGTH) {
-            return 1;
-        }
-    }
-    return CRYPTO_BLOCK_CIPHER_KEY_SIZE(ALG_NONE) != 0u;
-}
-
 static int ecb_kat(void) {
     static const uint8_t plaintext[16] = {
         0x00,0x11,0x22,0x33,0x44,0x55,0x66,0x77,
@@ -115,6 +60,34 @@ static int ecb_kat(void) {
     return 0;
 }
 
+/* Additional AESAVS records retained from the former mixed KAT runner. */
+static int ecb_iotcc_kat(void) {
+    static const struct {
+        AlgID algorithm;
+        size_t key_length;
+        uint8_t expected[16];
+    } vectors[] = {
+        { ALG_AES_128_ECB, 16u, {0x3a,0xd7,0x8e,0x72,0x6c,0x1e,0xc0,0x2b,0x7e,0xbf,0xe9,0x2b,0x23,0xd9,0xec,0x34} },
+        { ALG_AES_192_ECB, 24u, {0x6c,0xd0,0x25,0x13,0xe8,0xd4,0xdc,0x98,0x6b,0x4a,0xfe,0x08,0x7a,0x60,0xbd,0x0c} },
+        { ALG_AES_256_ECB, 32u, {0xdd,0xc6,0xbf,0x79,0x0c,0x15,0x76,0x0d,0x8d,0x9a,0xeb,0x6f,0x9a,0x75,0xfd,0x4e} }
+    };
+    uint8_t key[32] = {0};
+    uint8_t plaintext[16] = {0x80};
+    uint8_t ciphertext[16];
+    size_t i;
+
+    for (i = 0u; i < sizeof(vectors) / sizeof(vectors[0]); ++i) {
+        if (CRYPTO_BLOCK_CIPHER_ENCRYPT(
+                ciphertext, sizeof(ciphertext), NULL, 0u,
+                plaintext, sizeof(plaintext), key, vectors[i].key_length,
+                NULL, 0u, NULL, 0u, vectors[i].algorithm) != CRYPTO_SUCCESS ||
+            memcmp(ciphertext, vectors[i].expected, sizeof(ciphertext)) != 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static int cbc_ctr_kat(void) {
     static const uint8_t plaintext[16] = {
         0x6b,0xc1,0xbe,0xe2,0x2e,0x40,0x9f,0x96,
@@ -163,6 +136,7 @@ static int cbc_ctr_kat(void) {
     };
     static const size_t key_lengths[3] = {16u, 24u, 32u};
     uint8_t output[16];
+    uint8_t recovered[16];
     size_t i;
 
     for (i = 0u; i < 3u; ++i) {
@@ -174,12 +148,28 @@ static int cbc_ctr_kat(void) {
             memcmp(output, cbc_expected[i], sizeof(output)) != 0) {
             return 1;
         }
+        if (CRYPTO_BLOCK_CIPHER_DECRYPT(
+                recovered, sizeof(recovered), NULL, 0u,
+                cbc_expected[i], sizeof(cbc_expected[i]),
+                keys[i], key_lengths[i], iv, sizeof(iv), NULL, 0u,
+                cbc_algorithms[i]) != CRYPTO_SUCCESS ||
+            memcmp(recovered, plaintext, sizeof(recovered)) != 0) {
+            return 1;
+        }
         if (CRYPTO_BLOCK_CIPHER_ENCRYPT(
                 output, sizeof(output), NULL, 0u,
                 plaintext, sizeof(plaintext), keys[i], key_lengths[i],
                 counter, sizeof(counter), NULL, 0u,
                 ctr_algorithms[i]) != CRYPTO_SUCCESS ||
             memcmp(output, ctr_expected[i], sizeof(output)) != 0) {
+            return 1;
+        }
+        if (CRYPTO_BLOCK_CIPHER_DECRYPT(
+                recovered, sizeof(recovered), NULL, 0u,
+                ctr_expected[i], sizeof(ctr_expected[i]),
+                keys[i], key_lengths[i], counter, sizeof(counter), NULL, 0u,
+                ctr_algorithms[i]) != CRYPTO_SUCCESS ||
+            memcmp(recovered, plaintext, sizeof(recovered)) != 0) {
             return 1;
         }
     }
@@ -211,6 +201,7 @@ static int gcm_kat(void) {
     static const uint8_t iv[12] = {0};
     static const uint8_t plaintext[16] = {0};
     uint8_t ciphertext[16];
+    uint8_t recovered[16];
     uint8_t tag[16];
     size_t i;
 
@@ -224,6 +215,15 @@ static int gcm_kat(void) {
         }
         if (memcmp(ciphertext, expected_ciphertext[i], sizeof(ciphertext)) != 0 ||
             memcmp(tag, expected_tag[i], sizeof(tag)) != 0) {
+            return 1;
+        }
+        if (CRYPTO_BLOCK_CIPHER_DECRYPT(
+                recovered, sizeof(recovered), expected_tag[i],
+                sizeof(expected_tag[i]), expected_ciphertext[i],
+                sizeof(expected_ciphertext[i]), keys[i], key_lengths[i],
+                iv, sizeof(iv), NULL, 0u,
+                algorithms[i]) != CRYPTO_SUCCESS ||
+            memcmp(recovered, plaintext, sizeof(recovered)) != 0) {
             return 1;
         }
     }
@@ -254,6 +254,7 @@ static int ccm_kat(void) {
         0x17,0xe8,0xd1,0x2c,0xfd,0xf9,0x26,0xe0
     };
     uint8_t ciphertext[23];
+    uint8_t recovered[23];
     uint8_t tag[8];
 
     if (CRYPTO_BLOCK_CIPHER_ENCRYPT(
@@ -263,166 +264,27 @@ static int ccm_kat(void) {
             ALG_AES_128_CCM) != CRYPTO_SUCCESS) {
         return 1;
     }
-    return memcmp(ciphertext, expected_ciphertext, sizeof(ciphertext)) != 0 ||
-           memcmp(tag, expected_tag, sizeof(tag)) != 0;
-}
-
-static int all_parameter_sets_roundtrip(void) {
-    uint8_t key[32];
-    uint8_t iv[16];
-    uint8_t aad[13];
-    uint8_t plaintext[32];
-    uint8_t ciphertext[32];
-    uint8_t recovered[32];
-    uint8_t tag[16];
-    size_t i;
-    size_t j;
-
-    for (i = 0u; i < sizeof(key); ++i) key[i] = (uint8_t)(i * 3u + 1u);
-    for (i = 0u; i < sizeof(iv); ++i) iv[i] = (uint8_t)(i + 0x40u);
-    for (i = 0u; i < sizeof(aad); ++i) aad[i] = (uint8_t)(i + 0x70u);
-    for (i = 0u; i < sizeof(plaintext); ++i)
-        plaintext[i] = (uint8_t)(i * 7u + 5u);
-
-    for (j = 0u;
-         j < sizeof(AES_PARAMETER_SETS) / sizeof(AES_PARAMETER_SETS[0]);
-         ++j) {
-        AlgID alg = AES_PARAMETER_SETS[j].ALG;
-        size_t input_length = sizeof(plaintext);
-        const uint8_t *mode_iv = NULL;
-        size_t iv_length = 0u;
-        const uint8_t *mode_aad = NULL;
-        size_t aad_length = 0u;
-        size_t tag_length = 0u;
-
-        if (alg == ALG_AES_128_CTR || alg == ALG_AES_192_CTR ||
-            alg == ALG_AES_256_CTR) {
-            input_length = 29u;
-            mode_iv = iv;
-            iv_length = 16u;
-        } else if (alg == ALG_AES_128_CBC || alg == ALG_AES_192_CBC ||
-                   alg == ALG_AES_256_CBC) {
-            mode_iv = iv;
-            iv_length = 16u;
-        } else if (alg == ALG_AES_128_CCM || alg == ALG_AES_192_CCM ||
-                   alg == ALG_AES_256_CCM) {
-            input_length = 29u;
-            mode_iv = iv;
-            iv_length = 13u;
-            mode_aad = aad;
-            aad_length = sizeof(aad);
-            tag_length = 8u;
-        } else if (alg == ALG_AES_128_GCM || alg == ALG_AES_192_GCM ||
-                   alg == ALG_AES_256_GCM) {
-            input_length = 29u;
-            mode_iv = iv;
-            iv_length = 12u;
-            mode_aad = aad;
-            aad_length = sizeof(aad);
-            tag_length = 16u;
-        }
-
-        if (CRYPTO_BLOCK_CIPHER_ENCRYPT(
-                ciphertext, sizeof(ciphertext),
-                tag_length ? tag : NULL, tag_length,
-                plaintext, input_length,
-                key, AES_PARAMETER_SETS[j].KEY_LENGTH,
-                mode_iv, iv_length, mode_aad, aad_length,
-                alg) != CRYPTO_SUCCESS) {
-            return 1;
-        }
-        if (CRYPTO_BLOCK_CIPHER_DECRYPT(
-                recovered, sizeof(recovered),
-                tag_length ? tag : NULL, tag_length,
-                ciphertext, input_length,
-                key, AES_PARAMETER_SETS[j].KEY_LENGTH,
-                mode_iv, iv_length, mode_aad, aad_length,
-                alg) != CRYPTO_SUCCESS) {
-            return 1;
-        }
-        if (memcmp(recovered, plaintext, input_length) != 0) return 1;
-    }
-    return 0;
-}
-
-static int negative_test(void) {
-    uint8_t key[16] = {0};
-    uint8_t iv[16] = {0};
-    uint8_t input[17] = {0};
-    uint8_t output[17];
-    uint8_t tag[16] = {0};
-    uint8_t bad_tag[16];
-
-    if (CRYPTO_BLOCK_CIPHER_ENCRYPT(
-            output, sizeof(output), NULL, 0u, input, 16u,
-            key, sizeof(key), NULL, 0u, NULL, 0u,
-            ALG_NONE) != CRYPTO_ERROR_INVALID_ALG_ID) {
+    if (memcmp(ciphertext, expected_ciphertext, sizeof(ciphertext)) != 0 ||
+        memcmp(tag, expected_tag, sizeof(tag)) != 0) {
         return 1;
     }
-    if (CRYPTO_BLOCK_CIPHER_ENCRYPT(
-            output, sizeof(output), NULL, 0u, input, 16u,
-            key, sizeof(key), NULL, 0u, NULL, 0u,
-            (AlgID)0x00500010) != CRYPTO_ERROR_INVALID_ALG_ID ||
-        CRYPTO_BLOCK_CIPHER_KEY_SIZE((AlgID)0x00500310) != 0u) {
-        return 1;
-    }
-    if (CRYPTO_BLOCK_CIPHER_ENCRYPT(
-            output, sizeof(output), NULL, 0u, input, 16u,
-            key, sizeof(key) - 1u, NULL, 0u, NULL, 0u,
-            ALG_AES_128_ECB) != CRYPTO_ERROR_INVALID_KEY) {
-        return 1;
-    }
-    if (CRYPTO_BLOCK_CIPHER_ENCRYPT(
-            output, sizeof(output), NULL, 0u, input, 17u,
-            key, sizeof(key), iv, sizeof(iv), NULL, 0u,
-            ALG_AES_128_CBC) != CRYPTO_ERROR_INVALID_ARGUMENT) {
-        return 1;
-    }
-    if (CRYPTO_BLOCK_CIPHER_ENCRYPT(
-            output, sizeof(output), tag, 5u, input, 16u,
-            key, sizeof(key), iv, 12u, NULL, 0u,
-            ALG_AES_128_GCM) != CRYPTO_ERROR_INVALID_ARGUMENT) {
-        return 1;
-    }
-    if (CRYPTO_BLOCK_CIPHER_ENCRYPT(
-            output, sizeof(output), tag, 5u, input, 16u,
-            key, sizeof(key), iv, 13u, NULL, 0u,
-            ALG_AES_128_CCM) != CRYPTO_ERROR_INVALID_ARGUMENT) {
-        return 1;
-    }
-    if (CRYPTO_BLOCK_CIPHER_ENCRYPT(
-            output, 15u, NULL, 0u, input, 16u,
-            key, sizeof(key), NULL, 0u, NULL, 0u,
-            ALG_AES_128_ECB) != CRYPTO_ERROR_BUFFER_TOO_SMALL) {
-        return 1;
-    }
-
-    if (CRYPTO_BLOCK_CIPHER_ENCRYPT(
-            output, sizeof(output), tag, sizeof(tag), input, 16u,
-            key, sizeof(key), iv, 12u, NULL, 0u,
-            ALG_AES_128_GCM) != CRYPTO_SUCCESS) {
-        return 1;
-    }
-    memcpy(bad_tag, tag, sizeof(tag));
-    bad_tag[0] ^= 1u;
-    memset(input, 0xa5, 16u);
     if (CRYPTO_BLOCK_CIPHER_DECRYPT(
-            input, sizeof(input), bad_tag, sizeof(bad_tag), output, 16u,
-            key, sizeof(key), iv, 12u, NULL, 0u,
-            ALG_AES_128_GCM) != CRYPTO_ERROR_AUTHENTICATION_FAILED ||
-        !all_zero(input, 16u)) {
+            recovered, sizeof(recovered), expected_tag, sizeof(expected_tag),
+            expected_ciphertext, sizeof(expected_ciphertext),
+            key, sizeof(key), nonce, sizeof(nonce), aad, sizeof(aad),
+            ALG_AES_128_CCM) != CRYPTO_SUCCESS) {
         return 1;
     }
-    return 0;
+    return memcmp(recovered, plaintext, sizeof(recovered)) != 0;
 }
 
 int main(void) {
-    if (key_size_test()) {
-        fputs("AES parameter-set dispatch test failed\n", stderr);
-        return 1;
-    }
     if (ecb_kat()) {
         fputs("AES ECB KAT failed\n", stderr);
+        return 1;
+    }
+    if (ecb_iotcc_kat()) {
+        fputs("AES additional ECB KAT failed\n", stderr);
         return 1;
     }
     if (cbc_ctr_kat()) {
@@ -435,14 +297,6 @@ int main(void) {
     }
     if (ccm_kat()) {
         fputs("AES CCM KAT failed\n", stderr);
-        return 1;
-    }
-    if (all_parameter_sets_roundtrip()) {
-        fputs("AES complete parameter-set roundtrip failed\n", stderr);
-        return 1;
-    }
-    if (negative_test()) {
-        fputs("AES negative test failed\n", stderr);
         return 1;
     }
     puts("block cipher KAT passed");

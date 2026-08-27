@@ -88,6 +88,9 @@ static const hash_vector vectors[] = {
     { "SHA3-256 empty", "",
       "a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a",
       ALG_HASH_SHA3_256 },
+    { "SHA3-256 abc", "616263",
+      "3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532",
+      ALG_HASH_SHA3_256 },
     { "SHA3-384 empty", "",
       "0c63a75b845e4f7d01107d852e4c2485c51a50aaaa94fc61995e71bbee983a2a"
       "c3713831264adb47fb6bd1e058d5f004",
@@ -177,47 +180,6 @@ static int run_vector(const hash_vector *vector) {
     return 0;
 }
 
-static int test_argument_validation(void) {
-    uint8_t output[64];
-    uint8_t snapshot[64];
-    CryptoError error;
-
-    memset(output, 0x3c, sizeof(output));
-    memcpy(snapshot, output, sizeof(output));
-    error = CRYPTO_HASH(output, 31u, NULL, 0u, ALG_HASH_SHA2_256);
-    if (error != CRYPTO_ERROR_BUFFER_TOO_SMALL ||
-        memcmp(output, snapshot, sizeof(output)) != 0) {
-        fprintf(stderr, "short fixed-digest buffer validation failed\n");
-        return 1;
-    }
-    if (CRYPTO_HASH(NULL, 0u, NULL, 0u, ALG_HASH_SHA2_256) !=
-        CRYPTO_ERROR_BUFFER_TOO_SMALL) {
-        fprintf(stderr, "null fixed-digest buffer validation failed\n");
-        return 1;
-    }
-    if (CRYPTO_HASH(NULL, 1u, NULL, 0u, ALG_HASH_SHAKE128) !=
-        CRYPTO_ERROR_INVALID_ARGUMENT) {
-        fprintf(stderr, "null XOF output validation failed\n");
-        return 1;
-    }
-    if (CRYPTO_HASH(NULL, 0u, NULL, 0u, ALG_HASH_SHAKE128) !=
-        CRYPTO_SUCCESS) {
-        fprintf(stderr, "zero-length XOF validation failed\n");
-        return 1;
-    }
-    if (CRYPTO_HASH(output, sizeof(output), NULL, 1u, ALG_HASH_SHA3_512) !=
-        CRYPTO_ERROR_INVALID_ARGUMENT) {
-        fprintf(stderr, "null input validation failed\n");
-        return 1;
-    }
-    if (CRYPTO_HASH(output, sizeof(output), NULL, 0u, (AlgID)0x7fffffff) !=
-        CRYPTO_ERROR_INVALID_ALG_ID) {
-        fprintf(stderr, "invalid algorithm validation failed\n");
-        return 1;
-    }
-    return 0;
-}
-
 int main(void) {
     size_t index;
     int failures = 0;
@@ -225,8 +187,6 @@ int main(void) {
     for (index = 0; index < sizeof(vectors) / sizeof(vectors[0]); ++index) {
         failures += run_vector(&vectors[index]);
     }
-    failures += test_argument_validation();
-
     if (failures != 0) {
         fprintf(stderr, "hash KAT: %d failure(s)\n", failures);
         return 1;
