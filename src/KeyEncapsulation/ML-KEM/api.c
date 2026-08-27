@@ -40,14 +40,13 @@ static int mlkem_private_key_hash_is_valid(const uint8_t *private_key,
         private_key + pke_private_key_length;
     const uint8_t *stored_hash = private_key + private_key_length - 64u;
     uint8_t computed_hash[32];
-    uint32_t difference = 0u;
-    size_t i;
+    int valid;
 
     H(embedded_public_key, public_key_length, computed_hash);
-    for (i = 0u; i < sizeof(computed_hash); ++i)
-        difference |= (uint32_t)(computed_hash[i] ^ stored_hash[i]);
+    valid = crypto_constant_time_equal(
+        computed_hash, stored_hash, sizeof(computed_hash));
     crypto_zeroize(computed_hash, sizeof(computed_hash));
-    return difference == 0u;
+    return valid;
 }
 
 const mlkem_parameters *mlkem_parameters_for(AlgID alg) {

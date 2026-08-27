@@ -4,17 +4,11 @@
  */
 
 #include "BlockCipher/AES/aes_internal.h"
+#include "Util/Core/memory_internal.h"
 #include "Util/Core/secure_zero.h"
 #include "Util/Endian/endian_internal.h"
 
 #include <string.h>
-
-static int constant_time_equal(const uint8_t *a, const uint8_t *b, size_t length) {
-    uint8_t diff = 0;
-    size_t i;
-    for (i = 0; i < length; ++i) diff |= (uint8_t)(a[i] ^ b[i]);
-    return diff == 0;
-}
 
 static void xor_block(uint8_t out[16], const uint8_t a[16], const uint8_t b[16]) {
     size_t i;
@@ -242,7 +236,7 @@ CryptoError crypto_aes_gcm_decrypt(
                       INPUT, INPUT_LENGTH, full_tag);
     }
     if (err == CRYPTO_SUCCESS &&
-        !constant_time_equal(full_tag, TAG, TAG_LENGTH)) {
+        !crypto_constant_time_equal(full_tag, TAG, TAG_LENGTH)) {
         err = CRYPTO_ERROR_AUTHENTICATION_FAILED;
     }
     if (err == CRYPTO_SUCCESS)
@@ -464,7 +458,7 @@ CryptoError crypto_aes_ccm_decrypt(
         err = crypto_aes_encrypt_block(CONTEXT, ctr0, s0);
     if (err == CRYPTO_SUCCESS) {
         for (i = 0; i < TAG_LENGTH; ++i) expected[i] = (uint8_t)(mac[i] ^ s0[i]);
-        if (!constant_time_equal(expected, TAG, TAG_LENGTH))
+        if (!crypto_constant_time_equal(expected, TAG, TAG_LENGTH))
             err = CRYPTO_ERROR_AUTHENTICATION_FAILED;
     }
     if (err != CRYPTO_SUCCESS && OUTPUT && INPUT_LENGTH != 0u)

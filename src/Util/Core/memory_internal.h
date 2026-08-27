@@ -11,5 +11,7 @@
 int crypto_ranges_overlap(
     const void *first, size_t first_length,
     const void *second, size_t second_length);
+int crypto_constant_time_equal(
+    const uint8_t *left, const uint8_t *right, size_t length);
 
 #endif

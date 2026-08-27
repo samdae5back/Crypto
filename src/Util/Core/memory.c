@@ -19,3 +19,14 @@ int crypto_ranges_overlap(
         return second_address - first_address < first_length;
     return first_address - second_address < second_length;
 }
+
+int crypto_constant_time_equal(
+    const uint8_t *left, const uint8_t *right, size_t length) {
+    uint32_t difference = 0u;
+    size_t i;
+
+    for (i = 0u; i < length; ++i)
+        difference |= (uint32_t)(left[i] ^ right[i]);
+
+    return difference == 0u;
+}

@@ -4,6 +4,7 @@
  */
 
 #include "pqc_internal.h"
+#include "Util/Core/memory_internal.h"
 
 void crypto_pqc_poly16_add(
     crypto_pqc_poly16 *result,
@@ -27,13 +28,7 @@ void crypto_pqc_poly16_sub(
 
 int crypto_pqc_verify(
     const uint8_t *left, const uint8_t *right, size_t length) {
-    uint32_t difference = 0u;
-    size_t i;
-
-    for (i = 0u; i < length; ++i)
-        difference |= (uint32_t)(left[i] ^ right[i]);
-
-    return (int)((difference | (0u - difference)) >> 31);
+    return crypto_constant_time_equal(left, right, length) ? 0 : 1;
 }
 
 void crypto_pqc_cmov(
