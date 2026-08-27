@@ -35,12 +35,16 @@ def pascal_from_upper(name):
     return "".join(part[:1] + part[1:].lower() for part in name.split("_") if part)
 
 
-# Discover the old public namespace from the installed headers before changing it.
+# Discover the old installed namespace before changing it. This deliberately
+# limits renaming to identifiers that are actually public, so unrelated
+# CRYPTO_* names in bundled upstream backends are not rewritten accidentally.
 public_header_dir = ROOT / "inc"
 public_header_text = "\n".join(read(p) for p in public_header_dir.glob("*.h"))
 public_crypto_tokens = set(re.findall(r"\bCRYPTO_[A-Z0-9_]+\b", public_header_text))
+public_alg_tokens = set(re.findall(r"\bALG_[A-Z0-9_]+\b", public_header_text))
 
-# Public typedef names use the LiberaC type prefix rather than the LIBERAC_ symbol prefix.
+# Public typedef names use the LiberaC type prefix rather than the LIBERAC_
+# symbol prefix.
 public_type_aliases = {"AlgID", "CryptoError"}
 for match in re.finditer(r"}\s*(CRYPTO_[A-Z0-9_]+)\s*;", public_header_text):
     public_type_aliases.add(match.group(1))
@@ -66,14 +70,20 @@ def new_type_name(old):
 type_map = {old: new_type_name(old) for old in public_type_aliases}
 for old in public_type_aliases:
     public_crypto_tokens.discard(old)
+
 symbol_map = {
     old: "LIBERAC_" + old[len("CRYPTO_"):]
     for old in public_crypto_tokens
 }
+# Algorithm selectors are also public C identifiers. Namespace them too so the
+# installed API has one coherent LIBERAC_* identifier namespace.
+algorithm_map = {
+    old: "LIBERAC_" + old
+    for old in public_alg_tokens
+}
 
 # Apply public C identifier changes everywhere they are consumed. Exact token
-# replacement keeps unrelated bundled CRYPTO_* identifiers (for example upstream
-# CRYPTO_BYTES macros) untouched.
+# replacement keeps unrelated bundled identifiers untouched.
 for path in iter_text_files():
     text = read(path)
     original = text
@@ -81,6 +91,8 @@ for path in iter_text_files():
     for old, new in sorted(type_map.items(), key=lambda item: -len(item[0])):
         text = re.sub(rf"\b{re.escape(old)}\b", new, text)
     for old, new in sorted(symbol_map.items(), key=lambda item: -len(item[0])):
+        text = re.sub(rf"\b{re.escape(old)}\b", new, text)
+    for old, new in sorted(algorithm_map.items(), key=lambda item: -len(item[0])):
         text = re.sub(rf"\b{re.escape(old)}\b", new, text)
 
     text = text.replace("Crypto.h", "LiberaCrypt.h")
@@ -149,28 +161,14 @@ for path in cmake_paths:
     text = text.replace("crypto_exports.txt", "liberacrypt_exports.txt")
     write(path, text)
 
-# Rewrite the top-level CMake file where simple project-name substitution is not
-# sufficient to establish the requested library/package names.
+# Top-level library filename and documentation target.
 cmake = ROOT / "CMakeLists.txt"
 text = read(cmake)
-text = text.replace("project(LiberaCrypt VERSION", "project(LiberaCrypt VERSION")
-text = text.replace("add_library(LiberaCrypt::LiberaCrypt ALIAS LiberaCrypt)", "add_library(LiberaCrypt::LiberaCrypt ALIAS LiberaCrypt)")
 text = text.replace("OUTPUT_NAME crypto", "OUTPUT_NAME liberacrypt")
-text = text.replace("include(cmake/LiberaCryptExports.cmake)", "include(cmake/LiberaCryptExports.cmake)")
-text = text.replace("cmake/LiberaCryptConfig.cmake.in", "cmake/LiberaCryptConfig.cmake.in")
-text = text.replace("${CMAKE_CURRENT_BINARY_DIR}/LiberaCryptConfig.cmake", "${CMAKE_CURRENT_BINARY_DIR}/LiberaCryptConfig.cmake")
-text = text.replace("${CMAKE_CURRENT_BINARY_DIR}/LiberaCryptConfigVersion.cmake", "${CMAKE_CURRENT_BINARY_DIR}/LiberaCryptConfigVersion.cmake")
-text = text.replace("EXPORT LiberaCryptTargets", "EXPORT LiberaCryptTargets")
-text = text.replace("install(EXPORT LiberaCryptTargets NAMESPACE LiberaCrypt::", "install(EXPORT LiberaCryptTargets NAMESPACE LiberaCrypt::")
-text = text.replace("${CMAKE_INSTALL_LIBDIR}/cmake/LiberaCrypt", "${CMAKE_INSTALL_LIBDIR}/cmake/LiberaCrypt")
-text = text.replace("${CMAKE_INSTALL_DATADIR}/licenses/LiberaCrypt", "${CMAKE_INSTALL_DATADIR}/licenses/LiberaCrypt")
-text = text.replace('COMMENT "Generating LiberaCrypt public API documentation"', 'COMMENT "Generating LiberaCrypt public API documentation"')
 text = text.replace("add_custom_target(crypto_docs", "add_custom_target(liberacrypt_docs")
 write(cmake, text)
 
-# The broad CMake word replacement changes the target consistently, but verify
-# the exact requested public package shape and repair any old lowercase library
-# filename documentation.
+# Package-facing documentation and examples.
 for path in iter_text_files():
     text = read(path)
     original = text
@@ -183,45 +181,39 @@ for path in iter_text_files():
     if text != original:
         write(path, text)
 
-# README identity: old compatibility statement is no longer true after this
-# breaking public namespace rename.
+# README identity: the old compatibility statement is no longer true after
+# this breaking public namespace rename.
 readme = ROOT / "README.md"
 text = read(readme)
-old_note = (
+text = text.replace(
     "The public C API and CMake package identifiers currently retain the existing\n"
     "`LIBERAC_`, `LiberaCrypt.h`, and `LiberaCrypt::LiberaCrypt` names for compatibility; LiberaCrypt\n"
-    "is the project name.\n"
+    "is the project name.\n",
+    "LiberaCrypt uses `LIBERAC_` for public C symbols, macros, and algorithm\n"
+    "selectors, `LiberaC` for public type names, `LiberaCrypt.h` as its umbrella\n"
+    "header, and the `LiberaCrypt::LiberaCrypt` CMake target.\n",
 )
-if old_note in text:
-    text = text.replace(
-        old_note,
-        "LiberaCrypt uses `LIBERAC_` for public C symbols and macros, `LiberaC`\n"
-        "for public type names, `LiberaCrypt.h` as its umbrella header, and the\n"
-        "`LiberaCrypt::LiberaCrypt` CMake target.\n",
-    )
-# Handle the exact pre-rename wording if public-token replacement did not make it
-# match the normalized form above.
 text = text.replace(
     "The public C API and CMake package identifiers currently retain the existing\n"
     "`CRYPTO_`, `Crypto.h`, and `Crypto::Crypto` names for compatibility; LiberaCrypt\n"
     "is the project name.\n",
-    "LiberaCrypt uses `LIBERAC_` for public C symbols and macros, `LiberaC`\n"
-    "for public type names, `LiberaCrypt.h` as its umbrella header, and the\n"
-    "`LiberaCrypt::LiberaCrypt` CMake target.\n",
+    "LiberaCrypt uses `LIBERAC_` for public C symbols, macros, and algorithm\n"
+    "selectors, `LiberaC` for public type names, `LiberaCrypt.h` as its umbrella\n"
+    "header, and the `LiberaCrypt::LiberaCrypt` CMake target.\n",
 )
 text = text.replace("-DCRYPTO_BUILD_TESTS=ON", "-DLIBERAC_BUILD_TESTS=ON")
 text = text.replace("-DCRYPTO_BUILD_DOCS=ON", "-DLIBERAC_BUILD_DOCS=ON")
 write(readme, text)
 
-# Update documentation configuration branding.
+# Documentation branding.
 doxy = ROOT / "cmake" / "Doxyfile.in"
 if doxy.exists():
     text = read(doxy)
     text = re.sub(r"(?m)^PROJECT_NAME\s*=.*$", 'PROJECT_NAME           = "LiberaCrypt"', text)
     write(doxy, text)
 
-# Public namespace assertions: no old public header, public type, or CRYPTO_
-# symbol from the old installed headers may survive in the installed interface.
+# Public namespace assertions. Package-name assertions that depend on the
+# post-pass are intentionally checked by liberacrypt_public_api_post.py.
 if (ROOT / "inc" / "Crypto.h").exists():
     raise RuntimeError("old inc/Crypto.h still exists")
 if not (ROOT / "inc" / "LiberaCrypt.h").exists():
@@ -230,26 +222,32 @@ if not (ROOT / "inc" / "LiberaCrypt.h").exists():
 new_public_text = "\n".join(read(p) for p in public_header_dir.glob("*.h"))
 if re.search(r"\bCryptoError\b|\bAlgID\b", new_public_text):
     raise RuntimeError("old public type name remains in installed headers")
-old_public_tokens_left = sorted(token for token in public_crypto_tokens if re.search(rf"\b{re.escape(token)}\b", new_public_text))
+old_public_tokens_left = sorted(
+    token for token in public_crypto_tokens
+    if re.search(rf"\b{re.escape(token)}\b", new_public_text)
+)
 if old_public_tokens_left:
     raise RuntimeError(f"old public CRYPTO_ names remain: {old_public_tokens_left[:20]}")
+old_alg_tokens_left = sorted(
+    token for token in public_alg_tokens
+    if re.search(rf"\b{re.escape(token)}\b", new_public_text)
+)
+if old_alg_tokens_left:
+    raise RuntimeError(f"old public ALG_ names remain: {old_alg_tokens_left[:20]}")
 
-# Ensure requested CMake identity is present exactly.
+# Verify the part of the requested CMake identity established in this pass.
 cmake_text = read(ROOT / "CMakeLists.txt")
-required = [
+for item in (
     "project(LiberaCrypt VERSION",
     "add_library(LiberaCrypt ",
     "add_library(LiberaCrypt::LiberaCrypt ALIAS LiberaCrypt)",
     "OUTPUT_NAME liberacrypt",
-    "LiberaCryptTargets",
-    "NAMESPACE LiberaCrypt::",
-    "LiberaCryptConfig.cmake",
-]
-for item in required:
+):
     if item not in cmake_text:
         raise RuntimeError(f"missing requested CMake identity: {item}")
 
 print("Public type mapping:")
 for old, new in sorted(type_map.items()):
     print(f"  {old} -> {new}")
-print(f"Renamed {len(symbol_map)} installed CRYPTO_ symbols/macros to LIBERAC_*")
+print(f"Renamed {len(symbol_map)} installed CRYPTO_ identifiers to LIBERAC_*")
+print(f"Renamed {len(algorithm_map)} installed ALG_ selectors to LIBERAC_ALG_*")
