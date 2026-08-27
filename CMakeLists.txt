@@ -8,23 +8,32 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
-# Public symbols are explicitly marked with CRYPTO_API. Everything else is hidden
-# on Linux/macOS. Windows exports only __declspec(dllexport) symbols.
-if(NOT WIN32)
-    set(CMAKE_C_VISIBILITY_PRESET hidden)
-    set(CMAKE_VISIBILITY_INLINES_HIDDEN YES)
-endif()
+set(MLDSA_BACKEND_DIR
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/DigitalSignature/ML-DSA/Backend)
+set(SLHDSA_BACKEND_DIR
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/DigitalSignature/SLH-DSA/Backend)
 
-set(MLDSA_NATIVE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mldsa-native)
-set(SLHDSA_C_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/slhdsa-c)
-
-if(NOT EXISTS "${MLDSA_NATIVE_DIR}/mldsa/mldsa_native.c" OR
-   NOT EXISTS "${SLHDSA_C_DIR}/slh_dsa.c")
-    message(FATAL_ERROR "PQ signature submodules are missing. Run: git submodule update --init --recursive")
+# CMake 3.17 added the supported opt-out for AIX's automatic all-symbol
+# export. Set the initializer before creating the shared-library target.
+if(CMAKE_SYSTEM_NAME STREQUAL "AIX")
+    if(CMAKE_VERSION VERSION_LESS "3.17")
+        message(FATAL_ERROR
+            "Restricted AIX exports require CMake 3.17 or newer")
+    endif()
+    set(CMAKE_AIX_EXPORT_ALL_SYMBOLS OFF)
 endif()
 
 set(CRYPTO_SOURCES
-    src/Util/Core/core.c
+    # Public ABI entry points: one translation unit per operational category.
+    src/AsymmetricCipher.c
+    src/BlockCipher.c
+    src/DigitalSignature.c
+    src/HashFunction.c
+    src/KeyEncapsulation.c
+    src/RandomNumberGeneration.c
+    src/Util.c
+
+    # Private implementations grouped by primitive family and algorithm.
     src/Util/Core/secure_zero.c
     src/BlockCipher/AES/aes.c
     src/BlockCipher/AES/aes_aead.c
@@ -33,8 +42,9 @@ set(CRYPTO_SOURCES
     src/Util/Prime/prime.c
     src/AsymmetricCipher/RSA/rsa.c
     src/AsymmetricCipher/ElGamal/elgamal.c
+    src/HashFunction/SHA2/sha2.c
     src/HashFunction/SHA3/sha3.c
-    src/HashFunction.c
+    src/HashFunction/LSH/lsh.c
     src/RandomNumberGeneration/Noise/random.c
     src/Util/Endian/endian.c
     src/Util/NTT/ntt.c
@@ -56,7 +66,7 @@ list(APPEND CRYPTO_SOURCES
 # which makes checkout/build behavior consistent on Windows as well.
 add_library(crypto_mldsa OBJECT src/DigitalSignature/ML-DSA/mldsa_backend.c)
 set_target_properties(crypto_mldsa PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_include_directories(crypto_mldsa PRIVATE ${MLDSA_NATIVE_DIR}/mldsa)
+target_include_directories(crypto_mldsa PRIVATE ${MLDSA_BACKEND_DIR})
 target_compile_definitions(crypto_mldsa PRIVATE
     MLD_CONFIG_NO_RANDOMIZED_API
     MLD_CONFIG_MULTILEVEL_BUILD
@@ -65,31 +75,18 @@ target_compile_definitions(crypto_mldsa PRIVATE
 
 # slhdsa-c exposes all twelve FIPS 205 parameter objects from one portable build.
 set(SLHDSA_VENDOR_SOURCES
-    ${SLHDSA_C_DIR}/sha2_256.c
-    ${SLHDSA_C_DIR}/sha2_512.c
-    ${SLHDSA_C_DIR}/sha3_api.c
-    ${SLHDSA_C_DIR}/sha3_f1600.c
-    ${SLHDSA_C_DIR}/slh_dsa.c
-    ${SLHDSA_C_DIR}/slh_prehash.c
-    ${SLHDSA_C_DIR}/slh_sha2.c
-    ${SLHDSA_C_DIR}/slh_shake.c
+    ${SLHDSA_BACKEND_DIR}/sha2_256.c
+    ${SLHDSA_BACKEND_DIR}/sha2_512.c
+    ${SLHDSA_BACKEND_DIR}/sha3_api.c
+    ${SLHDSA_BACKEND_DIR}/sha3_f1600.c
+    ${SLHDSA_BACKEND_DIR}/slh_dsa.c
+    ${SLHDSA_BACKEND_DIR}/slh_prehash.c
+    ${SLHDSA_BACKEND_DIR}/slh_sha2.c
+    ${SLHDSA_BACKEND_DIR}/slh_shake.c
 )
 add_library(crypto_slhdsa OBJECT ${SLHDSA_VENDOR_SOURCES})
 set_target_properties(crypto_slhdsa PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_include_directories(crypto_slhdsa PRIVATE ${SLHDSA_C_DIR})
-
-if(MSVC)
-    # slhdsa-c compares GCC byte-order macros directly. When both are absent,
-    # MSVC preprocesses them as zero and incorrectly selects big-endian SHA-2.
-    target_compile_definitions(crypto_slhdsa PRIVATE
-        __BYTE_ORDER__=1234 __ORDER_BIG_ENDIAN__=4321
-    )
-    target_compile_options(crypto_mldsa PRIVATE /W4)
-    target_compile_options(crypto_slhdsa PRIVATE /W4)
-else()
-    target_compile_options(crypto_mldsa PRIVATE -Wall -Wextra -pedantic)
-    target_compile_options(crypto_slhdsa PRIVATE -Wall -Wextra -pedantic)
-endif()
+target_include_directories(crypto_slhdsa PRIVATE ${SLHDSA_BACKEND_DIR})
 
 add_library(Crypto ${CRYPTO_SOURCES}
     $<TARGET_OBJECTS:crypto_mldsa>
@@ -105,13 +102,13 @@ set_target_properties(Crypto PROPERTIES
 
 target_include_directories(Crypto
     PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/inc>
+        $<INSTALL_INTERFACE:inc>
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_SOURCE_DIR}/src/DigitalSignature/ML-DSA
-        ${MLDSA_NATIVE_DIR}/mldsa
-        ${SLHDSA_C_DIR}
+        ${MLDSA_BACKEND_DIR}
+        ${SLHDSA_BACKEND_DIR}
 )
 target_compile_definitions(Crypto PRIVATE
     MLD_CONFIG_NO_RANDOMIZED_API
@@ -119,32 +116,56 @@ target_compile_definitions(Crypto PRIVATE
     MLD_CONFIG_NAMESPACE_PREFIX=mldsa
 )
 
-if(BUILD_SHARED_LIBS)
-    target_compile_definitions(Crypto PUBLIC CRYPTO_SHARED PRIVATE CRYPTO_BUILDING_LIBRARY)
-endif()
-
 if(WIN32)
     target_link_libraries(Crypto PRIVATE bcrypt)
 endif()
 
-if(MSVC)
-    target_compile_options(Crypto PRIVATE /W4)
-else()
-    target_compile_options(Crypto PRIVATE -Wall -Wextra -pedantic)
-endif()
+include(cmake/CryptoExports.cmake)
+crypto_configure_exports(Crypto)
+crypto_configure_portable_warnings(Crypto crypto_mldsa crypto_slhdsa)
+crypto_configure_vendor_endianness(
+    SLHDSA_TARGET crypto_slhdsa
+    MLDSA_TARGET crypto_mldsa
+)
 
 include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+set(CRYPTO_CMAKE_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/Crypto)
+configure_package_config_file(
+    cmake/CryptoConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/CryptoConfig.cmake
+    INSTALL_DESTINATION ${CRYPTO_CMAKE_INSTALL_DIR}
+    NO_SET_AND_CHECK_MACRO
+    NO_CHECK_REQUIRED_COMPONENTS_MACRO
+)
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/CryptoConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+
 install(TARGETS Crypto
     EXPORT CryptoTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
-install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-install(EXPORT CryptoTargets NAMESPACE Crypto:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Crypto)
+install(DIRECTORY inc/ DESTINATION inc)
+install(EXPORT CryptoTargets NAMESPACE Crypto:: DESTINATION ${CRYPTO_CMAKE_INSTALL_DIR})
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/CryptoConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/CryptoConfigVersion.cmake
+    DESTINATION ${CRYPTO_CMAKE_INSTALL_DIR}
+)
 
 if(CRYPTO_BUILD_TESTS)
     enable_testing()
+
+    add_executable(public_header_tests tests/test_public_headers.c)
+    target_link_libraries(public_header_tests PRIVATE Crypto)
+    add_test(NAME public_header_tests COMMAND public_header_tests)
+
     add_executable(crypto_unittest tests/test_crypto.c)
     target_link_libraries(crypto_unittest PRIVATE Crypto)
     add_test(NAME crypto_unittest COMMAND crypto_unittest)
@@ -152,6 +173,14 @@ if(CRYPTO_BUILD_TESTS)
     add_executable(crypto_kat tests/test_kat.c)
     target_link_libraries(crypto_kat PRIVATE Crypto)
     add_test(NAME crypto_kat COMMAND crypto_kat)
+
+    add_executable(block_cipher_kat tests/block_cipher_kat.c)
+    target_link_libraries(block_cipher_kat PRIVATE Crypto)
+    add_test(NAME block_cipher_kat COMMAND block_cipher_kat)
+
+    add_executable(hash_kat tests/hash_kat.c)
+    target_link_libraries(hash_kat PRIVATE Crypto)
+    add_test(NAME hash_kat COMMAND hash_kat)
 
     add_executable(ctr_drbg_tests tests/test_ctr_drbg.c)
     target_link_libraries(ctr_drbg_tests PRIVATE Crypto)
