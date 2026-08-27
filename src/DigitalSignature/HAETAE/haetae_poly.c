@@ -529,10 +529,10 @@ void crypto_haetae_polyeta_pack(uint8_t  *r, const crypto_haetae_poly *a) {
 
 #if CRYPTO_HAETAE_ETA == 1
     for (i = 0; i < CRYPTO_HAETAE_N / 4; ++i) {
-        t[0] = CRYPTO_HAETAE_ETA - a->coeffs[4 * i + 0];
-        t[1] = CRYPTO_HAETAE_ETA - a->coeffs[4 * i + 1];
-        t[2] = CRYPTO_HAETAE_ETA - a->coeffs[4 * i + 2];
-        t[3] = CRYPTO_HAETAE_ETA - a->coeffs[4 * i + 3];
+        t[0] = (uint8_t)(CRYPTO_HAETAE_ETA - a->coeffs[4 * i + 0]);
+        t[1] = (uint8_t)(CRYPTO_HAETAE_ETA - a->coeffs[4 * i + 1]);
+        t[2] = (uint8_t)(CRYPTO_HAETAE_ETA - a->coeffs[4 * i + 2]);
+        t[3] = (uint8_t)(CRYPTO_HAETAE_ETA - a->coeffs[4 * i + 3]);
         r[i] = t[0] >> 0;
         r[i] |= t[1] << 2;
         r[i] |= t[2] << 4;
@@ -625,14 +625,14 @@ void crypto_haetae_poly2eta_pack(uint8_t  *r, const crypto_haetae_poly *a) {
 
 #if CRYPTO_HAETAE_ETA == 1
     for (i = 0; i < CRYPTO_HAETAE_N / 8; ++i) {
-        t[0] = 2 * CRYPTO_HAETAE_ETA - a->coeffs[8 * i + 0];
-        t[1] = 2 * CRYPTO_HAETAE_ETA - a->coeffs[8 * i + 1];
-        t[2] = 2 * CRYPTO_HAETAE_ETA - a->coeffs[8 * i + 2];
-        t[3] = 2 * CRYPTO_HAETAE_ETA - a->coeffs[8 * i + 3];
-        t[4] = 2 * CRYPTO_HAETAE_ETA - a->coeffs[8 * i + 4];
-        t[5] = 2 * CRYPTO_HAETAE_ETA - a->coeffs[8 * i + 5];
-        t[6] = 2 * CRYPTO_HAETAE_ETA - a->coeffs[8 * i + 6];
-        t[7] = 2 * CRYPTO_HAETAE_ETA - a->coeffs[8 * i + 7];
+        t[0] = (uint8_t)(2 * CRYPTO_HAETAE_ETA - a->coeffs[8 * i + 0]);
+        t[1] = (uint8_t)(2 * CRYPTO_HAETAE_ETA - a->coeffs[8 * i + 1]);
+        t[2] = (uint8_t)(2 * CRYPTO_HAETAE_ETA - a->coeffs[8 * i + 2]);
+        t[3] = (uint8_t)(2 * CRYPTO_HAETAE_ETA - a->coeffs[8 * i + 3]);
+        t[4] = (uint8_t)(2 * CRYPTO_HAETAE_ETA - a->coeffs[8 * i + 4]);
+        t[5] = (uint8_t)(2 * CRYPTO_HAETAE_ETA - a->coeffs[8 * i + 5]);
+        t[6] = (uint8_t)(2 * CRYPTO_HAETAE_ETA - a->coeffs[8 * i + 6]);
+        t[7] = (uint8_t)(2 * CRYPTO_HAETAE_ETA - a->coeffs[8 * i + 7]);
 
         r[3 * i + 0] = (t[0] >> 0) | (t[1] << 3) | (t[2] << 6);
         r[3 * i + 1] = (t[2] >> 2) | (t[3] << 1) | (t[4] << 4) | (t[5] << 7);

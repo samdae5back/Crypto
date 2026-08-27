@@ -8,6 +8,10 @@
 #include "haetae_poly.h"
 #include "haetae_polyvec.h"
 
+_Static_assert(((CRYPTO_HAETAE_MAX_K << 8) + CRYPTO_HAETAE_MAX_M +
+                CRYPTO_HAETAE_MAX_K) <= UINT16_MAX,
+               "HAETAE expansion nonce must fit uint16_t");
+
 
 #define BESTM_MAX_SIZE CRYPTO_HAETAE_N / CRYPTO_HAETAE_MIN_TAU + 1
 
@@ -126,8 +130,9 @@ void crypto_haetae_polyveck_freeze2q(crypto_haetae_polyveck* v, const crypto_hae
 void crypto_haetae_polyveck_expand(crypto_haetae_polyveck* v, const uint8_t  seed[CRYPTO_HAETAE_SEED_BYTES],
 	const crypto_haetae_parameters *parameters) {
 
-	const int haetae_m = parameters->l - 1;
-	unsigned int i, nonce = (parameters->k << 8) + haetae_m;
+	const uint32_t haetae_m = parameters->l - 1u;
+	unsigned int i;
+	uint16_t nonce = (uint16_t)((parameters->k << 8) + haetae_m);
 	for (i = 0; i < parameters->k; ++i)
 		crypto_haetae_poly_uniform(&v->vec[i], seed, nonce++);
 }
