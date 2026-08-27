@@ -34,13 +34,26 @@ jobs:
                   line[10:] if line.startswith('          ') else line
                   for line in lines)
 
-          # Reproduce the experimental FFT/range-widening patch exactly as in
-          # the original long-running experiment.
+          # Reproduce the original experimental FFT/range-widening patch.
           patch = extract_run(
               '.github/workflows/haetae-portable-arithmetic.yml',
               'Apply portable codec, reduction, and FFT fixes',
               'Validate HAETAE build and tests')
           exec(compile(patch, '<fft-patch>', 'exec'), {})
+
+          # The first diagnostic run identified a precedence bug in the
+          # experimental rounding constant. UINT64_C is for a literal token,
+          # not a compound expression; UINT64_C(1 << 5) became an expression
+          # whose shift bound to res + 1. Correct only that experimental line
+          # here to confirm it is the runtime root cause.
+          polyvec = Path('src/DigitalSignature/HAETAE/haetae_polyvec.c')
+          text = polyvec.read_text()
+          bad = 'UINT64_C(1 << 5)'
+          if text.count(bad) != 1:
+              raise RuntimeError(
+                  f'expected one bad rounding constant, found {text.count(bad)}')
+          text = text.replace(bad, 'UINT64_C(32)', 1)
+          polyvec.write_text(text)
 
           # Trace which runtime parameter set enters/exits key generation.
           unit = Path('tests/DigitalSignature/HAETAE/UnitTest.c')
@@ -64,8 +77,6 @@ jobs:
               1)
           unit.write_text(text)
 
-          # Trace the singular-value rejection result after each of the two
-          # key-generation calls, independent of surrounding whitespace.
           source = Path('src/DigitalSignature/HAETAE/haetae.c')
           text = source.read_text()
           if '#include <stdio.h>' not in text:
