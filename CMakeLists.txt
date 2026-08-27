@@ -40,6 +40,10 @@ set(MLDSA_BACKEND_DIR
     ${CMAKE_CURRENT_SOURCE_DIR}/src/DigitalSignature/ML-DSA/Backend)
 set(SLHDSA_BACKEND_DIR
     ${CMAKE_CURRENT_SOURCE_DIR}/src/DigitalSignature/SLH-DSA/Backend)
+set(AIMER_BACKEND_DIR
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/DigitalSignature/AIMer/Backend)
+set(HAETAE_SOURCE_DIR
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/DigitalSignature/HAETAE)
 
 # CMake 3.17 added the supported opt-out for AIX's automatic all-symbol
 # export. Set the initializer before creating the shared-library target.
@@ -80,6 +84,33 @@ set(CRYPTO_SOURCES
     src/Util/NTT/ntt.c
     src/Util/PQC/pqc.c
     src/KeyEncapsulation/ML-KEM/api.c
+    src/KeyEncapsulation/NTRU-Plus/ntru_plus.c
+    src/KeyEncapsulation/NTRU-Plus/ntru_plus_hash.c
+    src/KeyEncapsulation/NTRU-Plus/ntru_plus_ntt.c
+    src/KeyEncapsulation/NTRU-Plus/ntru_plus_poly.c
+    src/KeyEncapsulation/SMAUG-T/smaug_t.c
+    src/DigitalSignature/AIMer/aimer.c
+    src/DigitalSignature/AIMer/Backend/aimer_aim2.c
+    src/DigitalSignature/AIMer/Backend/aimer_backend.c
+    src/DigitalSignature/AIMer/Backend/aimer_field.c
+    src/DigitalSignature/AIMer/Backend/aimer_field128.c
+    src/DigitalSignature/AIMer/Backend/aimer_field192.c
+    src/DigitalSignature/AIMer/Backend/aimer_field256.c
+    src/DigitalSignature/AIMer/Backend/aimer_poly.c
+    src/DigitalSignature/AIMer/Backend/aimer_tree.c
+    src/DigitalSignature/HAETAE/haetae.c
+    src/DigitalSignature/HAETAE/haetae_decompose.c
+    src/DigitalSignature/HAETAE/haetae_encoding.c
+    src/DigitalSignature/HAETAE/haetae_fft.c
+    src/DigitalSignature/HAETAE/haetae_fixpoint.c
+    src/DigitalSignature/HAETAE/haetae_ntt.c
+    src/DigitalSignature/HAETAE/haetae_packing.c
+    src/DigitalSignature/HAETAE/haetae_poly.c
+    src/DigitalSignature/HAETAE/haetae_polyfix.c
+    src/DigitalSignature/HAETAE/haetae_polymat.c
+    src/DigitalSignature/HAETAE/haetae_polyvec.c
+    src/DigitalSignature/HAETAE/haetae_reduce.c
+    src/DigitalSignature/HAETAE/haetae_sampler.c
     src/DigitalSignature/ML-DSA/ml_dsa.c
     src/DigitalSignature/SLH-DSA/slh_dsa.c
 )
@@ -204,6 +235,46 @@ install(FILES ${MLDSA_BACKEND_DIR}/LICENSE
 install(FILES ${SLHDSA_BACKEND_DIR}/LICENSE
     DESTINATION ${CRYPTO_LICENSE_INSTALL_DIR}
     RENAME slhdsa-c-LICENSE.txt
+)
+install(FILES src/KeyEncapsulation/NTRU-Plus/LICENSE
+    DESTINATION ${CRYPTO_LICENSE_INSTALL_DIR}
+    RENAME ntru-plus-LICENSE.txt
+)
+install(FILES src/KeyEncapsulation/NTRU-Plus/UPSTREAM.md
+    DESTINATION ${CRYPTO_LICENSE_INSTALL_DIR}
+    RENAME ntru-plus-UPSTREAM.md
+)
+install(FILES src/KeyEncapsulation/SMAUG-T/LICENSE
+    DESTINATION ${CRYPTO_LICENSE_INSTALL_DIR}
+    RENAME smaug-t-LICENSE.txt
+)
+install(FILES src/KeyEncapsulation/SMAUG-T/UPSTREAM.md
+    DESTINATION ${CRYPTO_LICENSE_INSTALL_DIR}
+    RENAME smaug-t-UPSTREAM.md
+)
+install(FILES ${AIMER_BACKEND_DIR}/LICENSE
+    DESTINATION ${CRYPTO_LICENSE_INSTALL_DIR}
+    RENAME aimer-LICENSE.txt
+)
+install(FILES ${AIMER_BACKEND_DIR}/NOTICE
+    DESTINATION ${CRYPTO_LICENSE_INSTALL_DIR}
+    RENAME aimer-NOTICE.txt
+)
+install(FILES ${AIMER_BACKEND_DIR}/README.md
+    DESTINATION ${CRYPTO_LICENSE_INSTALL_DIR}
+    RENAME aimer-UPSTREAM.md
+)
+install(FILES ${HAETAE_SOURCE_DIR}/LICENSE
+    DESTINATION ${CRYPTO_LICENSE_INSTALL_DIR}
+    RENAME haetae-LICENSE.txt
+)
+install(FILES ${HAETAE_SOURCE_DIR}/NOTICE
+    DESTINATION ${CRYPTO_LICENSE_INSTALL_DIR}
+    RENAME haetae-NOTICE.txt
+)
+install(FILES ${HAETAE_SOURCE_DIR}/UPSTREAM.md
+    DESTINATION ${CRYPTO_LICENSE_INSTALL_DIR}
+    RENAME haetae-UPSTREAM.md
 )
 
 if(CRYPTO_BUILD_DOCS)
