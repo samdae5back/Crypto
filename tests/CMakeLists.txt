@@ -20,16 +20,7 @@ crypto_add_public_test(
 # Compile every installed header in an otherwise empty translation unit. This
 # catches accidental reliance on include order while retaining the umbrella
 # runtime check above for the public types used together.
-foreach(CRYPTO_PUBLIC_HEADER IN ITEMS
-        AsymmetricCipher.h
-        BlockCipher.h
-        Crypto.h
-        Def.h
-        DigitalSignature.h
-        HashFunction.h
-        KeyEncapsulation.h
-        RandomNumberGeneration.h
-        Util.h)
+foreach(CRYPTO_PUBLIC_HEADER IN LISTS CRYPTO_PUBLIC_HEADER_NAMES)
     get_filename_component(
         CRYPTO_PUBLIC_HEADER_STEM "${CRYPTO_PUBLIC_HEADER}" NAME_WE)
     string(TOLOWER

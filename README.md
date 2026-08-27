@@ -42,7 +42,8 @@ No submodule checkout or external crypto package is required.
 cmake -E make_directory build
 cmake -E chdir build cmake .. \
   -DBUILD_SHARED_LIBS=ON \
-  -DCRYPTO_BUILD_TESTS=ON
+  -DCRYPTO_BUILD_TESTS=ON \
+  -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release
 cmake -E chdir build ctest -C Release --output-on-failure
 ```
@@ -61,6 +62,12 @@ CMake consumers can discover the installed package and link its imported target:
 find_package(Crypto CONFIG REQUIRED)
 target_link_libraries(your_target PRIVATE Crypto::Crypto)
 ```
+
+Tests default to enabled for a standalone checkout and disabled when Crypto is
+included by another project with `add_subdirectory()`. An embedding project can
+enable them through the CMake cache (for example,
+`-DCRYPTO_BUILD_TESTS=ON`); its top-level CMake file must also call
+`enable_testing()` for root-level CTest discovery.
 
 The target exposes the installed `inc` directory, so source files include the
 umbrella header as follows:
@@ -206,7 +213,8 @@ When `CRYPTO_BUILD_TESTS` is enabled, CMake generates:
 - public-header isolation checks
 - operation-level unit tests for key generation, encryption/decryption,
   encapsulation/decapsulation, and signing/verification
-- AES mode known-answer tests for every supported key size
+- AES known-answer tests for every mode, plus round-trip coverage for every
+  supported mode and key size
 - SHA-2, SHA-3, SHAKE, and LSH known-answer tests
 - CTR_DRBG known-answer and derivation-function tests
 - operation tests for ML-KEM and both post-quantum signature families

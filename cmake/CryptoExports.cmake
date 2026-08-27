@@ -59,13 +59,15 @@ function(_crypto_exports_add_linker_option target linker_option)
     if(COMMAND target_link_options)
         target_link_options(${target} PRIVATE "LINKER:${linker_option}")
     else()
-        get_target_property(_crypto_old_link_flags ${target} LINK_FLAGS)
-        if(NOT _crypto_old_link_flags OR
-           _crypto_old_link_flags STREQUAL "_crypto_old_link_flags-NOTFOUND")
-            set(_crypto_old_link_flags "")
-        endif()
-        set_target_properties(${target} PROPERTIES LINK_FLAGS
-            "${_crypto_old_link_flags} -Wl,${linker_option}")
+        # LINK_FLAGS is an unstructured command fragment in CMake 3.10-3.12.
+        # Keep explicit quotes in that fragment so an export-map path remains
+        # one compiler-driver argument even when the build directory has
+        # spaces. A double quote cannot occur in a generated Unix path, but
+        # escape one defensively in caller-supplied options.
+        string(REPLACE "\"" "\\\"" _crypto_escaped_linker_option
+            "${linker_option}")
+        set_property(TARGET ${target} APPEND_STRING PROPERTY LINK_FLAGS
+            " \"-Wl,${_crypto_escaped_linker_option}\"")
     endif()
 endfunction()
 

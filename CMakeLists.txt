@@ -1,9 +1,36 @@
 cmake_minimum_required(VERSION 3.10)
 project(Crypto VERSION 0.6.0 LANGUAGES C)
 
+if(POLICY CMP0077)
+    cmake_policy(SET CMP0077 NEW)
+endif()
+
+if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+    set(CRYPTO_IS_TOP_LEVEL ON)
+else()
+    set(CRYPTO_IS_TOP_LEVEL OFF)
+endif()
+
 option(BUILD_SHARED_LIBS "Build Crypto as a shared library" ON)
-option(CRYPTO_BUILD_TESTS "Build Crypto tests" ON)
+option(CRYPTO_BUILD_TESTS "Build Crypto tests" ${CRYPTO_IS_TOP_LEVEL})
 option(CRYPTO_BUILD_DOCS "Generate the public API reference with Doxygen" OFF)
+
+set(CRYPTO_PUBLIC_HEADER_NAMES
+    AsymmetricCipher.h
+    BlockCipher.h
+    Crypto.h
+    Def.h
+    DigitalSignature.h
+    HashFunction.h
+    KeyEncapsulation.h
+    RandomNumberGeneration.h
+    Util.h
+)
+set(CRYPTO_PUBLIC_HEADERS "")
+foreach(CRYPTO_PUBLIC_HEADER IN LISTS CRYPTO_PUBLIC_HEADER_NAMES)
+    list(APPEND CRYPTO_PUBLIC_HEADERS
+        "${CMAKE_CURRENT_SOURCE_DIR}/inc/${CRYPTO_PUBLIC_HEADER}")
+endforeach()
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -153,7 +180,7 @@ install(TARGETS Crypto
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
-install(DIRECTORY inc/ DESTINATION inc)
+install(FILES ${CRYPTO_PUBLIC_HEADERS} DESTINATION inc)
 install(EXPORT CryptoTargets NAMESPACE Crypto:: DESTINATION ${CRYPTO_CMAKE_INSTALL_DIR})
 install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/CryptoConfig.cmake
@@ -179,17 +206,6 @@ install(FILES ${SLHDSA_BACKEND_DIR}/LICENSE
 
 if(CRYPTO_BUILD_DOCS)
     find_package(Doxygen 1.12 REQUIRED)
-    set(CRYPTO_PUBLIC_HEADERS
-        ${CMAKE_CURRENT_SOURCE_DIR}/inc/AsymmetricCipher.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/inc/BlockCipher.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/inc/Crypto.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/inc/Def.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/inc/DigitalSignature.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/inc/HashFunction.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/inc/KeyEncapsulation.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/inc/RandomNumberGeneration.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/inc/Util.h
-    )
     set(CRYPTO_DOXYGEN_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/docs")
     set(CRYPTO_DOXYGEN_INDEX
         "${CRYPTO_DOXYGEN_OUTPUT_DIR}/html/index.html")
