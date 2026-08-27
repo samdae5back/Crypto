@@ -87,3 +87,5 @@ is the project name.
           git commit -m "docs: introduce LiberaCrypt project identity" \
             -m "Describe simplicity, portability, environment independence, and software freedom as the project's primary design principles while retaining the current C API and CMake identifiers for compatibility."
           git push origin HEAD:main
+
+# second push triggers this newly registered workflow
