@@ -152,6 +152,7 @@ crypto_configure_portable_warnings(crypto_pqc_kat_module)
 add_executable(crypto_ml_kem_kat
     KeyEncapsulation/ML-KEM/KAT.c
     Internal/KatReader.c
+    Internal/KemKat.c
 )
 add_executable(crypto_ml_dsa_kat
     DigitalSignature/ML-DSA/KAT.c
