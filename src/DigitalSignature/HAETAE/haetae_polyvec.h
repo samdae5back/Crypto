@@ -75,7 +75,10 @@ void crypto_haetae_polyvecm_pointwise_acc_montgomery(crypto_haetae_poly *w,
 
 void crypto_haetae_polyvecm_ntt(crypto_haetae_polyvecm *x, const crypto_haetae_parameters *parameters);
 
-long long crypto_haetae_polyvecmk_sqsing_value(const crypto_haetae_polyvecm *s1, const crypto_haetae_polyveck *s2, const crypto_haetae_parameters *parameters);
+uint64_t crypto_haetae_polyvecmk_sqsing_value(
+    const crypto_haetae_polyvecm *s1,
+    const crypto_haetae_polyveck *s2,
+    const crypto_haetae_parameters *parameters);
 
 long long crypto_haetae_polyvecmk_sing_value(const crypto_haetae_polyvecm *s1, const crypto_haetae_polyveck *s2, const crypto_haetae_parameters *parameters);
 

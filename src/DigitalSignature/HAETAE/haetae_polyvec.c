@@ -482,81 +482,103 @@ void crypto_haetae_polyvecm_ntt(crypto_haetae_polyvecm* x, const crypto_haetae_p
 	}
 }
 
-static void minmax(int* x, int* y) // taken from djbsort
-{
-	int a = *x;
-	int b = *y;
-	int ab = b ^ a;
-	int c = b - a;
-	c ^= ab & (c ^ b);
-	c = -(int32_t)((uint32_t)c >> 31);
-	c &= ab;
-	*x = a ^ c;
-	*y = b ^ c;
+#define CRYPTO_HAETAE_FFT_SECRET_POLY_COUNT_MAX \
+    (CRYPTO_HAETAE_MAX_M + CRYPTO_HAETAE_MAX_K)
+#define CRYPTO_HAETAE_FFT_SUM_BOUND \
+    (CRYPTO_HAETAE_FFT_SQABS_BOUND * \
+     CRYPTO_HAETAE_FFT_SECRET_POLY_COUNT_MAX)
+#define CRYPTO_HAETAE_FFT_BESTM_COUNT_MAX \
+    (CRYPTO_HAETAE_N / CRYPTO_HAETAE_MIN_TAU + 1u)
+#define CRYPTO_HAETAE_FFT_RESULT_ACC_BOUND \
+    (CRYPTO_HAETAE_FFT_BESTM_COUNT_MAX * \
+     (((CRYPTO_HAETAE_FFT_SUM_BOUND + UINT64_C(0x10200)) >> 10) * \
+      CRYPTO_HAETAE_N))
+
+_Static_assert(CRYPTO_HAETAE_FFT_SUM_BOUND < (UINT64_C(1) << 63),
+               "HAETAE FFT norm sums must remain below 2^63");
+_Static_assert(CRYPTO_HAETAE_FFT_RESULT_ACC_BOUND < (UINT64_C(1) << 63),
+               "HAETAE singular-value accumulator must remain below 2^63");
+_Static_assert(BESTM_MAX_SIZE == CRYPTO_HAETAE_FFT_BESTM_COUNT_MAX,
+               "HAETAE best-m storage must match the range proof");
+
+/*
+ * Constant-time compare-and-swap for values proven below 2^63.
+ * For a,b < 2^63, the high bit of unsigned b-a is set exactly when b < a.
+ */
+static void crypto_haetae_minmax_u64(uint64_t *x, uint64_t *y) {
+    const uint64_t a = *x;
+    const uint64_t b = *y;
+    const uint64_t swap_mask = UINT64_C(0) - ((b - a) >> 63);
+    const uint64_t delta = (a ^ b) & swap_mask;
+
+    *x = a ^ delta;
+    *y = b ^ delta;
 }
 
-long long crypto_haetae_polyvecmk_sqsing_value(const crypto_haetae_polyvecm* s1, const crypto_haetae_polyveck* s2, const crypto_haetae_parameters *parameters) {
-	int res = 0;
-	crypto_haetae_complex_fp32_16 input[CRYPTO_HAETAE_FFT_N] = {{0, 0}};
+uint64_t crypto_haetae_polyvecmk_sqsing_value(
+    const crypto_haetae_polyvecm *s1,
+    const crypto_haetae_polyveck *s2,
+    const crypto_haetae_parameters *parameters) {
+    uint64_t result = 0u;
+    crypto_haetae_complex_fp32_16 input[CRYPTO_HAETAE_FFT_N] = {{0, 0}};
+    uint64_t sum[CRYPTO_HAETAE_N] = {0};
+    uint64_t bestm[BESTM_MAX_SIZE] = {0};
+    uint64_t minimum;
+    size_t i, j;
+    const uint32_t haetae_k = parameters->k;
+    const uint32_t haetae_m = parameters->l - 1u;
+    const uint32_t haetae_tau = parameters->tau;
+    const size_t bestm_size = CRYPTO_HAETAE_N / haetae_tau + 1u;
 
-	size_t i, j;
-	const uint32_t haetae_k = parameters->k;
-	const uint32_t haetae_m = parameters->l - 1u;
-	const uint32_t haetae_tau = parameters->tau;
-	const size_t bestm_size = CRYPTO_HAETAE_N / haetae_tau + 1;
-
-	int sum[CRYPTO_HAETAE_N] = {0};
-	int min = 0;
-	int bestm[BESTM_MAX_SIZE] = {0};
-	memset(bestm, 0, bestm_size * sizeof(int));
-
-	for (i = 0; i < haetae_m; ++i) {
-		crypto_haetae_fft_bitrev(input, &s1->vec[i]);
-		crypto_haetae_fft(input);
-
-		// cumulative sum
-		for (j = 0; j < CRYPTO_HAETAE_N; j++) {
-			sum[j] += crypto_haetae_complex_fp_sqabs(input[j]);
-		}
-	}
-
-	for (i = 0; i < haetae_k; ++i) {
-		crypto_haetae_fft_bitrev(input, &s2->vec[i]);
-		crypto_haetae_fft(input);
-
-		// cumulative sum
-		for (j = 0; j < CRYPTO_HAETAE_N; j++) {
-			sum[j] += crypto_haetae_complex_fp_sqabs(input[j]);
-		}
-	}
-
-	// compute max m
-	for (i = 0; i < CRYPTO_HAETAE_N / haetae_tau + 1; ++i) {
-		bestm[i] = sum[i];
-	}
-	for (i = CRYPTO_HAETAE_N / haetae_tau + 1; i < CRYPTO_HAETAE_N; i++) {
-		for (j = 0; j < CRYPTO_HAETAE_N / haetae_tau + 1; j++) {
-		minmax(&sum[i], &bestm[j]);
+    for (i = 0u; i < haetae_m; ++i) {
+        crypto_haetae_fft_bitrev(input, &s1->vec[i]);
+        crypto_haetae_fft(input);
+        for (j = 0u; j < CRYPTO_HAETAE_N; j++) {
+            sum[j] += crypto_haetae_complex_fp_sqabs(input[j]);
+        }
     }
-	}
-	// find minimum in bestm
-	min = bestm[0];
-	for (i = 1; i < CRYPTO_HAETAE_N / haetae_tau + 1; i++) {
-		int tmp = bestm[i];
-		minmax(&min, &tmp);
-	}
-	// multiply all but the minimum by N mod TAU
-	for (i = 0; i < CRYPTO_HAETAE_N / haetae_tau + 1; i++) {
-		int32_t difference = min - bestm[i];
-		int fac = -(int32_t)((uint32_t)difference >> 31);
-		fac = (fac & (haetae_tau)) ^ ((~fac) & (CRYPTO_HAETAE_N % haetae_tau)); // fac = TAU for all != min and N%TAU for min
-		bestm[i] +=
-			0x10200;     // add 1 for the "1 poly" in S, and prepare rounding
-		bestm[i] >>= 10; // round off 10 bits
-		bestm[i] *= fac;
-		res += bestm[i];
-	}
-	return (res + (1 << 5)) >> 6; // return rounded, squared value
+
+    for (i = 0u; i < haetae_k; ++i) {
+        crypto_haetae_fft_bitrev(input, &s2->vec[i]);
+        crypto_haetae_fft(input);
+        for (j = 0u; j < CRYPTO_HAETAE_N; j++) {
+            sum[j] += crypto_haetae_complex_fp_sqabs(input[j]);
+        }
+    }
+
+    for (i = 0u; i < bestm_size; ++i) {
+        bestm[i] = sum[i];
+    }
+    for (i = bestm_size; i < CRYPTO_HAETAE_N; i++) {
+        for (j = 0u; j < bestm_size; j++) {
+            crypto_haetae_minmax_u64(&sum[i], &bestm[j]);
+        }
+    }
+
+    minimum = bestm[0];
+    for (i = 1u; i < bestm_size; i++) {
+        uint64_t candidate = bestm[i];
+        crypto_haetae_minmax_u64(&minimum, &candidate);
+    }
+
+    for (i = 0u; i < bestm_size; i++) {
+        const uint64_t difference = bestm[i] - minimum;
+        const uint64_t nonzero =
+            (difference | (UINT64_C(0) - difference)) >> 63;
+        const uint64_t different_mask = UINT64_C(0) - nonzero;
+        const uint64_t factor =
+            (different_mask & (uint64_t)haetae_tau) |
+            (~different_mask &
+             (uint64_t)(CRYPTO_HAETAE_N % haetae_tau));
+
+        bestm[i] += UINT64_C(0x10200);
+        bestm[i] >>= 10;
+        bestm[i] *= factor;
+        result += bestm[i];
+    }
+
+    /* Preserve the specification's final round-to-nearest by 2^6. */
+    return (result + UINT64_C(32)) >> 6;
 }
 
 /*************************************************

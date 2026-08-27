@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "haetae_fft.h"
+#include "Util/Bit/bit_internal.h"
 
 /**************************************************************************
  * Roots of unity. This table is used to initialize the FFT data.
@@ -139,25 +140,96 @@ static const crypto_haetae_complex_fp32_16 roots[] = {
     {.real = -65457, .imag = -3216},  {.real = -65492, .imag = -2412},
     {.real = -65516, .imag = -1608},  {.real = -65531, .imag = -804}};
 
-static inline int32_t _mulrnd16(const int32_t x, const int32_t y) {
-  int64_t r = ((int64_t)x * (int64_t)y) + (1 << 15);
-  return r >> 16;
+/*
+ * Fixed-point range proof for the FFT used by HAETAE key generation.
+ *
+ * Only secret-key polynomials reach this FFT. CRYPTO_HAETAE_ETA is 1, so s1
+ * has |c| <= 1. For d == 0, s2 also has |c| <= 1. For d == 1, key generation
+ * replaces s2 by s2 - b0; crypto_haetae_decompose_vk produces b0 in
+ * {-1, 0, 1}, hence |s2| <= 2. We therefore use |c| <= 2 for every mode.
+ *
+ * The root table is Q16 with every real/imaginary component bounded by 2^16.
+ * After fft_bitrev, every stored component is bounded by
+ *   B0 = 2 * 2^16 = 131072.
+ *
+ * Suppose one radix-2 stage starts with component bound B. The Q16 scalar
+ * product is floor((x*y + 2^15)/2^16). Since |y| <= 2^16, its rounded result
+ * remains in [-B, B]. A complex-product component is a sum/difference of two
+ * such products and is therefore bounded by 2B. The butterfly computes
+ * u +/- t, giving the deliberately conservative recurrence B_next <= 3B.
+ * Eight stages give
+ *   B8 <= 3^8 * B0 = 6561 * 131072 = 859963392 < INT32_MAX.
+ *
+ * Therefore FFT real/imaginary storage is safely int32_t. Q16 products and
+ * butterfly expressions are evaluated in int64_t so the C expressions cannot
+ * overflow before the proven int32_t storage boundary. Squared magnitudes use
+ * uint64_t because their conservative bound does not fit int32_t.
+ */
+_Static_assert(CRYPTO_HAETAE_ETA == 1,
+               "HAETAE FFT input proof assumes ETA = 1");
+_Static_assert(CRYPTO_HAETAE_MAX_D <= 1u,
+               "HAETAE FFT input proof assumes d <= 1");
+_Static_assert(CRYPTO_HAETAE_FFT_N == 256u,
+               "HAETAE FFT proof assumes a 256-point transform");
+_Static_assert(CRYPTO_HAETAE_FFT_LOG_N == 8u,
+               "HAETAE FFT proof assumes eight radix-2 stages");
+_Static_assert(CRYPTO_HAETAE_FFT_COMPONENT_BOUND ==
+                   UINT64_C(131072) * UINT64_C(6561),
+               "HAETAE FFT component bound must equal 3^8 * B0");
+_Static_assert(CRYPTO_HAETAE_FFT_COMPONENT_BOUND <= INT32_MAX,
+               "HAETAE FFT components must fit int32_t");
+_Static_assert(
+    CRYPTO_HAETAE_FFT_COMPONENT_BOUND <=
+        (uint64_t)(INT64_MAX - INT64_C(32768)) /
+            CRYPTO_HAETAE_FFT_COMPONENT_BOUND,
+    "HAETAE FFT component square plus Q16 rounding must fit int64_t");
+_Static_assert(
+    CRYPTO_HAETAE_FFT_SQABS_BOUND ==
+        UINT64_C(2) *
+            ((CRYPTO_HAETAE_FFT_COMPONENT_BOUND *
+                  CRYPTO_HAETAE_FFT_COMPONENT_BOUND + UINT64_C(32768)) /
+             UINT64_C(65536)),
+    "HAETAE FFT squared-magnitude bound must match Q16 rounding");
+
+/*
+ * Return floor((x*y + 2^15) / 2^16) without right-shifting a negative signed
+ * value. Keeping this result in int64_t is part of the range proof above.
+ */
+static inline int64_t crypto_haetae_q16_mul_wide(
+    int32_t x, int32_t y) {
+  const int64_t product =
+      (int64_t)x * (int64_t)y + INT64_C(32768);
+  return crypto_floor_div_pow2_i64(product, 16u);
 }
 
-static inline int32_t _complex_mul_real(const crypto_haetae_complex_fp32_16 x,
-                                        const crypto_haetae_complex_fp32_16 y) {
-  return _mulrnd16(x.real, y.real) - _mulrnd16(x.imag, y.imag);
+static inline int32_t crypto_haetae_complex_mul_real(
+    crypto_haetae_complex_fp32_16 x,
+    crypto_haetae_complex_fp32_16 y) {
+  const int64_t value =
+      crypto_haetae_q16_mul_wide(x.real, y.real) -
+      crypto_haetae_q16_mul_wide(x.imag, y.imag);
+
+  /* The stage proof bounds each complex-product component by 2B. */
+  return (int32_t)value;
 }
 
-static inline int32_t _complex_mul_imag(const crypto_haetae_complex_fp32_16 x,
-                                        const crypto_haetae_complex_fp32_16 y) {
-  return _mulrnd16(x.real, y.imag) + _mulrnd16(x.imag, y.real);
+static inline int32_t crypto_haetae_complex_mul_imag(
+    crypto_haetae_complex_fp32_16 x,
+    crypto_haetae_complex_fp32_16 y) {
+  const int64_t value =
+      crypto_haetae_q16_mul_wide(x.real, y.imag) +
+      crypto_haetae_q16_mul_wide(x.imag, y.real);
+
+  /* The stage proof bounds each complex-product component by 2B. */
+  return (int32_t)value;
 }
 
-static void _complex_mul(crypto_haetae_complex_fp32_16 *r, const crypto_haetae_complex_fp32_16 x,
-                         const crypto_haetae_complex_fp32_16 y) {
-  r->real = _complex_mul_real(x, y);
-  r->imag = _complex_mul_imag(x, y);
+static void crypto_haetae_complex_mul(
+    crypto_haetae_complex_fp32_16 *r,
+    crypto_haetae_complex_fp32_16 x,
+    crypto_haetae_complex_fp32_16 y) {
+  r->real = crypto_haetae_complex_mul_real(x, y);
+  r->imag = crypto_haetae_complex_mul_imag(x, y);
 }
 
 /****************************************************************************
@@ -186,19 +258,33 @@ static const uint16_t brv8[] = {
  * Initialize the FFT array with coeffs[i] * root[i] and
  * store the values in bit-reversed order.
  ****************************************************************************/
-void crypto_haetae_fft_bitrev(crypto_haetae_complex_fp32_16 r[CRYPTO_HAETAE_FFT_N], const crypto_haetae_poly *x) {
-  int i, inv_i;
-  int c;
-  for (i = 0; i < CRYPTO_HAETAE_FFT_N; i++) {
-    inv_i = brv8[i];
-    c = x->coeffs[i];
-    r[inv_i].real = c * roots[i].real;
-    r[inv_i].imag = c * roots[i].imag;
+void crypto_haetae_fft_bitrev(
+    crypto_haetae_complex_fp32_16 r[CRYPTO_HAETAE_FFT_N],
+    const crypto_haetae_poly *x) {
+  uint32_t i;
+
+  for (i = 0u; i < CRYPTO_HAETAE_FFT_N; i++) {
+    const uint16_t inv_i = brv8[i];
+    const int32_t coefficient = x->coeffs[i];
+    const int64_t real =
+        (int64_t)coefficient * (int64_t)roots[i].real;
+    const int64_t imag =
+        (int64_t)coefficient * (int64_t)roots[i].imag;
+
+    /* |coefficient| <= 2 gives |real|, |imag| <= B0 = 131072. */
+    r[inv_i].real = (int32_t)real;
+    r[inv_i].imag = (int32_t)imag;
   }
 }
 
-int32_t crypto_haetae_complex_fp_sqabs(crypto_haetae_complex_fp32_16 x) {
-  return _mulrnd16(x.real, x.real) + _mulrnd16(x.imag, x.imag);
+uint64_t crypto_haetae_complex_fp_sqabs(
+    crypto_haetae_complex_fp32_16 x) {
+  const int64_t real_squared =
+      crypto_haetae_q16_mul_wide(x.real, x.real);
+  const int64_t imag_squared =
+      crypto_haetae_q16_mul_wide(x.imag, x.imag);
+
+  return (uint64_t)real_squared + (uint64_t)imag_squared;
 }
 
 /*************************************************
@@ -210,25 +296,41 @@ int32_t crypto_haetae_complex_fp_sqabs(crypto_haetae_complex_fp32_16 x) {
  *
  * Specification: Implements @[KS X 123456, Algorithm 43, FFT]
  **************************************************/
-void crypto_haetae_fft(crypto_haetae_complex_fp32_16 data[CRYPTO_HAETAE_FFT_N]) {
-  unsigned int r, m, md2, n, k, even, odd, twid;
+void crypto_haetae_fft(
+    crypto_haetae_complex_fp32_16 data[CRYPTO_HAETAE_FFT_N]) {
+  uint32_t stage;
   crypto_haetae_complex_fp32_16 u, t;
 
-  for (r = 1; r <= CRYPTO_HAETAE_FFT_LOG_N; r++) {
-    m = 1 << r;
-    md2 = m >> 1;
-    for (n = 0; n < CRYPTO_HAETAE_FFT_N; n += m) {
-      for (k = 0; k < md2; k++) {
-        even = n + k;
-        odd = even + md2;
-        twid = k << (CRYPTO_HAETAE_FFT_LOG_N - r + 1);
+  for (stage = 1u; stage <= CRYPTO_HAETAE_FFT_LOG_N; stage++) {
+    const uint32_t m = UINT32_C(1) << stage;
+    const uint32_t half_m = m >> 1;
+    uint32_t block;
+
+    for (block = 0u; block < CRYPTO_HAETAE_FFT_N; block += m) {
+      uint32_t k;
+      for (k = 0u; k < half_m; k++) {
+        const uint32_t even = block + k;
+        const uint32_t odd = even + half_m;
+        const uint32_t twiddle =
+            k << (CRYPTO_HAETAE_FFT_LOG_N - stage + 1u);
+        int64_t even_real;
+        int64_t even_imag;
+        int64_t odd_real;
+        int64_t odd_imag;
 
         u = data[even];
-        _complex_mul(&t, roots[twid], data[odd]);
-        data[even].real = u.real + t.real;
-        data[even].imag = u.imag + t.imag;
-        data[odd].real = u.real - t.real;
-        data[odd].imag = u.imag - t.imag;
+        crypto_haetae_complex_mul(&t, roots[twiddle], data[odd]);
+
+        /* Evaluate the butterfly wide before the proven int32_t store. */
+        even_real = (int64_t)u.real + (int64_t)t.real;
+        even_imag = (int64_t)u.imag + (int64_t)t.imag;
+        odd_real = (int64_t)u.real - (int64_t)t.real;
+        odd_imag = (int64_t)u.imag - (int64_t)t.imag;
+
+        data[even].real = (int32_t)even_real;
+        data[even].imag = (int32_t)even_imag;
+        data[odd].real = (int32_t)odd_real;
+        data[odd].imag = (int32_t)odd_imag;
       }
     }
   }
