@@ -20,9 +20,9 @@ inc/                              public category API headers only
 src/*.c                           public category API entry points
 src/AsymmetricCipher/{RSA,ElGamal}
 src/BlockCipher/AES
-src/DigitalSignature/{ML-DSA,SLH-DSA}
+src/DigitalSignature/{AIMer,HAETAE,ML-DSA,SLH-DSA}
 src/HashFunction/{SHA2,SHA3,LSH}
-src/KeyEncapsulation/ML-KEM
+src/KeyEncapsulation/{ML-KEM,NTRU-Plus,SMAUG-T}
 src/RandomNumberGeneration/{CTR_DRBG,KAT,Noise}
 src/Util/{Bignum,Bit,Core,Endian,NTT,Prime}
 cmake/                            platform export policy
@@ -178,7 +178,11 @@ the same byte stream as one request for the combined length.
 
 - CTR_DRBG with AES-128/192/256, with and without `Block_Cipher_df`
 - ML-KEM-512, ML-KEM-768, and ML-KEM-1024
+- NTRU+768, NTRU+864, and NTRU+1152
+- SMAUG-T-128, SMAUG-T-192, and SMAUG-T-256
 - ML-DSA-44, ML-DSA-65, and ML-DSA-87
+- AIMer 128/192/256 fast and small parameter sets
+- HAETAE-120, HAETAE-180, and HAETAE-260
 - All twelve FIPS 205 SLH-DSA SHA2/SHAKE small/fast parameter sets
 - Raw RSA and safe-prime ElGamal
 - Unsigned big-number byte load/store and lifecycle operations
@@ -217,8 +221,11 @@ When `CRYPTO_BUILD_TESTS` is enabled, CMake generates:
   supported mode and key size
 - SHA-2, SHA-3, SHAKE, and LSH known-answer tests
 - CTR_DRBG known-answer and derivation-function tests
-- operation tests for ML-KEM and both post-quantum signature families
-- 100-record KATs for all 3 ML-KEM, 3 ML-DSA, and 12 SLH-DSA parameter sets
+- operation tests for every supported post-quantum KEM and signature family
+- 100-record KATs for all 9 KEM parameter sets and all 24 current signature
+  parameter sets
+- verification of 300 context-explicit HAETAE 1.1.2 signatures as a
+  compatibility regression alongside the exact HAETAE 1.2.0 KATs
 
 The PQC KAT executables link a test-exclusive static module. Calling its
 private KAT initializer routes subsequent PQC randomness through AES-256
@@ -229,10 +236,10 @@ set is a separate CTest so the slower SLH-DSA cases can run in parallel.
 
 ## Bundled implementation notices
 
-The portable ML-DSA and SLH-DSA backends are vendored below their algorithm
-directories so a checkout is directly buildable. Their original license files
-are retained next to the source. See `THIRD_PARTY_NOTICES.md` for provenance and
-the upstream revisions used.
+The portable PQC backends are vendored below their algorithm directories so a
+checkout is directly buildable. Their original license and notice files are
+retained next to the source. See `THIRD_PARTY_NOTICES.md` for provenance,
+verified package hashes or pinned revisions, and the applicable upstream terms.
 
 ## License
 
@@ -242,6 +249,6 @@ Except for the separately identified third-party components, this project's
 original source code is licensed under the GNU Affero General Public License,
 version 3 only (`AGPL-3.0-only`). See `LICENSE` for the complete terms.
 
-The vendored ML-DSA and SLH-DSA sources remain available under their respective
-upstream licenses described in `THIRD_PARTY_NOTICES.md`; those notices and
-license grants are not replaced by the project's AGPL license.
+Vendored third-party sources remain available under their respective upstream
+licenses described in `THIRD_PARTY_NOTICES.md`; those notices and license grants
+are not replaced by the project's AGPL license.
