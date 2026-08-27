@@ -10,7 +10,10 @@ permissions:
 
 jobs:
   rename-and-test:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,23 +29,22 @@ jobs:
         run: |
           cmake -S . -B build \
             -DBUILD_SHARED_LIBS=ON \
-            -DLIBERAC_BUILD_TESTS=ON \
-            -DCMAKE_BUILD_TYPE=Release
-          cmake --build build -j2
-          ctest --test-dir build \
+            -DLIBERAC_BUILD_TESTS=ON
+          cmake --build build --config Release -j2
+          ctest --test-dir build -C Release \
             -R 'Public|Unit|HAETAE-120.KAT|ML-KEM-512.KAT' \
             --output-on-failure
 
-      - name: Verify installed package and library identity
+      - name: Verify installed package identity
         run: |
-          cmake --install build --prefix "$PWD/install"
-          test -f install/lib/libliberacrypt.so
+          cmake --install build --prefix "$PWD/install" --config Release
+          test -f install/bin/liberacrypt.dll
           test -f install/inc/LiberaCrypt.h
           test ! -e install/inc/Crypto.h
           test -f install/lib/cmake/LiberaCrypt/LiberaCryptConfig.cmake
           test -f install/lib/cmake/LiberaCrypt/LiberaCryptTargets.cmake
-          nm -D --defined-only install/lib/libliberacrypt.so | grep ' LIBERAC_HASH$'
-          if nm -D --defined-only install/lib/libliberacrypt.so | grep -q ' CRYPTO_HASH$'; then
+          grep -q '^LIBERAC_HASH$' cmake/liberacrypt_exports.txt
+          if grep -q '^CRYPTO_HASH$' cmake/liberacrypt_exports.txt; then
             echo 'old CRYPTO_HASH export remains' >&2
             exit 1
           fi
@@ -70,8 +72,8 @@ jobs:
           EOF
           cmake -S consumer -B consumer-build \
             -DCMAKE_PREFIX_PATH="$PWD/install"
-          cmake --build consumer-build -j2
-          LD_LIBRARY_PATH="$PWD/install/lib" ./consumer-build/consumer
+          cmake --build consumer-build --config Release -j2
+          PATH="$PWD/install/bin:$PATH" ./consumer-build/Release/consumer.exe
 
       - name: Commit rename
         run: |
@@ -82,5 +84,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "refactor(api): rename public surface to LiberaCrypt" \
-            -m "Rename public functions, macros, and algorithm selectors to LIBERAC_; public types to LiberaC*; the umbrella header to LiberaCrypt.h; the CMake package and target to LiberaCrypt::LiberaCrypt; and the Unix library to libliberacrypt. Keep unrelated vendored and private implementation namespaces intact. Validate the installed package with a standalone consumer and representative tests."
+            -m "Rename public functions, macros, and algorithm selectors to LIBERAC_; public types to LiberaC*; the umbrella header to LiberaCrypt.h; the CMake package and target to LiberaCrypt::LiberaCrypt; and the library output to liberacrypt. Keep unrelated vendored and private implementation namespaces intact. Validate the installed package with a standalone consumer and representative tests."
           git push origin HEAD:refactor/liberacrypt-public-api
