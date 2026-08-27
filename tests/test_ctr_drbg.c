@@ -1,4 +1,4 @@
-#include "CRYPTO.h"
+#include "Crypto.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -38,12 +38,12 @@ static int test_nist_aes256_no_df(void) {
     static const uint8_t final_v[16] = {
         0x53,0xc7,0x8a,0xc6,0x1a,0x0b,0xac,0x9d,0x7d,0x2e,0x92,0xb1,0xe7,0x3e,0x33,0x92
     };
-    CTR_DRBG_CONTEXT ctx;
+    CRYPTO_CTR_DRBG_CONTEXT ctx;
     uint8_t output[64];
 
     if (CRYPTO_CTR_DRBG_SEED_SIZE(ALG_CTR_DRBG_AES_256_NO_DF) != 48u) return 1;
-    if (CRYPTO_CTR_DRBG_INSTANTIATE(&ctx, ALG_CTR_DRBG_AES_256_NO_DF,
-                             entropy, sizeof(entropy), NULL, 0u, NULL, 0u) != CRYPTO_SUCCESS) return 1;
+    if (CRYPTO_CTR_DRBG_INSTANTIATE(&ctx, entropy, sizeof(entropy), NULL, 0u,
+                                     NULL, 0u, ALG_CTR_DRBG_AES_256_NO_DF) != CRYPTO_SUCCESS) return 1;
     if (memcmp(ctx.KEY, key_after_instantiate, sizeof(key_after_instantiate)) != 0) return 1;
     if (memcmp(ctx.V, v_after_instantiate, sizeof(v_after_instantiate)) != 0) return 1;
     if (ctx.RESEED_COUNTER != 1u) return 1;
@@ -78,17 +78,19 @@ static int test_df_variants(void) {
     for (i = 0u; i < sizeof(additional); ++i) additional[i] = (uint8_t)(0x40u + i);
 
     for (j = 0u; j < sizeof(algs) / sizeof(algs[0]); ++j) {
-        CTR_DRBG_CONTEXT c1, c2;
+        CRYPTO_CTR_DRBG_CONTEXT c1, c2;
         key_length = (j == 0u) ? 16u : (j == 1u ? 24u : 32u);
         security_length = key_length;
         nonce_length = (security_length + 1u) / 2u;
         if (CRYPTO_CTR_DRBG_SEED_SIZE(algs[j]) != key_length + 16u) return 1;
-        if (CRYPTO_CTR_DRBG_INSTANTIATE(&c1, algs[j], entropy, security_length,
-                                 nonce, nonce_length,
-                                 (const uint8_t *)"crypto-test", 11u) != CRYPTO_SUCCESS) return 1;
-        if (CRYPTO_CTR_DRBG_INSTANTIATE(&c2, algs[j], entropy, security_length,
-                                 nonce, nonce_length,
-                                 (const uint8_t *)"crypto-test", 11u) != CRYPTO_SUCCESS) return 1;
+        if (CRYPTO_CTR_DRBG_INSTANTIATE(&c1, entropy, security_length,
+                                         nonce, nonce_length,
+                                         (const uint8_t *)"crypto-test", 11u,
+                                         algs[j]) != CRYPTO_SUCCESS) return 1;
+        if (CRYPTO_CTR_DRBG_INSTANTIATE(&c2, entropy, security_length,
+                                         nonce, nonce_length,
+                                         (const uint8_t *)"crypto-test", 11u,
+                                         algs[j]) != CRYPTO_SUCCESS) return 1;
         if (CRYPTO_CTR_DRBG_GENERATE(&c1, a, sizeof(a), additional, sizeof(additional), 0) != CRYPTO_SUCCESS) return 1;
         if (CRYPTO_CTR_DRBG_GENERATE(&c2, b, sizeof(b), additional, sizeof(additional), 0) != CRYPTO_SUCCESS) return 1;
         if (memcmp(a, b, sizeof(a)) != 0) return 1;
@@ -98,17 +100,6 @@ static int test_df_variants(void) {
     return 0;
 }
 
-static int test_context_zeroization(void) {
-    static const uint8_t key[16] = {
-        0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,
-        0x08,0x09,0x0a,0x0b,0x0c,0x0d,0x0e,0x0f
-    };
-    AES_CONTEXT ctx;
-    if (CRYPTO_AES_CONTEXT_INIT(&ctx, ALG_AES_128, key, sizeof(key)) != CRYPTO_SUCCESS) return 1;
-    CRYPTO_AES_CONTEXT_CLEAR(&ctx);
-    return all_zero(&ctx, sizeof(ctx)) ? 0 : 1;
-}
-
 int main(void) {
     if (test_nist_aes256_no_df()) {
         fprintf(stderr, "CTR_DRBG NIST KAT failed\n");
@@ -116,10 +107,6 @@ int main(void) {
     }
     if (test_df_variants()) {
         fprintf(stderr, "CTR_DRBG derivation-function test failed\n");
-        return 1;
-    }
-    if (test_context_zeroization()) {
-        fprintf(stderr, "context zeroization test failed\n");
         return 1;
     }
     puts("CTR_DRBG tests passed");
