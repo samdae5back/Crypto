@@ -1,110 +1,232 @@
-#include "SHA3.h"
 #include "sha3_internal.h"
+
+#include "Util/Bit/bit_internal.h"
 #include "Util/Core/secure_zero.h"
-#include <string.h>
 
-static uint64_t rol64(uint64_t x, unsigned n) { return n ? ((x << n) | (x >> (64u - n))) : x; }
-
-void sha3_keccak_f1600(uint64_t s[25]) {
-    static const uint64_t rc[24] = {
-        0x0000000000000001ULL,0x0000000000008082ULL,0x800000000000808aULL,0x8000000080008000ULL,
-        0x000000000000808bULL,0x0000000080000001ULL,0x8000000080008081ULL,0x8000000000008009ULL,
-        0x000000000000008aULL,0x0000000000000088ULL,0x0000000080008009ULL,0x000000008000000aULL,
-        0x000000008000808bULL,0x800000000000008bULL,0x8000000000008089ULL,0x8000000000008003ULL,
-        0x8000000000008002ULL,0x8000000000000080ULL,0x000000000000800aULL,0x800000008000000aULL,
-        0x8000000080008081ULL,0x8000000000008080ULL,0x0000000080000001ULL,0x8000000080008008ULL
+static void keccak_f1600(uint64_t state[25]) {
+    static const uint64_t round_constants[24] = {
+        UINT64_C(0x0000000000000001), UINT64_C(0x0000000000008082),
+        UINT64_C(0x800000000000808a), UINT64_C(0x8000000080008000),
+        UINT64_C(0x000000000000808b), UINT64_C(0x0000000080000001),
+        UINT64_C(0x8000000080008081), UINT64_C(0x8000000000008009),
+        UINT64_C(0x000000000000008a), UINT64_C(0x0000000000000088),
+        UINT64_C(0x0000000080008009), UINT64_C(0x000000008000000a),
+        UINT64_C(0x000000008000808b), UINT64_C(0x800000000000008b),
+        UINT64_C(0x8000000000008089), UINT64_C(0x8000000000008003),
+        UINT64_C(0x8000000000008002), UINT64_C(0x8000000000000080),
+        UINT64_C(0x000000000000800a), UINT64_C(0x800000008000000a),
+        UINT64_C(0x8000000080008081), UINT64_C(0x8000000000008080),
+        UINT64_C(0x0000000080000001), UINT64_C(0x8000000080008008)
     };
-    static const unsigned r[25] = {
-        0,1,62,28,27,36,44,6,55,20,3,10,43,25,39,41,45,15,21,8,18,2,61,56,14
+    static const unsigned int rotation_offsets[25] = {
+        0u, 1u, 62u, 28u, 27u,
+        36u, 44u, 6u, 55u, 20u,
+        3u, 10u, 43u, 25u, 39u,
+        41u, 45u, 15u, 21u, 8u,
+        18u, 2u, 61u, 56u, 14u
     };
-    unsigned round, x, y;
-    for (round = 0; round < 24; ++round) {
-        uint64_t c[5], d[5], b[25];
-        for (x = 0; x < 5; ++x) c[x] = s[x]^s[x+5]^s[x+10]^s[x+15]^s[x+20];
-        for (x = 0; x < 5; ++x) d[x] = c[(x+4)%5] ^ rol64(c[(x+1)%5],1);
-        for (y = 0; y < 5; ++y) for (x = 0; x < 5; ++x) s[x+5*y] ^= d[x];
-        for (y = 0; y < 5; ++y) for (x = 0; x < 5; ++x) {
-            unsigned nx = y;
-            unsigned ny = (2*x + 3*y) % 5;
-            b[nx + 5*ny] = rol64(s[x+5*y], r[x+5*y]);
+    uint64_t columns[5];
+    uint64_t deltas[5];
+    uint64_t permuted[25];
+    size_t round, x, y;
+
+    for (round = 0; round < 24u; ++round) {
+        for (x = 0; x < 5u; ++x) {
+            columns[x] = state[x] ^ state[x + 5u] ^ state[x + 10u] ^
+                         state[x + 15u] ^ state[x + 20u];
         }
-        for (y = 0; y < 5; ++y) for (x = 0; x < 5; ++x)
-            s[x+5*y] = b[x+5*y] ^ ((~b[(x+1)%5+5*y]) & b[(x+2)%5+5*y]);
-        s[0] ^= rc[round];
-        crypto_zeroize(c, sizeof(c));
-        crypto_zeroize(d, sizeof(d));
-        crypto_zeroize(b, sizeof(b));
+        for (x = 0; x < 5u; ++x) {
+            deltas[x] = columns[(x + 4u) % 5u] ^
+                        crypto_rotl64(columns[(x + 1u) % 5u], 1u);
+        }
+        for (y = 0; y < 5u; ++y) {
+            for (x = 0; x < 5u; ++x) {
+                state[x + (5u * y)] ^= deltas[x];
+            }
+        }
+        for (y = 0; y < 5u; ++y) {
+            for (x = 0; x < 5u; ++x) {
+                const size_t new_x = y;
+                const size_t new_y = ((2u * x) + (3u * y)) % 5u;
+                permuted[new_x + (5u * new_y)] =
+                    crypto_rotl64(state[x + (5u * y)],
+                                  rotation_offsets[x + (5u * y)]);
+            }
+        }
+        for (y = 0; y < 5u; ++y) {
+            for (x = 0; x < 5u; ++x) {
+                state[x + (5u * y)] =
+                    permuted[x + (5u * y)] ^
+                    ((~permuted[((x + 1u) % 5u) + (5u * y)]) &
+                     permuted[((x + 2u) % 5u) + (5u * y)]);
+            }
+        }
+        state[0] ^= round_constants[round];
+    }
+
+    crypto_zeroize(permuted, sizeof(permuted));
+    crypto_zeroize(deltas, sizeof(deltas));
+    crypto_zeroize(columns, sizeof(columns));
+}
+
+static void sha3_context_init(
+    crypto_sha3_context *context, size_t rate, uint8_t domain) {
+    crypto_zeroize(context, sizeof(*context));
+    context->rate = rate;
+    context->domain = domain;
+}
+
+static void xor_byte(
+    crypto_sha3_context *context, size_t position, uint8_t value) {
+    const size_t lane = position / 8u;
+    const unsigned int shift = (unsigned int)(8u * (position % 8u));
+    context->state[lane] ^= (uint64_t)value << shift;
+}
+
+static uint8_t get_byte(
+    const crypto_sha3_context *context, size_t position) {
+    const size_t lane = position / 8u;
+    const unsigned int shift = (unsigned int)(8u * (position % 8u));
+    return (uint8_t)(context->state[lane] >> shift);
+}
+
+void crypto_shake128_init(crypto_sha3_context *CONTEXT) {
+    if (CONTEXT != NULL) {
+        sha3_context_init(CONTEXT, 168u, 0x1fu);
     }
 }
 
-static void ctx_init(SHA3_CONTEXT *ctx, size_t rate, uint8_t domain) {
-    crypto_zeroize(ctx, sizeof(*ctx));
-    ctx->RATE = rate;
-    ctx->DOMAIN = domain;
+void crypto_shake256_init(crypto_sha3_context *CONTEXT) {
+    if (CONTEXT != NULL) {
+        sha3_context_init(CONTEXT, 136u, 0x1fu);
+    }
 }
 
-static void xor_byte(SHA3_CONTEXT *ctx, size_t pos, uint8_t v) {
-    size_t lane = pos / 8u;
-    unsigned shift = (unsigned)(8u * (pos % 8u));
-    ctx->STATE[lane] ^= (uint64_t)v << shift;
-}
+void crypto_sha3_update(
+    crypto_sha3_context *CONTEXT,
+    const uint8_t *INPUT, size_t INPUT_LENGTH) {
+    size_t index;
 
-static uint8_t get_byte(const SHA3_CONTEXT *ctx, size_t pos) {
-    size_t lane = pos / 8u;
-    unsigned shift = (unsigned)(8u * (pos % 8u));
-    return (uint8_t)(ctx->STATE[lane] >> shift);
-}
-
-void CRYPTO_SHAKE128_INIT(SHA3_CONTEXT *CONTEXT) { if (CONTEXT) ctx_init(CONTEXT, 168u, 0x1fu); }
-void CRYPTO_SHAKE256_INIT(SHA3_CONTEXT *CONTEXT) { if (CONTEXT) ctx_init(CONTEXT, 136u, 0x1fu); }
-
-void CRYPTO_SHA3_UPDATE(SHA3_CONTEXT *CONTEXT, const uint8_t *IN, size_t IN_LENGTH) {
-    size_t i;
-    if (!CONTEXT || (!IN && IN_LENGTH) || CONTEXT->FINALIZED) return;
-    for (i = 0; i < IN_LENGTH; ++i) {
-        xor_byte(CONTEXT, CONTEXT->POS, IN[i]);
-        if (++CONTEXT->POS == CONTEXT->RATE) {
-            sha3_keccak_f1600(CONTEXT->STATE);
-            CONTEXT->POS = 0;
+    if (CONTEXT == NULL || (INPUT == NULL && INPUT_LENGTH != 0u) ||
+        CONTEXT->finalized != 0u) {
+        return;
+    }
+    for (index = 0; index < INPUT_LENGTH; ++index) {
+        xor_byte(CONTEXT, CONTEXT->position, INPUT[index]);
+        ++CONTEXT->position;
+        if (CONTEXT->position == CONTEXT->rate) {
+            keccak_f1600(CONTEXT->state);
+            CONTEXT->position = 0u;
         }
     }
 }
 
-void CRYPTO_SHA3_FINALIZE(SHA3_CONTEXT *CONTEXT) {
-    if (!CONTEXT || CONTEXT->FINALIZED) return;
-    xor_byte(CONTEXT, CONTEXT->POS, CONTEXT->DOMAIN);
-    xor_byte(CONTEXT, CONTEXT->RATE - 1u, 0x80u);
-    sha3_keccak_f1600(CONTEXT->STATE);
-    CONTEXT->POS = 0;
-    CONTEXT->FINALIZED = 1;
+void crypto_sha3_finalize(crypto_sha3_context *CONTEXT) {
+    if (CONTEXT == NULL || CONTEXT->finalized != 0u) {
+        return;
+    }
+    xor_byte(CONTEXT, CONTEXT->position, CONTEXT->domain);
+    xor_byte(CONTEXT, CONTEXT->rate - 1u, 0x80u);
+    keccak_f1600(CONTEXT->state);
+    CONTEXT->position = 0u;
+    CONTEXT->finalized = 1u;
 }
 
-void CRYPTO_SHA3_SQUEEZE(SHA3_CONTEXT *CONTEXT, uint8_t *OUT, size_t OUT_LENGTH) {
-    size_t i;
-    if (!CONTEXT || (!OUT && OUT_LENGTH)) return;
-    if (!CONTEXT->FINALIZED) CRYPTO_SHA3_FINALIZE(CONTEXT);
-    for (i = 0; i < OUT_LENGTH; ++i) {
-        if (CONTEXT->POS == CONTEXT->RATE) {
-            sha3_keccak_f1600(CONTEXT->STATE);
-            CONTEXT->POS = 0;
+void crypto_sha3_squeeze(
+    crypto_sha3_context *CONTEXT,
+    uint8_t *OUTPUT, size_t OUTPUT_LENGTH) {
+    size_t index;
+
+    if (CONTEXT == NULL || (OUTPUT == NULL && OUTPUT_LENGTH != 0u)) {
+        return;
+    }
+    if (CONTEXT->finalized == 0u) {
+        crypto_sha3_finalize(CONTEXT);
+    }
+    for (index = 0; index < OUTPUT_LENGTH; ++index) {
+        if (CONTEXT->position == CONTEXT->rate) {
+            keccak_f1600(CONTEXT->state);
+            CONTEXT->position = 0u;
         }
-        OUT[i] = get_byte(CONTEXT, CONTEXT->POS++);
+        OUTPUT[index] = get_byte(CONTEXT, CONTEXT->position);
+        ++CONTEXT->position;
     }
 }
 
-void CRYPTO_SHA3_CLEAR(SHA3_CONTEXT *CONTEXT) {
-    if (CONTEXT) crypto_zeroize(CONTEXT, sizeof(*CONTEXT));
+void crypto_sha3_clear(crypto_sha3_context *CONTEXT) {
+    if (CONTEXT != NULL) {
+        crypto_zeroize(CONTEXT, sizeof(*CONTEXT));
+    }
 }
 
-static void hash_fixed(uint8_t *out, size_t out_len, const uint8_t *in, size_t in_len, size_t rate) {
-    SHA3_CONTEXT ctx;
-    ctx_init(&ctx, rate, 0x06u);
-    CRYPTO_SHA3_UPDATE(&ctx, in, in_len);
-    CRYPTO_SHA3_SQUEEZE(&ctx, out, out_len);
-    CRYPTO_SHA3_CLEAR(&ctx);
+static void sha3_fixed(
+    uint8_t *output, size_t output_length,
+    const uint8_t *input, size_t input_length,
+    size_t rate) {
+    crypto_sha3_context context;
+
+    sha3_context_init(&context, rate, 0x06u);
+    crypto_sha3_update(&context, input, input_length);
+    crypto_sha3_squeeze(&context, output, output_length);
+    crypto_sha3_clear(&context);
 }
 
-void CRYPTO_SHA3_256(uint8_t OUT[SHA3_256_DIGEST_SIZE], const uint8_t *IN, size_t IN_LENGTH) { hash_fixed(OUT, 32u, IN, IN_LENGTH, 136u); }
-void CRYPTO_SHA3_512(uint8_t OUT[SHA3_512_DIGEST_SIZE], const uint8_t *IN, size_t IN_LENGTH) { hash_fixed(OUT, 64u, IN, IN_LENGTH, 72u); }
-void CRYPTO_SHAKE128(uint8_t *OUT, size_t OUT_LENGTH, const uint8_t *IN, size_t IN_LENGTH) { SHA3_CONTEXT c; CRYPTO_SHAKE128_INIT(&c); CRYPTO_SHA3_UPDATE(&c,IN,IN_LENGTH); CRYPTO_SHA3_SQUEEZE(&c,OUT,OUT_LENGTH); CRYPTO_SHA3_CLEAR(&c); }
-void CRYPTO_SHAKE256(uint8_t *OUT, size_t OUT_LENGTH, const uint8_t *IN, size_t IN_LENGTH) { SHA3_CONTEXT c; CRYPTO_SHAKE256_INIT(&c); CRYPTO_SHA3_UPDATE(&c,IN,IN_LENGTH); CRYPTO_SHA3_SQUEEZE(&c,OUT,OUT_LENGTH); CRYPTO_SHA3_CLEAR(&c); }
+void crypto_sha3_256(
+    uint8_t OUTPUT[32], const uint8_t *INPUT, size_t INPUT_LENGTH) {
+    sha3_fixed(OUTPUT, 32u, INPUT, INPUT_LENGTH, 136u);
+}
+
+void crypto_sha3_512(
+    uint8_t OUTPUT[64], const uint8_t *INPUT, size_t INPUT_LENGTH) {
+    sha3_fixed(OUTPUT, 64u, INPUT, INPUT_LENGTH, 72u);
+}
+
+void crypto_shake128(
+    uint8_t *OUTPUT, size_t OUTPUT_LENGTH,
+    const uint8_t *INPUT, size_t INPUT_LENGTH) {
+    crypto_sha3_context context;
+
+    crypto_shake128_init(&context);
+    crypto_sha3_update(&context, INPUT, INPUT_LENGTH);
+    crypto_sha3_squeeze(&context, OUTPUT, OUTPUT_LENGTH);
+    crypto_sha3_clear(&context);
+}
+
+void crypto_shake256(
+    uint8_t *OUTPUT, size_t OUTPUT_LENGTH,
+    const uint8_t *INPUT, size_t INPUT_LENGTH) {
+    crypto_sha3_context context;
+
+    crypto_shake256_init(&context);
+    crypto_sha3_update(&context, INPUT, INPUT_LENGTH);
+    crypto_sha3_squeeze(&context, OUTPUT, OUTPUT_LENGTH);
+    crypto_sha3_clear(&context);
+}
+
+CryptoError crypto_sha3_hash(
+    uint8_t *OUTPUT, size_t OUTPUT_LENGTH,
+    const uint8_t *INPUT, size_t INPUT_LENGTH,
+    AlgID ALG) {
+    switch (ALG) {
+        case ALG_HASH_SHA3_224:
+            sha3_fixed(OUTPUT, 28u, INPUT, INPUT_LENGTH, 144u);
+            return CRYPTO_SUCCESS;
+        case ALG_HASH_SHA3_256:
+            crypto_sha3_256(OUTPUT, INPUT, INPUT_LENGTH);
+            return CRYPTO_SUCCESS;
+        case ALG_HASH_SHA3_384:
+            sha3_fixed(OUTPUT, 48u, INPUT, INPUT_LENGTH, 104u);
+            return CRYPTO_SUCCESS;
+        case ALG_HASH_SHA3_512:
+            crypto_sha3_512(OUTPUT, INPUT, INPUT_LENGTH);
+            return CRYPTO_SUCCESS;
+        case ALG_HASH_SHAKE128:
+            crypto_shake128(OUTPUT, OUTPUT_LENGTH, INPUT, INPUT_LENGTH);
+            return CRYPTO_SUCCESS;
+        case ALG_HASH_SHAKE256:
+            crypto_shake256(OUTPUT, OUTPUT_LENGTH, INPUT, INPUT_LENGTH);
+            return CRYPTO_SUCCESS;
+        default:
+            return CRYPTO_ERROR_INVALID_ALG_ID;
+    }
+}

@@ -1,23 +1,25 @@
-#include "AES.h"
+#include "BlockCipher/AES/aes_internal.h"
 #include "Util/Core/secure_zero.h"
 
 #include <string.h>
 
 static uint8_t aes_xtime(uint8_t x) {
     uint8_t hi = (uint8_t)(x >> 7);
-    return (uint8_t)((uint8_t)(x << 1) ^ (uint8_t)(0x1bu & (uint8_t)(0u - hi)));
+    return (uint8_t)((uint8_t)(x << 1) ^
+                     (uint8_t)(0x1bu & (uint8_t)(0u - hi)));
 }
 
 static uint8_t aes_gmul(uint8_t a, uint8_t b) {
-    uint8_t r = 0u;
+    uint8_t result = 0u;
     size_t i;
+
     for (i = 0u; i < 8u; ++i) {
         uint8_t mask = (uint8_t)(0u - (uint8_t)(b & 1u));
-        r ^= (uint8_t)(a & mask);
+        result ^= (uint8_t)(a & mask);
         a = aes_xtime(a);
         b = (uint8_t)(b >> 1);
     }
-    return r;
+    return result;
 }
 
 static uint8_t aes_rotl8(uint8_t x, uint8_t n) {
@@ -32,16 +34,17 @@ static uint8_t aes_gf_inv(uint8_t x) {
     uint8_t x32 = aes_gmul(x16, x16);
     uint8_t x64 = aes_gmul(x32, x32);
     uint8_t x128 = aes_gmul(x64, x64);
-    uint8_t y = aes_gmul(x2, x4);
-    y = aes_gmul(y, x8);
-    y = aes_gmul(y, x16);
-    y = aes_gmul(y, x32);
-    y = aes_gmul(y, x64);
-    y = aes_gmul(y, x128);
-    return y;
+    uint8_t result = aes_gmul(x2, x4);
+
+    result = aes_gmul(result, x8);
+    result = aes_gmul(result, x16);
+    result = aes_gmul(result, x32);
+    result = aes_gmul(result, x64);
+    result = aes_gmul(result, x128);
+    return result;
 }
 
-/* Fixed-operation algebraic S-box. No secret-indexed S-box/T-table loads. */
+/* Fixed-operation algebraic S-box: no secret-indexed S-box/T-table loads. */
 static uint8_t aes_sbox(uint8_t x) {
     uint8_t y = aes_gf_inv(x);
     return (uint8_t)(y ^ aes_rotl8(y, 1u) ^ aes_rotl8(y, 2u) ^
@@ -54,113 +57,142 @@ static uint8_t aes_inv_sbox(uint8_t x) {
     return aes_gf_inv(y);
 }
 
-static void add_round_key(uint8_t state[16], const uint8_t *round_key) {
+static void add_round_key(uint8_t state[AES_BLOCK_SIZE],
+                          const uint8_t *round_key) {
     size_t i;
-    for (i = 0u; i < 16u; ++i) state[i] ^= round_key[i];
+    for (i = 0u; i < AES_BLOCK_SIZE; ++i) state[i] ^= round_key[i];
 }
 
-static void sub_bytes(uint8_t state[16]) {
+static void sub_bytes(uint8_t state[AES_BLOCK_SIZE]) {
     size_t i;
-    for (i = 0u; i < 16u; ++i) state[i] = aes_sbox(state[i]);
+    for (i = 0u; i < AES_BLOCK_SIZE; ++i) state[i] = aes_sbox(state[i]);
 }
 
-static void inv_sub_bytes(uint8_t state[16]) {
+static void inv_sub_bytes(uint8_t state[AES_BLOCK_SIZE]) {
     size_t i;
-    for (i = 0u; i < 16u; ++i) state[i] = aes_inv_sbox(state[i]);
+    for (i = 0u; i < AES_BLOCK_SIZE; ++i) state[i] = aes_inv_sbox(state[i]);
 }
 
-static void shift_rows(uint8_t s[16]) {
-    uint8_t t[16];
-    t[0]=s[0];  t[4]=s[4];  t[8]=s[8];   t[12]=s[12];
-    t[1]=s[5];  t[5]=s[9];  t[9]=s[13];  t[13]=s[1];
-    t[2]=s[10]; t[6]=s[14]; t[10]=s[2];  t[14]=s[6];
-    t[3]=s[15]; t[7]=s[3];  t[11]=s[7];  t[15]=s[11];
-    memcpy(s, t, sizeof(t));
-    crypto_zeroize(t, sizeof(t));
+static void shift_rows(uint8_t state[AES_BLOCK_SIZE]) {
+    uint8_t temp[AES_BLOCK_SIZE];
+
+    temp[0] = state[0];   temp[4] = state[4];
+    temp[8] = state[8];   temp[12] = state[12];
+    temp[1] = state[5];   temp[5] = state[9];
+    temp[9] = state[13];  temp[13] = state[1];
+    temp[2] = state[10];  temp[6] = state[14];
+    temp[10] = state[2];  temp[14] = state[6];
+    temp[3] = state[15];  temp[7] = state[3];
+    temp[11] = state[7];  temp[15] = state[11];
+    memcpy(state, temp, sizeof(temp));
+    crypto_zeroize(temp, sizeof(temp));
 }
 
-static void inv_shift_rows(uint8_t s[16]) {
-    uint8_t t[16];
-    t[0]=s[0];  t[4]=s[4];  t[8]=s[8];   t[12]=s[12];
-    t[1]=s[13]; t[5]=s[1];  t[9]=s[5];   t[13]=s[9];
-    t[2]=s[10]; t[6]=s[14]; t[10]=s[2];  t[14]=s[6];
-    t[3]=s[7];  t[7]=s[11]; t[11]=s[15]; t[15]=s[3];
-    memcpy(s, t, sizeof(t));
-    crypto_zeroize(t, sizeof(t));
+static void inv_shift_rows(uint8_t state[AES_BLOCK_SIZE]) {
+    uint8_t temp[AES_BLOCK_SIZE];
+
+    temp[0] = state[0];   temp[4] = state[4];
+    temp[8] = state[8];   temp[12] = state[12];
+    temp[1] = state[13];  temp[5] = state[1];
+    temp[9] = state[5];   temp[13] = state[9];
+    temp[2] = state[10];  temp[6] = state[14];
+    temp[10] = state[2];  temp[14] = state[6];
+    temp[3] = state[7];   temp[7] = state[11];
+    temp[11] = state[15]; temp[15] = state[3];
+    memcpy(state, temp, sizeof(temp));
+    crypto_zeroize(temp, sizeof(temp));
 }
 
-static void mix_columns(uint8_t s[16]) {
-    size_t c;
-    for (c = 0u; c < 4u; ++c) {
-        size_t i = c * 4u;
-        uint8_t a0=s[i], a1=s[i+1u], a2=s[i+2u], a3=s[i+3u];
-        uint8_t x0 = aes_xtime(a0), x1 = aes_xtime(a1);
-        uint8_t x2 = aes_xtime(a2), x3 = aes_xtime(a3);
-        s[i]    = (uint8_t)(x0 ^ (uint8_t)(x1 ^ a1) ^ a2 ^ a3);
-        s[i+1u] = (uint8_t)(a0 ^ x1 ^ (uint8_t)(x2 ^ a2) ^ a3);
-        s[i+2u] = (uint8_t)(a0 ^ a1 ^ x2 ^ (uint8_t)(x3 ^ a3));
-        s[i+3u] = (uint8_t)((uint8_t)(x0 ^ a0) ^ a1 ^ a2 ^ x3);
+static void mix_columns(uint8_t state[AES_BLOCK_SIZE]) {
+    size_t column;
+
+    for (column = 0u; column < 4u; ++column) {
+        size_t i = column * 4u;
+        uint8_t a0 = state[i];
+        uint8_t a1 = state[i + 1u];
+        uint8_t a2 = state[i + 2u];
+        uint8_t a3 = state[i + 3u];
+        uint8_t x0 = aes_xtime(a0);
+        uint8_t x1 = aes_xtime(a1);
+        uint8_t x2 = aes_xtime(a2);
+        uint8_t x3 = aes_xtime(a3);
+
+        state[i] = (uint8_t)(x0 ^ (uint8_t)(x1 ^ a1) ^ a2 ^ a3);
+        state[i + 1u] = (uint8_t)(a0 ^ x1 ^ (uint8_t)(x2 ^ a2) ^ a3);
+        state[i + 2u] = (uint8_t)(a0 ^ a1 ^ x2 ^ (uint8_t)(x3 ^ a3));
+        state[i + 3u] = (uint8_t)((uint8_t)(x0 ^ a0) ^ a1 ^ a2 ^ x3);
     }
 }
 
-static void inv_mix_columns(uint8_t s[16]) {
-    size_t c;
-    for (c = 0u; c < 4u; ++c) {
-        size_t i = c * 4u;
-        uint8_t a0=s[i], a1=s[i+1u], a2=s[i+2u], a3=s[i+3u];
-        s[i]    = (uint8_t)(aes_gmul(a0,14u)^aes_gmul(a1,11u)^aes_gmul(a2,13u)^aes_gmul(a3,9u));
-        s[i+1u] = (uint8_t)(aes_gmul(a0,9u)^aes_gmul(a1,14u)^aes_gmul(a2,11u)^aes_gmul(a3,13u));
-        s[i+2u] = (uint8_t)(aes_gmul(a0,13u)^aes_gmul(a1,9u)^aes_gmul(a2,14u)^aes_gmul(a3,11u));
-        s[i+3u] = (uint8_t)(aes_gmul(a0,11u)^aes_gmul(a1,13u)^aes_gmul(a2,9u)^aes_gmul(a3,14u));
+static void inv_mix_columns(uint8_t state[AES_BLOCK_SIZE]) {
+    size_t column;
+
+    for (column = 0u; column < 4u; ++column) {
+        size_t i = column * 4u;
+        uint8_t a0 = state[i];
+        uint8_t a1 = state[i + 1u];
+        uint8_t a2 = state[i + 2u];
+        uint8_t a3 = state[i + 3u];
+
+        state[i] = (uint8_t)(aes_gmul(a0, 14u) ^ aes_gmul(a1, 11u) ^
+                             aes_gmul(a2, 13u) ^ aes_gmul(a3, 9u));
+        state[i + 1u] = (uint8_t)(aes_gmul(a0, 9u) ^ aes_gmul(a1, 14u) ^
+                                  aes_gmul(a2, 11u) ^ aes_gmul(a3, 13u));
+        state[i + 2u] = (uint8_t)(aes_gmul(a0, 13u) ^ aes_gmul(a1, 9u) ^
+                                  aes_gmul(a2, 14u) ^ aes_gmul(a3, 11u));
+        state[i + 3u] = (uint8_t)(aes_gmul(a0, 11u) ^ aes_gmul(a1, 13u) ^
+                                  aes_gmul(a2, 9u) ^ aes_gmul(a3, 14u));
     }
 }
 
-static CryptoError aes_parameters(AlgID alg, size_t *key_length, uint8_t *key_words, uint8_t *rounds) {
-    switch (alg) {
-        case ALG_AES_128:
-            if (key_length) *key_length = 16u;
-            if (key_words) *key_words = 4u;
-            if (rounds) *rounds = 10u;
+static CryptoError aes_key_parameters(size_t key_length,
+                                      uint8_t *key_words, uint8_t *rounds) {
+    switch (key_length) {
+        case 16u:
+            *key_words = 4u;
+            *rounds = 10u;
             return CRYPTO_SUCCESS;
-        case ALG_AES_192:
-            if (key_length) *key_length = 24u;
-            if (key_words) *key_words = 6u;
-            if (rounds) *rounds = 12u;
+        case 24u:
+            *key_words = 6u;
+            *rounds = 12u;
             return CRYPTO_SUCCESS;
-        case ALG_AES_256:
-            if (key_length) *key_length = 32u;
-            if (key_words) *key_words = 8u;
-            if (rounds) *rounds = 14u;
+        case 32u:
+            *key_words = 8u;
+            *rounds = 14u;
             return CRYPTO_SUCCESS;
         default:
-            return CRYPTO_ERROR_INVALID_ALG_ID;
+            return CRYPTO_ERROR_INVALID_KEY;
     }
 }
 
-size_t CRYPTO_AES_KEY_SIZE(AlgID ALG) {
-    size_t key_length = 0u;
-    return aes_parameters(ALG, &key_length, NULL, NULL) == CRYPTO_SUCCESS ? key_length : 0u;
-}
-
-CryptoError CRYPTO_AES_CONTEXT_INIT(AES_CONTEXT *CONTEXT, AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH) {
-    size_t expected = 0u, bytes_generated, total_bytes, i;
-    uint8_t key_words = 0u, rounds = 0u, rcon = 1u, temp[4] = {0};
+CryptoError crypto_aes_context_init(AES_CONTEXT *CONTEXT,
+                                     const uint8_t *KEY, size_t KEY_LENGTH) {
+    size_t bytes_generated;
+    size_t total_bytes;
+    size_t i;
+    uint8_t key_words = 0u;
+    uint8_t rounds = 0u;
+    uint8_t rcon = 1u;
+    uint8_t temp[4] = {0u, 0u, 0u, 0u};
     CryptoError err;
 
-    if (!CONTEXT || !KEY) return CRYPTO_ERROR_INVALID_ARGUMENT;
-    err = aes_parameters(ALG, &expected, &key_words, &rounds);
-    if (err != CRYPTO_SUCCESS) return err;
-    if (KEY_LENGTH != expected) return CRYPTO_ERROR_INVALID_KEY;
-
+    if (!CONTEXT) return CRYPTO_ERROR_INVALID_ARGUMENT;
     crypto_zeroize(CONTEXT, sizeof(*CONTEXT));
+    if (!KEY) return CRYPTO_ERROR_INVALID_ARGUMENT;
+
+    err = aes_key_parameters(KEY_LENGTH, &key_words, &rounds);
+    if (err != CRYPTO_SUCCESS) return err;
+
     memcpy(CONTEXT->ROUND_KEYS, KEY, KEY_LENGTH);
     CONTEXT->ROUNDS = rounds;
     CONTEXT->KEY_WORDS = key_words;
-
     bytes_generated = KEY_LENGTH;
-    total_bytes = 16u * ((size_t)rounds + 1u);
+    total_bytes = AES_BLOCK_SIZE * ((size_t)rounds + 1u);
+
     while (bytes_generated < total_bytes) {
-        for (i = 0u; i < 4u; ++i) temp[i] = CONTEXT->ROUND_KEYS[bytes_generated - 4u + i];
+        for (i = 0u; i < 4u; ++i) {
+            temp[i] = CONTEXT->ROUND_KEYS[bytes_generated - 4u + i];
+        }
         if ((bytes_generated % KEY_LENGTH) == 0u) {
             uint8_t x = temp[0];
             temp[0] = aes_sbox(temp[1]);
@@ -169,188 +201,350 @@ CryptoError CRYPTO_AES_CONTEXT_INIT(AES_CONTEXT *CONTEXT, AlgID ALG, const uint8
             temp[3] = aes_sbox(x);
             temp[0] ^= rcon;
             rcon = aes_xtime(rcon);
-        } else if (KEY_LENGTH == 32u && (bytes_generated % KEY_LENGTH) == 16u) {
+        } else if (KEY_LENGTH == 32u &&
+                   (bytes_generated % KEY_LENGTH) == 16u) {
             for (i = 0u; i < 4u; ++i) temp[i] = aes_sbox(temp[i]);
         }
         for (i = 0u; i < 4u && bytes_generated < total_bytes; ++i) {
             CONTEXT->ROUND_KEYS[bytes_generated] =
-                (uint8_t)(CONTEXT->ROUND_KEYS[bytes_generated - KEY_LENGTH] ^ temp[i]);
+                (uint8_t)(CONTEXT->ROUND_KEYS[bytes_generated - KEY_LENGTH] ^
+                          temp[i]);
             ++bytes_generated;
         }
     }
+
     crypto_zeroize(temp, sizeof(temp));
     return CRYPTO_SUCCESS;
 }
 
-void CRYPTO_AES_CONTEXT_CLEAR(AES_CONTEXT *CONTEXT) {
+void crypto_aes_context_clear(AES_CONTEXT *CONTEXT) {
     if (CONTEXT) crypto_zeroize(CONTEXT, sizeof(*CONTEXT));
 }
 
-static int aes_context_valid(const AES_CONTEXT *ctx) {
-    return ctx && (ctx->ROUNDS == 10u || ctx->ROUNDS == 12u || ctx->ROUNDS == 14u);
+static int aes_context_valid(const AES_CONTEXT *context) {
+    if (!context) return 0;
+    return (context->ROUNDS == 10u && context->KEY_WORDS == 4u) ||
+           (context->ROUNDS == 12u && context->KEY_WORDS == 6u) ||
+           (context->ROUNDS == 14u && context->KEY_WORDS == 8u);
 }
 
-CryptoError CRYPTO_AES_ENCRYPT_BLOCK(const AES_CONTEXT *CONTEXT, const uint8_t INPUT[16], uint8_t OUTPUT[16]) {
-    uint8_t state[16];
+CryptoError crypto_aes_encrypt_block(const AES_CONTEXT *CONTEXT,
+                                      const uint8_t INPUT[AES_BLOCK_SIZE],
+                                      uint8_t OUTPUT[AES_BLOCK_SIZE]) {
+    uint8_t state[AES_BLOCK_SIZE];
     uint8_t round;
-    if (!aes_context_valid(CONTEXT) || !INPUT || !OUTPUT) return CRYPTO_ERROR_INVALID_ARGUMENT;
-    memcpy(state, INPUT, 16u);
+
+    if (!aes_context_valid(CONTEXT) || !INPUT || !OUTPUT)
+        return CRYPTO_ERROR_INVALID_ARGUMENT;
+
+    memcpy(state, INPUT, sizeof(state));
     add_round_key(state, CONTEXT->ROUND_KEYS);
     for (round = 1u; round < CONTEXT->ROUNDS; ++round) {
         sub_bytes(state);
         shift_rows(state);
         mix_columns(state);
-        add_round_key(state, CONTEXT->ROUND_KEYS + 16u * (size_t)round);
+        add_round_key(state,
+                      CONTEXT->ROUND_KEYS + AES_BLOCK_SIZE * (size_t)round);
     }
     sub_bytes(state);
     shift_rows(state);
-    add_round_key(state, CONTEXT->ROUND_KEYS + 16u * (size_t)CONTEXT->ROUNDS);
-    memcpy(OUTPUT, state, 16u);
+    add_round_key(state,
+                  CONTEXT->ROUND_KEYS +
+                  AES_BLOCK_SIZE * (size_t)CONTEXT->ROUNDS);
+    memcpy(OUTPUT, state, sizeof(state));
     crypto_zeroize(state, sizeof(state));
     return CRYPTO_SUCCESS;
 }
 
-CryptoError CRYPTO_AES_DECRYPT_BLOCK(const AES_CONTEXT *CONTEXT, const uint8_t INPUT[16], uint8_t OUTPUT[16]) {
-    uint8_t state[16];
+CryptoError crypto_aes_decrypt_block(const AES_CONTEXT *CONTEXT,
+                                      const uint8_t INPUT[AES_BLOCK_SIZE],
+                                      uint8_t OUTPUT[AES_BLOCK_SIZE]) {
+    uint8_t state[AES_BLOCK_SIZE];
     uint8_t round;
-    if (!aes_context_valid(CONTEXT) || !INPUT || !OUTPUT) return CRYPTO_ERROR_INVALID_ARGUMENT;
-    memcpy(state, INPUT, 16u);
-    add_round_key(state, CONTEXT->ROUND_KEYS + 16u * (size_t)CONTEXT->ROUNDS);
+
+    if (!aes_context_valid(CONTEXT) || !INPUT || !OUTPUT)
+        return CRYPTO_ERROR_INVALID_ARGUMENT;
+
+    memcpy(state, INPUT, sizeof(state));
+    add_round_key(state,
+                  CONTEXT->ROUND_KEYS +
+                  AES_BLOCK_SIZE * (size_t)CONTEXT->ROUNDS);
     for (round = CONTEXT->ROUNDS; round > 1u; --round) {
         inv_shift_rows(state);
         inv_sub_bytes(state);
-        add_round_key(state, CONTEXT->ROUND_KEYS + 16u * (size_t)(round - 1u));
+        add_round_key(state,
+                      CONTEXT->ROUND_KEYS +
+                      AES_BLOCK_SIZE * (size_t)(round - 1u));
         inv_mix_columns(state);
     }
     inv_shift_rows(state);
     inv_sub_bytes(state);
     add_round_key(state, CONTEXT->ROUND_KEYS);
-    memcpy(OUTPUT, state, 16u);
+    memcpy(OUTPUT, state, sizeof(state));
     crypto_zeroize(state, sizeof(state));
     return CRYPTO_SUCCESS;
 }
 
-static CryptoError aes_oneshot_init(AES_CONTEXT *ctx, AlgID alg, const uint8_t *key,
-                                    size_t key_length, const uint8_t *input, size_t input_length,
-                                    uint8_t *output, size_t output_length) {
-    if (!ctx || !key || (!input && input_length) || (!output && input_length))
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
-    if (output_length < input_length) return CRYPTO_ERROR_BUFFER_TOO_SMALL;
-    return CRYPTO_AES_CONTEXT_INIT(ctx, alg, key, key_length);
-}
-
-CryptoError CRYPTO_AES_ECB_ENCRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
-                            const uint8_t *INPUT, size_t INPUT_LENGTH,
-                            uint8_t *OUTPUT, size_t OUTPUT_LENGTH) {
-    AES_CONTEXT ctx;
-    CryptoError err;
+static CryptoError aes_ecb_encrypt(const AES_CONTEXT *context,
+                                   uint8_t *output,
+                                   const uint8_t *input, size_t input_length) {
+    CryptoError err = CRYPTO_SUCCESS;
     size_t offset;
-    if ((INPUT_LENGTH % AES_BLOCK_SIZE) != 0u) return CRYPTO_ERROR_INVALID_ARGUMENT;
-    err = aes_oneshot_init(&ctx, ALG, KEY, KEY_LENGTH, INPUT, INPUT_LENGTH, OUTPUT, OUTPUT_LENGTH);
-    if (err != CRYPTO_SUCCESS) return err;
-    for (offset = 0u; offset < INPUT_LENGTH; offset += AES_BLOCK_SIZE) {
-        err = CRYPTO_AES_ENCRYPT_BLOCK(&ctx, INPUT + offset, OUTPUT + offset);
+
+    for (offset = 0u; offset < input_length; offset += AES_BLOCK_SIZE) {
+        err = crypto_aes_encrypt_block(context, input + offset, output + offset);
         if (err != CRYPTO_SUCCESS) break;
     }
-    CRYPTO_AES_CONTEXT_CLEAR(&ctx);
     return err;
 }
 
-CryptoError CRYPTO_AES_ECB_DECRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
-                            const uint8_t *INPUT, size_t INPUT_LENGTH,
-                            uint8_t *OUTPUT, size_t OUTPUT_LENGTH) {
-    AES_CONTEXT ctx;
-    CryptoError err;
+static CryptoError aes_ecb_decrypt(const AES_CONTEXT *context,
+                                   uint8_t *output,
+                                   const uint8_t *input, size_t input_length) {
+    CryptoError err = CRYPTO_SUCCESS;
     size_t offset;
-    if ((INPUT_LENGTH % AES_BLOCK_SIZE) != 0u) return CRYPTO_ERROR_INVALID_ARGUMENT;
-    err = aes_oneshot_init(&ctx, ALG, KEY, KEY_LENGTH, INPUT, INPUT_LENGTH, OUTPUT, OUTPUT_LENGTH);
-    if (err != CRYPTO_SUCCESS) return err;
-    for (offset = 0u; offset < INPUT_LENGTH; offset += AES_BLOCK_SIZE) {
-        err = CRYPTO_AES_DECRYPT_BLOCK(&ctx, INPUT + offset, OUTPUT + offset);
+
+    for (offset = 0u; offset < input_length; offset += AES_BLOCK_SIZE) {
+        err = crypto_aes_decrypt_block(context, input + offset, output + offset);
         if (err != CRYPTO_SUCCESS) break;
     }
-    CRYPTO_AES_CONTEXT_CLEAR(&ctx);
     return err;
 }
 
-CryptoError CRYPTO_AES_CBC_ENCRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
-                            const uint8_t IV[16], const uint8_t *INPUT, size_t INPUT_LENGTH,
-                            uint8_t *OUTPUT, size_t OUTPUT_LENGTH) {
-    AES_CONTEXT ctx;
-    uint8_t chain[16], block[16];
-    CryptoError err;
-    size_t offset, i;
-    if (!IV || (INPUT_LENGTH % AES_BLOCK_SIZE) != 0u) return CRYPTO_ERROR_INVALID_ARGUMENT;
-    err = aes_oneshot_init(&ctx, ALG, KEY, KEY_LENGTH, INPUT, INPUT_LENGTH, OUTPUT, OUTPUT_LENGTH);
-    if (err != CRYPTO_SUCCESS) return err;
-    memcpy(chain, IV, 16u);
-    for (offset = 0u; offset < INPUT_LENGTH; offset += 16u) {
-        for (i = 0u; i < 16u; ++i) block[i] = (uint8_t)(INPUT[offset + i] ^ chain[i]);
-        err = CRYPTO_AES_ENCRYPT_BLOCK(&ctx, block, OUTPUT + offset);
+static CryptoError aes_cbc_encrypt(const AES_CONTEXT *context,
+                                   uint8_t *output, const uint8_t *input,
+                                   size_t input_length, const uint8_t iv[16]) {
+    uint8_t chain[AES_BLOCK_SIZE];
+    uint8_t block[AES_BLOCK_SIZE];
+    CryptoError err = CRYPTO_SUCCESS;
+    size_t offset;
+    size_t i;
+
+    memcpy(chain, iv, sizeof(chain));
+    for (offset = 0u; offset < input_length; offset += AES_BLOCK_SIZE) {
+        for (i = 0u; i < AES_BLOCK_SIZE; ++i) {
+            block[i] = (uint8_t)(input[offset + i] ^ chain[i]);
+        }
+        err = crypto_aes_encrypt_block(context, block, output + offset);
         if (err != CRYPTO_SUCCESS) break;
-        memcpy(chain, OUTPUT + offset, 16u);
+        memcpy(chain, output + offset, sizeof(chain));
     }
+
     crypto_zeroize(block, sizeof(block));
     crypto_zeroize(chain, sizeof(chain));
-    CRYPTO_AES_CONTEXT_CLEAR(&ctx);
     return err;
 }
 
-CryptoError CRYPTO_AES_CBC_DECRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
-                            const uint8_t IV[16], const uint8_t *INPUT, size_t INPUT_LENGTH,
-                            uint8_t *OUTPUT, size_t OUTPUT_LENGTH) {
-    AES_CONTEXT ctx;
-    uint8_t chain[16], block[16], cipher_block[16];
-    CryptoError err;
-    size_t offset, i;
-    if (!IV || (INPUT_LENGTH % AES_BLOCK_SIZE) != 0u) return CRYPTO_ERROR_INVALID_ARGUMENT;
-    err = aes_oneshot_init(&ctx, ALG, KEY, KEY_LENGTH, INPUT, INPUT_LENGTH, OUTPUT, OUTPUT_LENGTH);
-    if (err != CRYPTO_SUCCESS) return err;
-    memcpy(chain, IV, 16u);
-    for (offset = 0u; offset < INPUT_LENGTH; offset += 16u) {
-        memcpy(cipher_block, INPUT + offset, 16u);
-        err = CRYPTO_AES_DECRYPT_BLOCK(&ctx, cipher_block, block);
+static CryptoError aes_cbc_decrypt(const AES_CONTEXT *context,
+                                   uint8_t *output, const uint8_t *input,
+                                   size_t input_length, const uint8_t iv[16]) {
+    uint8_t chain[AES_BLOCK_SIZE];
+    uint8_t block[AES_BLOCK_SIZE];
+    uint8_t cipher_block[AES_BLOCK_SIZE];
+    CryptoError err = CRYPTO_SUCCESS;
+    size_t offset;
+    size_t i;
+
+    memcpy(chain, iv, sizeof(chain));
+    for (offset = 0u; offset < input_length; offset += AES_BLOCK_SIZE) {
+        memcpy(cipher_block, input + offset, sizeof(cipher_block));
+        err = crypto_aes_decrypt_block(context, cipher_block, block);
         if (err != CRYPTO_SUCCESS) break;
-        for (i = 0u; i < 16u; ++i) OUTPUT[offset + i] = (uint8_t)(block[i] ^ chain[i]);
-        memcpy(chain, cipher_block, 16u);
+        for (i = 0u; i < AES_BLOCK_SIZE; ++i) {
+            output[offset + i] = (uint8_t)(block[i] ^ chain[i]);
+        }
+        memcpy(chain, cipher_block, sizeof(chain));
     }
+
     crypto_zeroize(cipher_block, sizeof(cipher_block));
     crypto_zeroize(block, sizeof(block));
     crypto_zeroize(chain, sizeof(chain));
-    CRYPTO_AES_CONTEXT_CLEAR(&ctx);
     return err;
 }
 
-static void increment_counter128(uint8_t counter[16]) {
+static void increment_counter128(uint8_t counter[AES_BLOCK_SIZE]) {
     int i;
-    for (i = 15; i >= 0; --i) {
+    for (i = (int)AES_BLOCK_SIZE - 1; i >= 0; --i) {
         counter[i] = (uint8_t)(counter[i] + 1u);
         if (counter[i] != 0u) break;
     }
 }
 
-CryptoError CRYPTO_AES_CTR_CRYPT(AlgID ALG, const uint8_t *KEY, size_t KEY_LENGTH,
-                          const uint8_t INITIAL_COUNTER[16], const uint8_t *INPUT, size_t INPUT_LENGTH,
-                          uint8_t *OUTPUT, size_t OUTPUT_LENGTH) {
-    AES_CONTEXT ctx;
-    uint8_t counter[16], stream[16];
-    CryptoError err;
-    size_t offset = 0u, i, chunk;
-    if (!INITIAL_COUNTER) return CRYPTO_ERROR_INVALID_ARGUMENT;
-    err = aes_oneshot_init(&ctx, ALG, KEY, KEY_LENGTH, INPUT, INPUT_LENGTH, OUTPUT, OUTPUT_LENGTH);
-    if (err != CRYPTO_SUCCESS) return err;
-    memcpy(counter, INITIAL_COUNTER, 16u);
-    while (offset < INPUT_LENGTH) {
-        err = CRYPTO_AES_ENCRYPT_BLOCK(&ctx, counter, stream);
+static CryptoError aes_ctr_crypt(const AES_CONTEXT *context,
+                                 uint8_t *output, const uint8_t *input,
+                                 size_t input_length,
+                                 const uint8_t initial_counter[16]) {
+    uint8_t counter[AES_BLOCK_SIZE];
+    uint8_t stream[AES_BLOCK_SIZE];
+    CryptoError err = CRYPTO_SUCCESS;
+    size_t offset = 0u;
+    size_t chunk;
+    size_t i;
+
+    memcpy(counter, initial_counter, sizeof(counter));
+    while (offset < input_length) {
+        err = crypto_aes_encrypt_block(context, counter, stream);
         if (err != CRYPTO_SUCCESS) break;
-        chunk = INPUT_LENGTH - offset;
-        if (chunk > 16u) chunk = 16u;
-        for (i = 0u; i < chunk; ++i) OUTPUT[offset + i] = (uint8_t)(INPUT[offset + i] ^ stream[i]);
+        chunk = input_length - offset;
+        if (chunk > AES_BLOCK_SIZE) chunk = AES_BLOCK_SIZE;
+        for (i = 0u; i < chunk; ++i) {
+            output[offset + i] = (uint8_t)(input[offset + i] ^ stream[i]);
+        }
         offset += chunk;
         increment_counter128(counter);
     }
+
     crypto_zeroize(stream, sizeof(stream));
     crypto_zeroize(counter, sizeof(counter));
-    CRYPTO_AES_CONTEXT_CLEAR(&ctx);
+    return err;
+}
+
+static CryptoError aes_validate_request(
+    const uint8_t *OUTPUT, size_t OUTPUT_CAPACITY,
+    const uint8_t *TAG, size_t TAG_LENGTH,
+    const uint8_t *INPUT, size_t INPUT_LENGTH,
+    const uint8_t *KEY, size_t KEY_LENGTH,
+    const uint8_t *IV, size_t IV_LENGTH,
+    const uint8_t *AAD, size_t AAD_LENGTH,
+    size_t expected_key_length, CryptoAesMode mode) {
+    if (!KEY || (!INPUT && INPUT_LENGTH != 0u) ||
+        (!OUTPUT && INPUT_LENGTH != 0u) || (!AAD && AAD_LENGTH != 0u)) {
+        return CRYPTO_ERROR_INVALID_ARGUMENT;
+    }
+    if (KEY_LENGTH != expected_key_length) return CRYPTO_ERROR_INVALID_KEY;
+    if (expected_key_length != 16u && expected_key_length != 24u &&
+        expected_key_length != 32u) {
+        return CRYPTO_ERROR_INVALID_KEY;
+    }
+    switch (mode) {
+        case CRYPTO_AES_MODE_ECB:
+            if (IV_LENGTH != 0u || AAD_LENGTH != 0u || TAG_LENGTH != 0u ||
+                (INPUT_LENGTH % AES_BLOCK_SIZE) != 0u) {
+                return CRYPTO_ERROR_INVALID_ARGUMENT;
+            }
+            break;
+        case CRYPTO_AES_MODE_CBC:
+            if (!IV || IV_LENGTH != AES_BLOCK_SIZE || AAD_LENGTH != 0u ||
+                TAG_LENGTH != 0u ||
+                (INPUT_LENGTH % AES_BLOCK_SIZE) != 0u) {
+                return CRYPTO_ERROR_INVALID_ARGUMENT;
+            }
+            break;
+        case CRYPTO_AES_MODE_CTR:
+            if (!IV || IV_LENGTH != AES_BLOCK_SIZE || AAD_LENGTH != 0u ||
+                TAG_LENGTH != 0u) {
+                return CRYPTO_ERROR_INVALID_ARGUMENT;
+            }
+            break;
+        case CRYPTO_AES_MODE_CCM:
+            if (!IV || IV_LENGTH < 7u || IV_LENGTH > 13u || !TAG)
+                return CRYPTO_ERROR_INVALID_ARGUMENT;
+            break;
+        case CRYPTO_AES_MODE_GCM:
+            if (!IV || IV_LENGTH == 0u || !TAG)
+                return CRYPTO_ERROR_INVALID_ARGUMENT;
+            break;
+        default:
+            return CRYPTO_ERROR_INVALID_ALG_ID;
+    }
+    if (OUTPUT_CAPACITY < INPUT_LENGTH) return CRYPTO_ERROR_BUFFER_TOO_SMALL;
+    return CRYPTO_SUCCESS;
+}
+
+CryptoError crypto_aes_encrypt(
+    uint8_t *OUTPUT, size_t OUTPUT_CAPACITY,
+    uint8_t *TAG, size_t TAG_LENGTH,
+    const uint8_t *INPUT, size_t INPUT_LENGTH,
+    const uint8_t *KEY, size_t KEY_LENGTH,
+    const uint8_t *IV, size_t IV_LENGTH,
+    const uint8_t *AAD, size_t AAD_LENGTH,
+    size_t EXPECTED_KEY_LENGTH, CryptoAesMode MODE) {
+    AES_CONTEXT context;
+    CryptoError err;
+
+    err = aes_validate_request(OUTPUT, OUTPUT_CAPACITY, TAG, TAG_LENGTH,
+                               INPUT, INPUT_LENGTH, KEY, KEY_LENGTH,
+                               IV, IV_LENGTH, AAD, AAD_LENGTH,
+                               EXPECTED_KEY_LENGTH, MODE);
+    if (err != CRYPTO_SUCCESS) return err;
+
+    err = crypto_aes_context_init(&context, KEY, KEY_LENGTH);
+    if (err != CRYPTO_SUCCESS) return err;
+
+    switch (MODE) {
+        case CRYPTO_AES_MODE_ECB:
+            err = aes_ecb_encrypt(&context, OUTPUT, INPUT, INPUT_LENGTH);
+            break;
+        case CRYPTO_AES_MODE_CBC:
+            err = aes_cbc_encrypt(&context, OUTPUT, INPUT, INPUT_LENGTH, IV);
+            break;
+        case CRYPTO_AES_MODE_CTR:
+            err = aes_ctr_crypt(&context, OUTPUT, INPUT, INPUT_LENGTH, IV);
+            break;
+        case CRYPTO_AES_MODE_CCM:
+            err = crypto_aes_ccm_encrypt(&context, OUTPUT, TAG, TAG_LENGTH,
+                                         INPUT, INPUT_LENGTH, IV, IV_LENGTH,
+                                         AAD, AAD_LENGTH);
+            break;
+        case CRYPTO_AES_MODE_GCM:
+            err = crypto_aes_gcm_encrypt(&context, OUTPUT, TAG, TAG_LENGTH,
+                                         INPUT, INPUT_LENGTH, IV, IV_LENGTH,
+                                         AAD, AAD_LENGTH);
+            break;
+        default:
+            err = CRYPTO_ERROR_INVALID_ALG_ID;
+            break;
+    }
+
+    crypto_aes_context_clear(&context);
+    return err;
+}
+
+CryptoError crypto_aes_decrypt(
+    uint8_t *OUTPUT, size_t OUTPUT_CAPACITY,
+    const uint8_t *TAG, size_t TAG_LENGTH,
+    const uint8_t *INPUT, size_t INPUT_LENGTH,
+    const uint8_t *KEY, size_t KEY_LENGTH,
+    const uint8_t *IV, size_t IV_LENGTH,
+    const uint8_t *AAD, size_t AAD_LENGTH,
+    size_t EXPECTED_KEY_LENGTH, CryptoAesMode MODE) {
+    AES_CONTEXT context;
+    CryptoError err;
+
+    err = aes_validate_request(OUTPUT, OUTPUT_CAPACITY, TAG, TAG_LENGTH,
+                               INPUT, INPUT_LENGTH, KEY, KEY_LENGTH,
+                               IV, IV_LENGTH, AAD, AAD_LENGTH,
+                               EXPECTED_KEY_LENGTH, MODE);
+    if (err != CRYPTO_SUCCESS) return err;
+
+    err = crypto_aes_context_init(&context, KEY, KEY_LENGTH);
+    if (err != CRYPTO_SUCCESS) return err;
+
+    switch (MODE) {
+        case CRYPTO_AES_MODE_ECB:
+            err = aes_ecb_decrypt(&context, OUTPUT, INPUT, INPUT_LENGTH);
+            break;
+        case CRYPTO_AES_MODE_CBC:
+            err = aes_cbc_decrypt(&context, OUTPUT, INPUT, INPUT_LENGTH, IV);
+            break;
+        case CRYPTO_AES_MODE_CTR:
+            err = aes_ctr_crypt(&context, OUTPUT, INPUT, INPUT_LENGTH, IV);
+            break;
+        case CRYPTO_AES_MODE_CCM:
+            err = crypto_aes_ccm_decrypt(&context, OUTPUT, TAG, TAG_LENGTH,
+                                         INPUT, INPUT_LENGTH, IV, IV_LENGTH,
+                                         AAD, AAD_LENGTH);
+            break;
+        case CRYPTO_AES_MODE_GCM:
+            err = crypto_aes_gcm_decrypt(&context, OUTPUT, TAG, TAG_LENGTH,
+                                         INPUT, INPUT_LENGTH, IV, IV_LENGTH,
+                                         AAD, AAD_LENGTH);
+            break;
+        default:
+            err = CRYPTO_ERROR_INVALID_ALG_ID;
+            break;
+    }
+
+    crypto_aes_context_clear(&context);
     return err;
 }

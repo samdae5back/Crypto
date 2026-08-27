@@ -1,13 +1,67 @@
-#include "ENDIAN.h"
-uint16_t CRYPTO_ENDIAN_LOAD16_LE(const uint8_t *p){return (uint16_t)p[0]|((uint16_t)p[1]<<8);}
-uint32_t CRYPTO_ENDIAN_LOAD32_LE(const uint8_t *p){return (uint32_t)p[0]|((uint32_t)p[1]<<8)|((uint32_t)p[2]<<16)|((uint32_t)p[3]<<24);}
-uint64_t CRYPTO_ENDIAN_LOAD64_LE(const uint8_t *p){return (uint64_t)CRYPTO_ENDIAN_LOAD32_LE(p)|((uint64_t)CRYPTO_ENDIAN_LOAD32_LE(p+4)<<32);}
-uint16_t CRYPTO_ENDIAN_LOAD16_BE(const uint8_t *p){return ((uint16_t)p[0]<<8)|(uint16_t)p[1];}
-uint32_t CRYPTO_ENDIAN_LOAD32_BE(const uint8_t *p){return ((uint32_t)p[0]<<24)|((uint32_t)p[1]<<16)|((uint32_t)p[2]<<8)|(uint32_t)p[3];}
-uint64_t CRYPTO_ENDIAN_LOAD64_BE(const uint8_t *p){return ((uint64_t)CRYPTO_ENDIAN_LOAD32_BE(p)<<32)|(uint64_t)CRYPTO_ENDIAN_LOAD32_BE(p+4);}
-void CRYPTO_ENDIAN_STORE16_LE(uint8_t *p,uint16_t x){p[0]=(uint8_t)x;p[1]=(uint8_t)(x>>8);}
-void CRYPTO_ENDIAN_STORE32_LE(uint8_t *p,uint32_t x){p[0]=(uint8_t)x;p[1]=(uint8_t)(x>>8);p[2]=(uint8_t)(x>>16);p[3]=(uint8_t)(x>>24);}
-void CRYPTO_ENDIAN_STORE64_LE(uint8_t *p,uint64_t x){CRYPTO_ENDIAN_STORE32_LE(p,(uint32_t)x);CRYPTO_ENDIAN_STORE32_LE(p+4,(uint32_t)(x>>32));}
-void CRYPTO_ENDIAN_STORE16_BE(uint8_t *p,uint16_t x){p[0]=(uint8_t)(x>>8);p[1]=(uint8_t)x;}
-void CRYPTO_ENDIAN_STORE32_BE(uint8_t *p,uint32_t x){p[0]=(uint8_t)(x>>24);p[1]=(uint8_t)(x>>16);p[2]=(uint8_t)(x>>8);p[3]=(uint8_t)x;}
-void CRYPTO_ENDIAN_STORE64_BE(uint8_t *p,uint64_t x){CRYPTO_ENDIAN_STORE32_BE(p,(uint32_t)(x>>32));CRYPTO_ENDIAN_STORE32_BE(p+4,(uint32_t)x);}
+#include "endian_internal.h"
+
+uint16_t crypto_load16_le(const uint8_t *input) {
+    return (uint16_t)input[0] | ((uint16_t)input[1] << 8);
+}
+
+uint32_t crypto_load32_le(const uint8_t *input) {
+    return (uint32_t)input[0] |
+           ((uint32_t)input[1] << 8) |
+           ((uint32_t)input[2] << 16) |
+           ((uint32_t)input[3] << 24);
+}
+
+uint64_t crypto_load64_le(const uint8_t *input) {
+    return (uint64_t)crypto_load32_le(input) |
+           ((uint64_t)crypto_load32_le(input + 4) << 32);
+}
+
+uint16_t crypto_load16_be(const uint8_t *input) {
+    return ((uint16_t)input[0] << 8) | (uint16_t)input[1];
+}
+
+uint32_t crypto_load32_be(const uint8_t *input) {
+    return ((uint32_t)input[0] << 24) |
+           ((uint32_t)input[1] << 16) |
+           ((uint32_t)input[2] << 8) |
+           (uint32_t)input[3];
+}
+
+uint64_t crypto_load64_be(const uint8_t *input) {
+    return ((uint64_t)crypto_load32_be(input) << 32) |
+           (uint64_t)crypto_load32_be(input + 4);
+}
+
+void crypto_store16_le(uint8_t *output, uint16_t value) {
+    output[0] = (uint8_t)value;
+    output[1] = (uint8_t)(value >> 8);
+}
+
+void crypto_store32_le(uint8_t *output, uint32_t value) {
+    output[0] = (uint8_t)value;
+    output[1] = (uint8_t)(value >> 8);
+    output[2] = (uint8_t)(value >> 16);
+    output[3] = (uint8_t)(value >> 24);
+}
+
+void crypto_store64_le(uint8_t *output, uint64_t value) {
+    crypto_store32_le(output, (uint32_t)value);
+    crypto_store32_le(output + 4, (uint32_t)(value >> 32));
+}
+
+void crypto_store16_be(uint8_t *output, uint16_t value) {
+    output[0] = (uint8_t)(value >> 8);
+    output[1] = (uint8_t)value;
+}
+
+void crypto_store32_be(uint8_t *output, uint32_t value) {
+    output[0] = (uint8_t)(value >> 24);
+    output[1] = (uint8_t)(value >> 16);
+    output[2] = (uint8_t)(value >> 8);
+    output[3] = (uint8_t)value;
+}
+
+void crypto_store64_be(uint8_t *output, uint64_t value) {
+    crypto_store32_be(output, (uint32_t)(value >> 32));
+    crypto_store32_be(output + 4, (uint32_t)value);
+}
