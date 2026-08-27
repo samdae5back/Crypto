@@ -4,6 +4,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+static int bytes_are(const uint8_t *buffer, size_t length, uint8_t value) {
+    size_t i;
+    for (i = 0u; i < length; ++i)
+        if (buffer[i] != value) return 0;
+    return 1;
+}
+
 static int test_hash(void) {
     static const uint8_t expected[32] = {
         0x3a,0x98,0x5d,0xa7,0x4f,0xe2,0x25,0xb2,
@@ -162,14 +169,90 @@ static int test_bignum(void) {
         0xfe,0xdc,0xba,0x98,0x76,0x54,0x32,0x10
     };
     uint8_t output[sizeof(input)];
+    uint8_t little_endian[sizeof(input)];
     CRYPTO_BIGNUM value;
+    size_t i;
     int failed;
 
     CRYPTO_BIGNUM_INIT(&value);
     failed = CRYPTO_BIGNUM_FROM_BYTES_BE(&value, input, sizeof(input)) != CRYPTO_SUCCESS ||
              CRYPTO_BIGNUM_TO_BYTES_BE(&value, output, sizeof(output)) != CRYPTO_SUCCESS ||
-             memcmp(input, output, sizeof(input)) != 0;
+             memcmp(input, output, sizeof(input)) != 0 ||
+             CRYPTO_BIGNUM_TO_BYTES_BE(&value, output, sizeof(output) - 1u) !=
+                 CRYPTO_ERROR_BUFFER_TOO_SMALL ||
+             CRYPTO_BIGNUM_FROM_BYTES_BE(&value, NULL, 1u) !=
+                 CRYPTO_ERROR_INVALID_ARGUMENT ||
+             CRYPTO_BIGNUM_FROM_BYTES_BE(&value, input, SIZE_MAX) !=
+                 CRYPTO_ERROR_MESSAGE_TOO_LARGE ||
+             CRYPTO_PRIME_GENERATE(&value, SIZE_MAX, 1u) !=
+                 CRYPTO_ERROR_MESSAGE_TOO_LARGE;
+    if (!failed) {
+        for (i = 0u; i < sizeof(input); ++i)
+            little_endian[i] = input[sizeof(input) - 1u - i];
+        failed = CRYPTO_BIGNUM_TO_BYTES_LE(
+                     &value, output, sizeof(output)) != CRYPTO_SUCCESS ||
+                 memcmp(little_endian, output, sizeof(output)) != 0 ||
+                 CRYPTO_BIGNUM_FROM_BYTES_LE(
+                     &value, little_endian, sizeof(little_endian)) !=
+                     CRYPTO_SUCCESS ||
+                 CRYPTO_BIGNUM_TO_BYTES_BE(
+                     &value, output, sizeof(output)) != CRYPTO_SUCCESS ||
+                 memcmp(input, output, sizeof(input)) != 0;
+    }
+    if (!failed) {
+        memset(output, 0xa5, sizeof(output));
+        failed = CRYPTO_PRIME_GENERATE_SAFE(&value, &value, 32u, 1u) !=
+                     CRYPTO_ERROR_INVALID_ARGUMENT ||
+                 CRYPTO_BIGNUM_FROM_BYTES_BE(&value, NULL, 0u) !=
+                     CRYPTO_SUCCESS ||
+                 CRYPTO_BIGNUM_TO_BYTES_BE(
+                     &value, output, sizeof(output)) != CRYPTO_SUCCESS;
+        for (i = 0u; !failed && i < sizeof(output); ++i)
+            failed = output[i] != 0u;
+    }
     CRYPTO_BIGNUM_FREE(&value);
+    return failed;
+}
+
+static int test_elgamal(void) {
+    static const uint8_t encoded[] = {42u};
+    uint8_t decoded[sizeof(encoded)];
+    CRYPTO_ELGAMAL_PUBLIC_KEY public_key;
+    CRYPTO_ELGAMAL_PRIVATE_KEY private_key;
+    CRYPTO_ELGAMAL_CIPHERTEXT ciphertext;
+    CRYPTO_BIGNUM message, recovered;
+    int failed = 1;
+
+    CRYPTO_ELGAMAL_PUBLIC_KEY_INIT(&public_key);
+    CRYPTO_ELGAMAL_PRIVATE_KEY_INIT(&private_key);
+    CRYPTO_ELGAMAL_CIPHERTEXT_INIT(&ciphertext);
+    CRYPTO_BIGNUM_INIT(&message);
+    CRYPTO_BIGNUM_INIT(&recovered);
+    if (CRYPTO_ELGAMAL_KEYGEN(&public_key, &private_key, 32u, 8u,
+                              ALG_ELGAMAL_SAFE_PRIME) != CRYPTO_SUCCESS)
+        goto done;
+    if (CRYPTO_BIGNUM_FROM_BYTES_BE(
+            &message, encoded, sizeof(encoded)) != CRYPTO_SUCCESS)
+        goto done;
+    if (CRYPTO_ELGAMAL_ENCRYPT(&ciphertext, &message, &public_key,
+                               ALG_ELGAMAL_SAFE_PRIME) != CRYPTO_SUCCESS)
+        goto done;
+    if (CRYPTO_ELGAMAL_DECRYPT(&recovered, &ciphertext, &public_key,
+                               &private_key,
+                               ALG_ELGAMAL_SAFE_PRIME) != CRYPTO_SUCCESS)
+        goto done;
+    if (CRYPTO_BIGNUM_TO_BYTES_BE(
+            &recovered, decoded, sizeof(decoded)) != CRYPTO_SUCCESS ||
+        memcmp(encoded, decoded, sizeof(encoded)) != 0)
+        goto done;
+    failed = 0;
+
+done:
+    CRYPTO_BIGNUM_FREE(&message);
+    CRYPTO_BIGNUM_FREE(&recovered);
+    CRYPTO_ELGAMAL_CIPHERTEXT_FREE(&ciphertext);
+    CRYPTO_ELGAMAL_PRIVATE_KEY_FREE(&private_key);
+    CRYPTO_ELGAMAL_PUBLIC_KEY_FREE(&public_key);
     return failed;
 }
 
@@ -221,6 +304,10 @@ static int test_ml_kem(AlgID alg) {
     uint8_t rejected[CRYPTO_ML_KEM_SHARED_SECRET_BYTES];
     uint8_t rejection_expected[CRYPTO_ML_KEM_SHARED_SECRET_BYTES];
     uint8_t rejection_input[CRYPTO_ML_KEM_1024_CIPHERTEXT_BYTES + 32u];
+    uint8_t overlap_snapshot[CRYPTO_ML_KEM_1024_PRIVATE_KEY_BYTES];
+    size_t embedded_public_key_offset;
+    uint8_t saved_first;
+    uint8_t saved_second;
     int failed = 1;
 
     public_key = (uint8_t *)malloc(public_key_length);
@@ -254,6 +341,89 @@ static int test_ml_kem(AlgID alg) {
     if (memcmp(rejected, rejection_expected, sizeof(rejected)) != 0)
         goto done;
 
+    /* Encapsulation rejects non-canonical 12-bit public-key coefficients. */
+    saved_first = public_key[0];
+    saved_second = public_key[1];
+    public_key[0] = 0x01u;
+    public_key[1] = (uint8_t)((public_key[1] & 0xf0u) | 0x0du); /* 3329 */
+    memset(shared_a, 0xa5, sizeof(shared_a));
+    memset(ciphertext, 0xa5, ciphertext_length);
+    if (CRYPTO_ML_KEM_ENCAPS(public_key, public_key_length, shared_a,
+                             ciphertext, ciphertext_length, alg) !=
+            CRYPTO_ERROR_INVALID_KEY ||
+        !bytes_are(shared_a, sizeof(shared_a), 0u) ||
+        !bytes_are(ciphertext, ciphertext_length, 0u))
+        goto done;
+    public_key[0] = saved_first;
+    public_key[1] = saved_second;
+
+    /* Decapsulation validates H(embedded public key) before PKE work. */
+    embedded_public_key_offset =
+        private_key_length - public_key_length - 64u;
+    private_key[embedded_public_key_offset] ^= 1u;
+    memset(shared_b, 0xa5, sizeof(shared_b));
+    if (CRYPTO_ML_KEM_DECAPS(private_key, private_key_length,
+                             ciphertext, ciphertext_length, shared_b,
+                             alg) != CRYPTO_ERROR_INVALID_KEY ||
+        !bytes_are(shared_b, sizeof(shared_b), 0u))
+        goto done;
+    private_key[embedded_public_key_offset] ^= 1u;
+
+    private_key[private_key_length - 64u] ^= 1u;
+    memset(shared_b, 0xa5, sizeof(shared_b));
+    if (CRYPTO_ML_KEM_DECAPS(private_key, private_key_length,
+                             ciphertext, ciphertext_length, shared_b,
+                             alg) != CRYPTO_ERROR_INVALID_KEY ||
+        !bytes_are(shared_b, sizeof(shared_b), 0u))
+        goto done;
+    private_key[private_key_length - 64u] ^= 1u;
+
+    /* Actual input/output regions must not overlap; rejection is non-mutating. */
+    memcpy(overlap_snapshot, public_key, public_key_length);
+    if (CRYPTO_ML_KEM_ENCAPS(public_key, public_key_length, public_key,
+                             ciphertext, ciphertext_length, alg) !=
+            CRYPTO_ERROR_INVALID_ARGUMENT ||
+        memcmp(public_key, overlap_snapshot, public_key_length) != 0)
+        goto done;
+
+    memcpy(overlap_snapshot, public_key, public_key_length);
+    memset(shared_a, 0xa5, sizeof(shared_a));
+    if (CRYPTO_ML_KEM_ENCAPS(public_key, public_key_length, shared_a,
+                             public_key, ciphertext_length, alg) !=
+            CRYPTO_ERROR_INVALID_ARGUMENT ||
+        memcmp(public_key, overlap_snapshot, public_key_length) != 0 ||
+        !bytes_are(shared_a, sizeof(shared_a), 0xa5u))
+        goto done;
+
+    memset(ciphertext, 0xa5, ciphertext_length);
+    memcpy(overlap_snapshot, ciphertext, ciphertext_length);
+    if (CRYPTO_ML_KEM_ENCAPS(public_key, public_key_length, ciphertext,
+                             ciphertext, ciphertext_length, alg) !=
+            CRYPTO_ERROR_INVALID_ARGUMENT ||
+        memcmp(ciphertext, overlap_snapshot, ciphertext_length) != 0)
+        goto done;
+
+    memcpy(overlap_snapshot, private_key, private_key_length);
+    if (CRYPTO_ML_KEM_DECAPS(private_key, private_key_length,
+                             ciphertext, ciphertext_length, private_key,
+                             alg) != CRYPTO_ERROR_INVALID_ARGUMENT ||
+        memcmp(private_key, overlap_snapshot, private_key_length) != 0)
+        goto done;
+
+    memcpy(overlap_snapshot, ciphertext, ciphertext_length);
+    if (CRYPTO_ML_KEM_DECAPS(private_key, private_key_length,
+                             ciphertext, ciphertext_length, ciphertext,
+                             alg) != CRYPTO_ERROR_INVALID_ARGUMENT ||
+        memcmp(ciphertext, overlap_snapshot, ciphertext_length) != 0)
+        goto done;
+
+    memset(private_key, 0xa5, private_key_length);
+    if (CRYPTO_ML_KEM_KEYGEN(private_key, public_key_length,
+                             private_key, private_key_length, alg) !=
+            CRYPTO_ERROR_INVALID_ARGUMENT ||
+        !bytes_are(private_key, private_key_length, 0xa5u))
+        goto done;
+
     failed = 0;
 
 done:
@@ -274,6 +444,7 @@ int main(void) {
     if (test_aead()) { fputs("AEAD unit test failed\n", stderr); return 1; }
     if (test_bignum()) { fputs("bignum unit test failed\n", stderr); return 1; }
     if (test_rsa()) { fputs("RSA unit test failed\n", stderr); return 1; }
+    if (test_elgamal()) { fputs("ElGamal unit test failed\n", stderr); return 1; }
     for (i = 0u; i < sizeof(ml_kem_algorithms) / sizeof(ml_kem_algorithms[0]); ++i) {
         if (test_ml_kem(ml_kem_algorithms[i])) {
             fprintf(stderr, "ML-KEM algorithm %d unit test failed\n",
