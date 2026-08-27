@@ -1,0 +1,152 @@
+name: Diagnose HAETAE FFT rejection runtime
+
+on:
+  push:
+    branches:
+      - fix/haetae-portable-arithmetic-final
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/haetae-portable-arithmetic-final
+
+      - name: Reproduce experimental FFT patch
+        shell: python
+        run: |
+          from pathlib import Path
+          workflow = Path('.github/workflows/haetae-portable-arithmetic.yml').read_text()
+          start_marker = '      - name: Apply portable codec, reduction, and FFT fixes\n'
+          end_marker = '      - name: Validate HAETAE build and tests\n'
+          start = workflow.index(start_marker)
+          run_pos = workflow.index('        run: |\n', start) + len('        run: |\n')
+          end = workflow.index(end_marker, run_pos)
+          lines = workflow[run_pos:end].splitlines()
+          script = '\n'.join(line[10:] if line.startswith('          ') else line for line in lines)
+          exec(compile(script, '<embedded-patch>', 'exec'), {})
+
+      - name: Add diagnostic tracing
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p = Path('tests/DigitalSignature/HAETAE/UnitTest.c')
+          t = p.read_text()
+          t = t.replace(
+              '    error = CRYPTO_HAETAE_KEYGEN(\n',
+              '    fprintf(stderr, "HAETAE unit: keygen start alg=%d\\n", (int)alg);\n'
+              '    fflush(stderr);\n'
+              '    error = CRYPTO_HAETAE_KEYGEN(\n')
+          t = t.replace(
+              '    if (error != CRYPTO_SUCCESS) goto cleanup;\n    error = CRYPTO_HAETAE_SIGN(',
+              '    fprintf(stderr, "HAETAE unit: keygen done alg=%d err=%d\\n", (int)alg, (int)error);\n'
+              '    fflush(stderr);\n'
+              '    if (error != CRYPTO_SUCCESS) goto cleanup;\n'
+              '    error = CRYPTO_HAETAE_SIGN(')
+          p.write_text(t)
+
+          p = Path('src/DigitalSignature/HAETAE/haetae.c')
+          t = p.read_text()
+          if '#include <stdio.h>' not in t:
+              marker = '#include <stdlib.h>\n'
+              if marker in t:
+                  t = t.replace(marker, marker + '#include <stdio.h>\n', 1)
+              else:
+                  t = '#include <stdio.h>\n' + t
+
+          needle = '''        squared_singular_value = crypto_haetae_polyvecmk_sqsing_value(
+            &workspace->s1, &workspace->s2, parameters);
+        if ((double)squared_singular_value >
+            parameters->gamma * parameters->gamma *
+                (double)CRYPTO_HAETAE_N) {
+            goto reject_with_rounding;
+        }
+'''
+          repl = '''        squared_singular_value = crypto_haetae_polyvecmk_sqsing_value(
+            &workspace->s1, &workspace->s2, parameters);
+        {
+            static unsigned int fft_diag_rounding = 0u;
+            if (fft_diag_rounding < 24u) {
+                fprintf(stderr,
+                        "HAETAE diag rounding alg=%d sq=%lld limit=%.3f reject=%d\\n",
+                        (int)parameters->algorithm,
+                        squared_singular_value,
+                        parameters->gamma * parameters->gamma *
+                            (double)CRYPTO_HAETAE_N,
+                        (double)squared_singular_value >
+                            parameters->gamma * parameters->gamma *
+                                (double)CRYPTO_HAETAE_N);
+                fflush(stderr);
+                ++fft_diag_rounding;
+            }
+        }
+        if ((double)squared_singular_value >
+            parameters->gamma * parameters->gamma *
+                (double)CRYPTO_HAETAE_N) {
+            goto reject_with_rounding;
+        }
+'''
+          if needle not in t:
+              raise RuntimeError('rounding rejection block not found')
+          t = t.replace(needle, repl, 1)
+
+          needle = '''        squared_singular_value = crypto_haetae_polyvecmk_sqsing_value(
+            &workspace->s1, &workspace->s2, parameters);
+        if ((double)squared_singular_value >
+            parameters->gamma * parameters->gamma *
+                (double)CRYPTO_HAETAE_N) {
+            goto reject_without_rounding;
+        }
+'''
+          repl = '''        squared_singular_value = crypto_haetae_polyvecmk_sqsing_value(
+            &workspace->s1, &workspace->s2, parameters);
+        {
+            static unsigned int fft_diag_no_rounding = 0u;
+            if (fft_diag_no_rounding < 24u) {
+                fprintf(stderr,
+                        "HAETAE diag no-rounding alg=%d sq=%lld limit=%.3f reject=%d\\n",
+                        (int)parameters->algorithm,
+                        squared_singular_value,
+                        parameters->gamma * parameters->gamma *
+                            (double)CRYPTO_HAETAE_N,
+                        (double)squared_singular_value >
+                            parameters->gamma * parameters->gamma *
+                                (double)CRYPTO_HAETAE_N);
+                fflush(stderr);
+                ++fft_diag_no_rounding;
+            }
+        }
+        if ((double)squared_singular_value >
+            parameters->gamma * parameters->gamma *
+                (double)CRYPTO_HAETAE_N) {
+            goto reject_without_rounding;
+        }
+'''
+          if needle not in t:
+              raise RuntimeError('no-rounding rejection block not found')
+          t = t.replace(needle, repl, 1)
+          p.write_text(t)
+
+      - name: Build diagnostic binary
+        shell: bash
+        run: |
+          cmake -S . -B build -DBUILD_SHARED_LIBS=ON -DCRYPTO_BUILD_TESTS=ON
+          cmake --build build -j2
+
+      - name: Run HAETAE unit with timeout
+        shell: bash
+        run: |
+          set +e
+          timeout 90s ./build/crypto_haetae_unit
+          rc=$?
+          echo "HAETAE diagnostic unit exit=$rc"
+          if [ "$rc" -eq 124 ]; then
+            echo "HAETAE unit timed out after 90 seconds"
+          fi
+          exit 0
