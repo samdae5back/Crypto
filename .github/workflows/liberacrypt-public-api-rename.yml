@@ -79,14 +79,19 @@ jobs:
           cmake --build consumer-build --config Release -j2
           PATH="$PWD/install/bin:$PATH" ./consumer-build/Release/consumer.exe
 
-      - name: Commit rename
+      - name: Commit source rename only
         run: |
+          rm -rf build install consumer consumer-build
+          git checkout -- .github/workflows
           rm .github/liberacrypt_public_api_rename.py
           rm .github/liberacrypt_public_api_post.py
-          rm .github/workflows/liberacrypt-public-api-rename.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "refactor(api): rename public surface to LiberaCrypt" \
-            -m "Rename public functions, macros, and algorithm selectors to LIBERAC_; public types to LiberaC*; the umbrella header to LiberaCrypt.h; the CMake package and target to LiberaCrypt::LiberaCrypt; and the library output to liberacrypt. Keep unrelated vendored and private implementation namespaces intact. Validate the installed package with a standalone consumer and representative tests."
-          git push origin HEAD:rename/liberacrypt-public-api
+          git add -A -- README.md CMakeLists.txt cmake inc src tests \
+            .github/liberacrypt_public_api_rename.py \
+            .github/liberacrypt_public_api_post.py
+          if ! git diff --cached --quiet; then
+            git commit -m "refactor(api): rename public surface to LiberaCrypt" \
+              -m "Rename public functions, macros, and algorithm selectors to LIBERAC_; public types to LiberaC*; the umbrella header to LiberaCrypt.h; the CMake package and target to LiberaCrypt::LiberaCrypt; and the library output to liberacrypt. Keep unrelated vendored and private implementation namespaces intact. Validate the installed package with a standalone consumer and representative tests."
+            git push origin HEAD:rename/liberacrypt-public-api
+          fi
