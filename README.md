@@ -192,4 +192,14 @@ directories so a checkout is directly buildable. Their original license files
 are retained next to the source. See `THIRD_PARTY_NOTICES.md` for provenance and
 the upstream revisions used.
 
-The top-level project is licensed under the terms in `LICENSE`.
+## License
+
+Copyright (C) 2026 Myungjun Kim.
+
+Except for the separately identified third-party components, this project's
+original source code is licensed under the GNU Affero General Public License,
+version 3 only (`AGPL-3.0-only`). See `LICENSE` for the complete terms.
+
+The vendored ML-DSA and SLH-DSA sources remain available under their respective
+upstream licenses described in `THIRD_PARTY_NOTICES.md`; those notices and
+license grants are not replaced by the project's AGPL license.
