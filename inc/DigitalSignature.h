@@ -243,7 +243,7 @@ CRYPTO_API CryptoError CRYPTO_AIMER_KEYGEN(uint8_t *PUBLIC_KEY, size_t PUBLIC_KE
 /**
  * @brief Sign a message with randomized AIMer.
  * @param[in] PRIVATE_KEY Encoded private key selected by ALG.
- * @param[in] PRIVATE_KEY_LENGTH Available private-key bytes.
+ * @param[in] PRIVATE_KEY_LENGTH Exact encoded private-key size for ALG.
  * @param[in] MESSAGE Message bytes; may be null only for an empty message.
  * @param[in] MESSAGE_LENGTH Message length in bytes.
  * @param[in] CONTEXT Optional domain-separation context.
@@ -259,7 +259,7 @@ CRYPTO_API CryptoError CRYPTO_AIMER_SIGN(const uint8_t *PRIVATE_KEY, size_t PRIV
 /**
  * @brief Verify an AIMer signature.
  * @param[in] PUBLIC_KEY Encoded public key selected by ALG.
- * @param[in] PUBLIC_KEY_LENGTH Available public-key bytes.
+ * @param[in] PUBLIC_KEY_LENGTH Exact encoded public-key size for ALG.
  * @param[in] MESSAGE Message bytes; may be null only for an empty message.
  * @param[in] MESSAGE_LENGTH Message length in bytes.
  * @param[in] CONTEXT Domain-separation context used while signing.
@@ -307,7 +307,7 @@ CRYPTO_API CryptoError CRYPTO_HAETAE_KEYGEN(uint8_t *PUBLIC_KEY, size_t PUBLIC_K
 /**
  * @brief Sign a message with randomized HAETAE.
  * @param[in] PRIVATE_KEY Encoded private key selected by ALG.
- * @param[in] PRIVATE_KEY_LENGTH Available private-key bytes.
+ * @param[in] PRIVATE_KEY_LENGTH Exact encoded private-key size for ALG.
  * @param[in] MESSAGE Message bytes; may be null only for an empty message.
  * @param[in] MESSAGE_LENGTH Message length in bytes.
  * @param[in] CONTEXT Optional domain-separation context.
@@ -323,7 +323,7 @@ CRYPTO_API CryptoError CRYPTO_HAETAE_SIGN(const uint8_t *PRIVATE_KEY, size_t PRI
 /**
  * @brief Verify a HAETAE signature.
  * @param[in] PUBLIC_KEY Encoded public key selected by ALG.
- * @param[in] PUBLIC_KEY_LENGTH Available public-key bytes.
+ * @param[in] PUBLIC_KEY_LENGTH Exact encoded public-key size for ALG.
  * @param[in] MESSAGE Message bytes; may be null only for an empty message.
  * @param[in] MESSAGE_LENGTH Message length in bytes.
  * @param[in] CONTEXT Domain-separation context used while signing.
