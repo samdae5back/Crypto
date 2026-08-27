@@ -1,0 +1,510 @@
+name: Apply HAETAE portable arithmetic fixes
+
+on:
+  push:
+    branches:
+      - fix/haetae-portable-arithmetic-final
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/haetae-portable-arithmetic-final
+          fetch-depth: 0
+
+      - name: Apply portable codec, reduction, and FFT fixes
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def read(path):
+              return Path(path).read_text(encoding="utf-8")
+
+          def write(path, text):
+              Path(path).write_text(text, encoding="utf-8")
+
+          def replace_exact(text, old, new, expected=1):
+              count = text.count(old)
+              if count != expected:
+                  raise RuntimeError(
+                      f"expected {expected} occurrence(s), found {count}: {old!r}")
+              return text.replace(old, new)
+
+          # ------------------------------------------------------------------
+          # Low-bit codec: decompose_z1 emits coefficients in [-128, 127].
+          # Encode modulo 256 and decode the signed byte mathematically so the
+          # representation is independent of whether plain char is signed on
+          # the target (notably AIX/Power defaults encountered by this port).
+          # ------------------------------------------------------------------
+          path = "src/DigitalSignature/HAETAE/haetae_poly.c"
+          text = read(path)
+          old = '''void crypto_haetae_poly_decomposed_pack(uint8_t  *buf, const crypto_haetae_poly *a) {
+              unsigned int i;
+              for (i = 0; i < CRYPTO_HAETAE_N; i++) {
+                  buf[i] = a->coeffs[i];
+              }
+          }
+
+          //The type "char" is "unsigned char" by default in AIX-Power. If you need "signed char", use "signed char" instead of "char".
+          void crypto_haetae_poly_decomposed_unpack(crypto_haetae_poly *a, const uint8_t  *buf) {
+              unsigned int i;
+              for (i = 0; i < CRYPTO_HAETAE_N; i++) {
+                  a->coeffs[i] = (signed char)buf[i];
+              }
+          }
+          '''
+          new = '''/*
+           * crypto_haetae_decompose_z1 centers the low byte in [-128, 127].
+           * Store that value modulo 256 and reconstruct the signed value with
+           * integer arithmetic. This keeps the wire format independent of the
+           * implementation-defined signedness/representation of char.
+           */
+          void crypto_haetae_poly_decomposed_pack(uint8_t *buf,
+                                                   const crypto_haetae_poly *a) {
+              unsigned int i;
+              for (i = 0; i < CRYPTO_HAETAE_N; i++) {
+                  buf[i] = (uint8_t)a->coeffs[i];
+              }
+          }
+
+          void crypto_haetae_poly_decomposed_unpack(crypto_haetae_poly *a,
+                                                     const uint8_t *buf) {
+              unsigned int i;
+              for (i = 0; i < CRYPTO_HAETAE_N; i++) {
+                  const uint32_t encoded = (uint32_t)buf[i];
+                  a->coeffs[i] = (int32_t)encoded -
+                      (int32_t)((encoded >> 7) << 8);
+              }
+          }
+          '''
+          text = replace_exact(text, old, new)
+          write(path, text)
+
+          # ------------------------------------------------------------------
+          # Reduction: preserve the upstream arithmetic intent without relying
+          # on arithmetic right shift of negative signed integers or on an
+          # out-of-range uint32/int32 bit-pattern conversion.
+          # ------------------------------------------------------------------
+          path = "src/DigitalSignature/HAETAE/haetae_reduce.c"
+          text = '''// SPDX-License-Identifier: MIT
+
+          #include "haetae_reduce.h"
+          #include "Util/Bit/bit_internal.h"
+
+          static inline int64_t crypto_haetae_sign_mask_i64(int64_t value) {
+              return -(int64_t)((uint64_t)value >> 63);
+          }
+
+          static inline int32_t crypto_haetae_sign_mask_i32(int32_t value) {
+              return -(int32_t)((uint32_t)value >> 31);
+          }
+
+          /*************************************************
+           * Name:        montgomery_reduce for haetae
+           *
+           * Description: For finite field element a with -2^{31}Q <= a <= Q*2^31,
+           *              compute r \\equiv a*2^{-32} (mod Q) such that -Q < r < Q.
+           *
+           * Arguments: - long long a: finite field element
+           *
+           * Returns r.
+           **************************************************/
+          int crypto_haetae_montgomery_reduce(long long a) {
+              const int64_t a64 = (int64_t)a;
+              const uint32_t t_bits =
+                  (uint32_t)a64 * (uint32_t)CRYPTO_HAETAE_Q_INVERSE;
+              const int64_t t =
+                  (int64_t)(t_bits & UINT32_C(0x7fffffff)) -
+                  (int64_t)(t_bits & UINT32_C(0x80000000));
+              const int64_t numerator =
+                  a64 - t * (int64_t)CRYPTO_HAETAE_Q;
+              const int64_t reduced =
+                  crypto_floor_div_pow2_i64(numerator, 32u);
+
+              /* numerator is a multiple of 2^32 by the Montgomery construction. */
+              return (int)reduced;
+          }
+
+          /*************************************************
+           * Name:        caddq
+           *
+           * Description: Add Q if input coefficient is negative.
+           *
+           * Arguments: - int a: finite field element
+           *
+           * Returns r.
+           **************************************************/
+          int crypto_haetae_caddq(int a) {
+              const int32_t value = (int32_t)a;
+              return (int)(value +
+                  (crypto_haetae_sign_mask_i32(value) & CRYPTO_HAETAE_Q));
+          }
+
+          /*************************************************
+           * Name:        freeze
+           *
+           * Description: For finite field element a, compute standard
+           *              representative r = a mod^+ Q.
+           *
+           * Arguments: - int a: finite field element
+           *
+           * Returns r.
+           **************************************************/
+          int crypto_haetae_freeze(int a) {
+              int64_t t = (int64_t)a * CRYPTO_HAETAE_Q_RECIPROCAL;
+
+              t = crypto_floor_div_pow2_i64(t, 32u);
+              t = (int64_t)a - t * CRYPTO_HAETAE_Q; /* -2Q < t < 2Q */
+              t += crypto_haetae_sign_mask_i64(t) &
+                   CRYPTO_HAETAE_DOUBLE_Q;           /* 0 <= t < 2Q */
+              t -= ~crypto_haetae_sign_mask_i64(t - CRYPTO_HAETAE_Q) &
+                   CRYPTO_HAETAE_Q;                  /* 0 <= t < Q */
+              return (int)t;
+          }
+
+          /*************************************************
+           * Name:        reduce32_2q
+           *
+           * Description: compute centered reduction modulo 2Q.
+           *
+           * Arguments: - int a: finite field element
+           *
+           * Returns r.
+           **************************************************/
+          int crypto_haetae_reduce32_2q(int a) {
+              int64_t t =
+                  (int64_t)a * CRYPTO_HAETAE_DOUBLE_Q_RECIPROCAL;
+
+              t = crypto_floor_div_pow2_i64(t, 32u);
+              t = (int64_t)a - t * CRYPTO_HAETAE_DOUBLE_Q; /* -4Q < t < 4Q */
+              t += crypto_haetae_sign_mask_i64(t) &
+                   (CRYPTO_HAETAE_DOUBLE_Q * 2);            /* 0 <= t < 4Q */
+              t -= ~crypto_haetae_sign_mask_i64(
+                       t - CRYPTO_HAETAE_DOUBLE_Q) &
+                   CRYPTO_HAETAE_DOUBLE_Q;                 /* 0 <= t < 2Q */
+              t -= ~crypto_haetae_sign_mask_i64(t - CRYPTO_HAETAE_Q) &
+                   CRYPTO_HAETAE_DOUBLE_Q;                 /* -Q <= t < Q */
+              return (int)t;
+          }
+
+          /*************************************************
+           * Name:        freeze2q
+           *
+           * Description: For finite field element a, compute standard
+           *              representative r = a mod^+ 2Q.
+           *
+           * Arguments: - int a: finite field element
+           *
+           * Returns r.
+           **************************************************/
+          int crypto_haetae_freeze2q(int a) {
+              int64_t t =
+                  (int64_t)a * CRYPTO_HAETAE_DOUBLE_Q_RECIPROCAL;
+
+              t = crypto_floor_div_pow2_i64(t, 32u);
+              t = (int64_t)a - t * CRYPTO_HAETAE_DOUBLE_Q; /* -4Q < t < 4Q */
+              t += crypto_haetae_sign_mask_i64(t) &
+                   (CRYPTO_HAETAE_DOUBLE_Q * 2);            /* 0 <= t < 4Q */
+              t -= ~crypto_haetae_sign_mask_i64(
+                       t - CRYPTO_HAETAE_DOUBLE_Q) &
+                   CRYPTO_HAETAE_DOUBLE_Q;                 /* 0 <= t < 2Q */
+              return (int)t;
+          }
+          '''
+          # Strip the workflow indentation from the complete replacement file.
+          text = "\n".join(line[10:] if line.startswith("          ") else line
+                           for line in text.splitlines()) + "\n"
+          write(path, text)
+
+          # ------------------------------------------------------------------
+          # FFT: the key-generation path only transforms secret coefficients
+          # with |c| <= 2. ETA is 1; for d=0 s2 is an ETA sample, and for d=1
+          # s2 = e_gen - b0 with |e_gen| <= 1 and |b0| <= 1.
+          # Roots are Q16 with component magnitude <= 2^16.
+          #
+          # Initial component bound B0 = 2 * 2^16 = 131072.
+          # If a stage input has component bound B, Q16 multiplication by one
+          # root component stays <= B after rounding; a complex product
+          # component is <= 2B, and the butterfly u +/- t is <= 3B.
+          # Eight radix-2 stages therefore give B8 <= 3^8 B0 = 859963392,
+          # below INT32_MAX. Squared magnitudes, however, need more than 32
+          # bits, so keep the Q16 multiply wide for sqabs and widen the norm
+          # accumulator path.
+          # ------------------------------------------------------------------
+          path = "src/DigitalSignature/HAETAE/haetae_fft.h"
+          text = read(path)
+          text = replace_exact(
+              text,
+              "#define CRYPTO_HAETAE_FFT_LOG_N 8\n",
+              "#define CRYPTO_HAETAE_FFT_LOG_N 8\n"
+              "#define CRYPTO_HAETAE_FFT_COMPONENT_BOUND UINT64_C(859963392)\n"
+              "#define CRYPTO_HAETAE_FFT_SQABS_BOUND UINT64_C(22568879259648)\n")
+          text = replace_exact(
+              text,
+              "int crypto_haetae_complex_fp_sqabs(crypto_haetae_complex_fp32_16 x);",
+              "uint64_t crypto_haetae_complex_fp_sqabs(crypto_haetae_complex_fp32_16 x);")
+          write(path, text)
+
+          path = "src/DigitalSignature/HAETAE/haetae_fft.c"
+          text = read(path)
+          text = replace_exact(
+              text,
+              '#include "haetae_fft.h"\n',
+              '#include "haetae_fft.h"\n#include "Util/Bit/bit_internal.h"\n')
+
+          helper_start = text.index("static inline int32_t _mulrnd16")
+          helper_end = text.index("/****************************************************************************\n * To generate values in Phython:", helper_start)
+          new_helpers = '''/*
+           * Range proof for the fixed-point FFT used by the key-rejection test.
+           *
+           * Current HAETAE parameters have ETA = 1 and D <= 1. Therefore the
+           * sampled s1 coefficients have |c| <= 1; s2 has |c| <= 1 for D = 0,
+           * and for D = 1 it is e_gen - b0 with both terms bounded by one, so
+           * every polynomial passed to this FFT has |c| <= 2.
+           *
+           * The root table is Q16 and every real/imaginary root component has
+           * magnitude <= 2^16. fft_bitrev therefore starts with
+           * B0 = 2 * 2^16 = 131072 for each real/imaginary component.
+           *
+           * Assume one FFT stage starts with component bound B. For a Q16
+           * scalar product round((x*y)/2^16), |y| <= 2^16 implies the rounded
+           * result is still bounded by B. Each complex-product component is a
+           * sum/difference of two such products and is bounded by 2B. The
+           * radix-2 butterfly then computes u +/- t and is bounded by 3B.
+           * Hence after eight stages B8 <= 3^8 * B0 = 859963392 < INT32_MAX.
+           * This is deliberately looser than the usual radix-2 FFT growth bound
+           * but follows directly from the source operations and also covers Q16
+           * rounding.
+           *
+           * Squaring an FFT component does not fit int32_t in that conservative
+           * range. Keep multiplication in int64_t and return sqabs as uint64_t.
+           */
+          _Static_assert(CRYPTO_HAETAE_ETA == 1,
+                         "FFT input proof assumes HAETAE ETA = 1");
+          _Static_assert(CRYPTO_HAETAE_MAX_D <= 1,
+                         "FFT input proof assumes D <= 1");
+          _Static_assert(CRYPTO_HAETAE_FFT_N == 256,
+                         "FFT range proof assumes a 256-point transform");
+          _Static_assert(CRYPTO_HAETAE_FFT_LOG_N == 8,
+                         "FFT range proof assumes eight radix-2 stages");
+          _Static_assert(CRYPTO_HAETAE_FFT_COMPONENT_BOUND ==
+                             UINT64_C(131072) * UINT64_C(6561),
+                         "FFT component bound must match 3^8 * B0");
+          _Static_assert(CRYPTO_HAETAE_FFT_COMPONENT_BOUND <= INT32_MAX,
+                         "FFT components must fit int32_t");
+          _Static_assert(
+              CRYPTO_HAETAE_FFT_COMPONENT_BOUND <=
+                  (uint64_t)(INT64_MAX - (INT64_C(1) << 15)) /
+                      CRYPTO_HAETAE_FFT_COMPONENT_BOUND,
+              "FFT squared product must fit int64_t");
+          _Static_assert(
+              CRYPTO_HAETAE_FFT_SQABS_BOUND ==
+                  UINT64_C(2) *
+                      ((CRYPTO_HAETAE_FFT_COMPONENT_BOUND *
+                            CRYPTO_HAETAE_FFT_COMPONENT_BOUND +
+                        (UINT64_C(1) << 15)) /
+                       (UINT64_C(1) << 16)),
+              "FFT sqabs bound must match the Q16 rounding rule");
+
+          static inline int64_t crypto_haetae_mulrnd16_wide(
+              const int32_t x, const int32_t y) {
+              const int64_t product =
+                  (int64_t)x * (int64_t)y + (INT64_C(1) << 15);
+              return crypto_floor_div_pow2_i64(product, 16u);
+          }
+
+          static inline int32_t _complex_mul_real(
+              const crypto_haetae_complex_fp32_16 x,
+              const crypto_haetae_complex_fp32_16 y) {
+              const int64_t value =
+                  crypto_haetae_mulrnd16_wide(x.real, y.real) -
+                  crypto_haetae_mulrnd16_wide(x.imag, y.imag);
+              return (int32_t)value;
+          }
+
+          static inline int32_t _complex_mul_imag(
+              const crypto_haetae_complex_fp32_16 x,
+              const crypto_haetae_complex_fp32_16 y) {
+              const int64_t value =
+                  crypto_haetae_mulrnd16_wide(x.real, y.imag) +
+                  crypto_haetae_mulrnd16_wide(x.imag, y.real);
+              return (int32_t)value;
+          }
+
+          static void _complex_mul(
+              crypto_haetae_complex_fp32_16 *r,
+              const crypto_haetae_complex_fp32_16 x,
+              const crypto_haetae_complex_fp32_16 y) {
+              r->real = _complex_mul_real(x, y);
+              r->imag = _complex_mul_imag(x, y);
+          }
+
+          '''
+          text = text[:helper_start] + new_helpers + text[helper_end:]
+
+          old_sqabs = '''int32_t crypto_haetae_complex_fp_sqabs(crypto_haetae_complex_fp32_16 x) {
+            return _mulrnd16(x.real, x.real) + _mulrnd16(x.imag, x.imag);
+          }
+          '''
+          new_sqabs = '''uint64_t crypto_haetae_complex_fp_sqabs(
+              crypto_haetae_complex_fp32_16 x) {
+            const int64_t real_sq = crypto_haetae_mulrnd16_wide(x.real, x.real);
+            const int64_t imag_sq = crypto_haetae_mulrnd16_wide(x.imag, x.imag);
+
+            return (uint64_t)real_sq + (uint64_t)imag_sq;
+          }
+          '''
+          text = replace_exact(text, old_sqabs, new_sqabs)
+          write(path, text)
+
+          # ------------------------------------------------------------------
+          # Singular-value accumulation. The conservative FFT sqabs bound above
+          # is ~2.26e13. At most (MAX_L-1)+MAX_K = 10 secret polynomials are
+          # accumulated, so all sums remain below 2^63. Use uint64_t to avoid
+          # narrowing and retain branchless compare/swap using that <2^63 bound.
+          # ------------------------------------------------------------------
+          path = "src/DigitalSignature/HAETAE/haetae_polyvec.c"
+          text = read(path)
+          minmax_start = text.index("static void minmax(int* x, int* y)")
+          singular_start = text.index(
+              "long long crypto_haetae_polyvecmk_sqsing_value", minmax_start)
+          singular_end = text.index("/*************************************************", singular_start)
+          replacement = '''#define CRYPTO_HAETAE_FFT_SECRET_POLY_COUNT_MAX \\
+              ((CRYPTO_HAETAE_MAX_L - 1u) + CRYPTO_HAETAE_MAX_K)
+          #define CRYPTO_HAETAE_FFT_SUM_BOUND \\
+              (CRYPTO_HAETAE_FFT_SQABS_BOUND * \\
+               CRYPTO_HAETAE_FFT_SECRET_POLY_COUNT_MAX)
+          #define CRYPTO_HAETAE_FFT_BESTM_COUNT_MAX \\
+              (CRYPTO_HAETAE_N / CRYPTO_HAETAE_MIN_TAU + 1u)
+          #define CRYPTO_HAETAE_FFT_RESULT_ACC_BOUND \\
+              (CRYPTO_HAETAE_FFT_BESTM_COUNT_MAX * \\
+               (((CRYPTO_HAETAE_FFT_SUM_BOUND + UINT64_C(0x10200)) >> 10) * \\
+                CRYPTO_HAETAE_N))
+
+          _Static_assert(CRYPTO_HAETAE_FFT_SUM_BOUND < (UINT64_C(1) << 63),
+                         "FFT norm sums must stay below 2^63");
+          _Static_assert(CRYPTO_HAETAE_FFT_RESULT_ACC_BOUND <
+                             (UINT64_C(1) << 63),
+                         "FFT singular-value accumulator must fit int64_t");
+
+          static void minmax_u64(uint64_t *x, uint64_t *y) {
+              const uint64_t a = *x;
+              const uint64_t b = *y;
+              /*
+               * a,b < 2^63 by the bound above. Thus b-a has its high bit set
+               * exactly when b < a, even when the unsigned subtraction wraps.
+               */
+              const uint64_t swap_mask =
+                  UINT64_C(0) - ((b - a) >> 63);
+              const uint64_t delta = (a ^ b) & swap_mask;
+              *x = a ^ delta;
+              *y = b ^ delta;
+          }
+
+          long long crypto_haetae_polyvecmk_sqsing_value(
+              const crypto_haetae_polyvecm* s1,
+              const crypto_haetae_polyveck* s2,
+              const crypto_haetae_parameters *parameters) {
+              uint64_t res = 0;
+              crypto_haetae_complex_fp32_16 input[CRYPTO_HAETAE_FFT_N] = {{0, 0}};
+
+              size_t i, j;
+              const uint32_t haetae_k = parameters->k;
+              const uint32_t haetae_m = parameters->l - 1u;
+              const uint32_t haetae_tau = parameters->tau;
+              const size_t bestm_size = CRYPTO_HAETAE_N / haetae_tau + 1u;
+
+              uint64_t sum[CRYPTO_HAETAE_N] = {0};
+              uint64_t min = 0;
+              uint64_t bestm[BESTM_MAX_SIZE] = {0};
+              memset(bestm, 0, bestm_size * sizeof(uint64_t));
+
+              for (i = 0; i < haetae_m; ++i) {
+                  crypto_haetae_fft_bitrev(input, &s1->vec[i]);
+                  crypto_haetae_fft(input);
+                  for (j = 0; j < CRYPTO_HAETAE_N; j++) {
+                      sum[j] += crypto_haetae_complex_fp_sqabs(input[j]);
+                  }
+              }
+
+              for (i = 0; i < haetae_k; ++i) {
+                  crypto_haetae_fft_bitrev(input, &s2->vec[i]);
+                  crypto_haetae_fft(input);
+                  for (j = 0; j < CRYPTO_HAETAE_N; j++) {
+                      sum[j] += crypto_haetae_complex_fp_sqabs(input[j]);
+                  }
+              }
+
+              for (i = 0; i < bestm_size; ++i) {
+                  bestm[i] = sum[i];
+              }
+              for (i = bestm_size; i < CRYPTO_HAETAE_N; i++) {
+                  for (j = 0; j < bestm_size; j++) {
+                      minmax_u64(&sum[i], &bestm[j]);
+                  }
+              }
+
+              min = bestm[0];
+              for (i = 1; i < bestm_size; i++) {
+                  uint64_t tmp = bestm[i];
+                  minmax_u64(&min, &tmp);
+              }
+
+              for (i = 0; i < bestm_size; i++) {
+                  const uint64_t difference = min ^ bestm[i];
+                  const uint64_t nonzero =
+                      (difference | (UINT64_C(0) - difference)) >> 63;
+                  const uint64_t different_mask = UINT64_C(0) - nonzero;
+                  const uint64_t fac =
+                      (different_mask & (uint64_t)haetae_tau) |
+                      (~different_mask &
+                       (uint64_t)(CRYPTO_HAETAE_N % haetae_tau));
+
+                  bestm[i] += UINT64_C(0x10200);
+                  bestm[i] >>= 10;
+                  bestm[i] *= fac;
+                  res += bestm[i];
+              }
+
+              return (long long)((res + UINT64_C(1 << 5)) >> 6);
+          }
+
+          '''
+          text = text[:minmax_start] + replacement + text[singular_end:]
+          write(path, text)
+
+          # Sanity guards: old implementation-defined constructs targeted by
+          # this patch must be gone from the changed areas.
+          reduce_text = read("src/DigitalSignature/HAETAE/haetae_reduce.c")
+          for bad in ["t = t >> 32", "t >>= 32", "a >> 31"]:
+              if bad in reduce_text:
+                  raise RuntimeError(f"signed-shift dependency remains: {bad}")
+          poly_text = read("src/DigitalSignature/HAETAE/haetae_poly.c")
+          if "(signed char)buf[i]" in poly_text:
+              raise RuntimeError("signed-char wire decode still present")
+          fft_text = read("src/DigitalSignature/HAETAE/haetae_fft.c")
+          if "return r >> 16" in fft_text or "_mulrnd16(" in fft_text:
+              raise RuntimeError("old narrow/signed-shift FFT helper still present")
+
+      - name: Validate HAETAE build and tests
+        shell: bash
+        run: |
+          cmake -S . -B build -DBUILD_SHARED_LIBS=ON -DCRYPTO_BUILD_TESTS=ON
+          cmake --build build -j2
+          ctest --test-dir build -L haetae --output-on-failure
+
+      - name: Commit portable arithmetic fixes
+        shell: bash
+        run: |
+          rm .github/workflows/haetae-portable-arithmetic.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/DigitalSignature/HAETAE .github/workflows/haetae-portable-arithmetic.yml
+          git commit -m "fix(haetae): make low-bit and fixed-point arithmetic portable" \
+            -m "Replace the AIX-sensitive signed-char low-bit decode with an explicit [-128,127] modulo-256 mapping. Rewrite Montgomery/Barrett reduction to preserve the upstream floor/sign-mask semantics without negative signed shifts or implementation-defined signed bit-pattern conversions. Prove the key-rejection FFT component range from |secret coefficient| <= 2, Q16 roots, and eight radix-2 stages: B0=131072 and B8<=3^8*B0=859963392<INT32_MAX. Keep Q16 multiplication wide for squared magnitudes and widen the singular-value accumulation because sqabs itself is not int32-bounded. Static assertions tie the proof to ETA=1, D<=1, N=256, and eight stages."
+          git push origin HEAD:fix/haetae-portable-arithmetic-final
