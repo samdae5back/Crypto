@@ -103,10 +103,34 @@ crypto_add_public_test(
     "unit;pqc;key-encapsulation;ml-kem"
 )
 crypto_add_public_test(
+    crypto_ntru_plus_unit
+    Crypto.KeyEncapsulation.NTRU-Plus.Unit
+    KeyEncapsulation/NTRU-Plus/UnitTest.c
+    "unit;pqc;key-encapsulation;ntru-plus"
+)
+crypto_add_public_test(
+    crypto_smaug_t_unit
+    Crypto.KeyEncapsulation.SMAUG-T.Unit
+    KeyEncapsulation/SMAUG-T/UnitTest.c
+    "unit;pqc;key-encapsulation;smaug-t"
+)
+crypto_add_public_test(
     crypto_ml_dsa_unit
     Crypto.DigitalSignature.ML-DSA.Unit
     DigitalSignature/ML-DSA/UnitTest.c
     "unit;pqc;digital-signature;ml-dsa"
+)
+crypto_add_public_test(
+    crypto_aimer_unit
+    Crypto.DigitalSignature.AIMer.Unit
+    DigitalSignature/AIMer/UnitTest.c
+    "unit;pqc;digital-signature;aimer"
+)
+crypto_add_public_test(
+    crypto_haetae_unit
+    Crypto.DigitalSignature.HAETAE.Unit
+    DigitalSignature/HAETAE/UnitTest.c
+    "unit;pqc;digital-signature;haetae"
 )
 crypto_add_public_test(
     crypto_slh_dsa_unit
@@ -159,6 +183,24 @@ add_executable(crypto_ml_dsa_kat
     Internal/KatReader.c
     Internal/SignatureKat.c
 )
+add_executable(crypto_aimer_kat
+    DigitalSignature/AIMer/KAT.c
+    Internal/KatReader.c
+)
+add_executable(crypto_haetae_kat
+    DigitalSignature/HAETAE/KAT.c
+    Internal/KatReader.c
+)
+add_executable(crypto_ntru_plus_kat
+    KeyEncapsulation/NTRU-Plus/KAT.c
+    Internal/KatReader.c
+    Internal/KemKat.c
+)
+add_executable(crypto_smaug_t_kat
+    KeyEncapsulation/SMAUG-T/KAT.c
+    Internal/KatReader.c
+    Internal/KemKat.c
+)
 add_executable(crypto_slh_dsa_kat
     DigitalSignature/SLH-DSA/KAT.c
     Internal/KatReader.c
@@ -166,7 +208,9 @@ add_executable(crypto_slh_dsa_kat
 )
 
 foreach(CRYPTO_PQC_KAT_TARGET
-        crypto_ml_kem_kat crypto_ml_dsa_kat crypto_slh_dsa_kat)
+        crypto_ml_kem_kat crypto_ntru_plus_kat crypto_smaug_t_kat
+        crypto_ml_dsa_kat crypto_aimer_kat crypto_haetae_kat
+        crypto_slh_dsa_kat)
     target_include_directories(${CRYPTO_PQC_KAT_TARGET} PRIVATE
         ${PROJECT_SOURCE_DIR}/inc
         ${PROJECT_SOURCE_DIR}/src
@@ -201,12 +245,68 @@ crypto_add_pqc_kat(Crypto.KeyEncapsulation.ML-KEM-768.KAT
 crypto_add_pqc_kat(Crypto.KeyEncapsulation.ML-KEM-1024.KAT
     crypto_ml_kem_kat mlkem1024.kat ML-KEM-1024 "key-encapsulation;ml-kem")
 
+crypto_add_pqc_kat(Crypto.KeyEncapsulation.NTRU-Plus-768.KAT
+    crypto_ntru_plus_kat ntruplus768.kat NTRU+768
+    "key-encapsulation;ntru-plus")
+crypto_add_pqc_kat(Crypto.KeyEncapsulation.NTRU-Plus-864.KAT
+    crypto_ntru_plus_kat ntruplus864.kat NTRU+864
+    "key-encapsulation;ntru-plus")
+crypto_add_pqc_kat(Crypto.KeyEncapsulation.NTRU-Plus-1152.KAT
+    crypto_ntru_plus_kat ntruplus1152.kat NTRU+1152
+    "key-encapsulation;ntru-plus")
+
+crypto_add_pqc_kat(Crypto.KeyEncapsulation.SMAUG-T-128.KAT
+    crypto_smaug_t_kat smaugt128_v1_2_0.kat SMAUG-T-128
+    "key-encapsulation;smaug-t")
+crypto_add_pqc_kat(Crypto.KeyEncapsulation.SMAUG-T-192.KAT
+    crypto_smaug_t_kat smaugt192_v1_2_0.kat SMAUG-T-192
+    "key-encapsulation;smaug-t")
+crypto_add_pqc_kat(Crypto.KeyEncapsulation.SMAUG-T-256.KAT
+    crypto_smaug_t_kat smaugt256_v1_2_0.kat SMAUG-T-256
+    "key-encapsulation;smaug-t")
+
 crypto_add_pqc_kat(Crypto.DigitalSignature.ML-DSA-44.KAT
     crypto_ml_dsa_kat mldsa44.kat ML-DSA-44 "digital-signature;ml-dsa")
 crypto_add_pqc_kat(Crypto.DigitalSignature.ML-DSA-65.KAT
     crypto_ml_dsa_kat mldsa65.kat ML-DSA-65 "digital-signature;ml-dsa")
 crypto_add_pqc_kat(Crypto.DigitalSignature.ML-DSA-87.KAT
     crypto_ml_dsa_kat mldsa87.kat ML-DSA-87 "digital-signature;ml-dsa")
+
+crypto_add_pqc_kat(Crypto.DigitalSignature.AIMer-128f.KAT
+    crypto_aimer_kat aimer128f.kat AIMer-128f "digital-signature;aimer")
+crypto_add_pqc_kat(Crypto.DigitalSignature.AIMer-128s.KAT
+    crypto_aimer_kat aimer128s.kat AIMer-128s "digital-signature;aimer")
+crypto_add_pqc_kat(Crypto.DigitalSignature.AIMer-192f.KAT
+    crypto_aimer_kat aimer192f.kat AIMer-192f "digital-signature;aimer")
+crypto_add_pqc_kat(Crypto.DigitalSignature.AIMer-192s.KAT
+    crypto_aimer_kat aimer192s.kat AIMer-192s "digital-signature;aimer")
+crypto_add_pqc_kat(Crypto.DigitalSignature.AIMer-256f.KAT
+    crypto_aimer_kat aimer256f.kat AIMer-256f "digital-signature;aimer")
+crypto_add_pqc_kat(Crypto.DigitalSignature.AIMer-256s.KAT
+    crypto_aimer_kat aimer256s.kat AIMer-256s "digital-signature;aimer")
+
+crypto_add_pqc_kat(Crypto.DigitalSignature.HAETAE-120.KAT
+    crypto_haetae_kat haetae120_v1_2_0.kat HAETAE-120
+    "digital-signature;haetae")
+crypto_add_pqc_kat(Crypto.DigitalSignature.HAETAE-180.KAT
+    crypto_haetae_kat haetae180_v1_2_0.kat HAETAE-180
+    "digital-signature;haetae")
+crypto_add_pqc_kat(Crypto.DigitalSignature.HAETAE-260.KAT
+    crypto_haetae_kat haetae260_v1_2_0.kat HAETAE-260
+    "digital-signature;haetae")
+
+# The supplied context-explicit vectors were generated with HAETAE 1.1.2.
+# HAETAE 1.2.0 changes signature sampling but intentionally retains verifier
+# compatibility, so keep these vectors as regression coverage for old data.
+crypto_add_pqc_kat(Crypto.DigitalSignature.HAETAE-120.LegacyKAT
+    crypto_haetae_kat haetae120.kat HAETAE-120-legacy
+    "digital-signature;haetae;compatibility")
+crypto_add_pqc_kat(Crypto.DigitalSignature.HAETAE-180.LegacyKAT
+    crypto_haetae_kat haetae180.kat HAETAE-180-legacy
+    "digital-signature;haetae;compatibility")
+crypto_add_pqc_kat(Crypto.DigitalSignature.HAETAE-260.LegacyKAT
+    crypto_haetae_kat haetae260.kat HAETAE-260-legacy
+    "digital-signature;haetae;compatibility")
 
 crypto_add_pqc_kat(Crypto.DigitalSignature.SLH-DSA-SHA2-128s.KAT
     crypto_slh_dsa_kat slhdsa_sha2_128s.kat SLH-DSA-SHA2-128s
