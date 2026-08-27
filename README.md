@@ -1,13 +1,40 @@
-# Crypto
+# LiberaCrypt
 
-Crypto is a portable C11 cryptography library with one runtime-selected API per
-primitive family. Every supported parameter set is compiled into one library;
-callers select the algorithm and parameter set with the final `AlgID` argument.
+**Free cryptography, everywhere.**
 
-The library is self-contained. Algorithm implementations use ISO C and
-project-local headers rather than an external cryptographic library. The random
-byte adapter necessarily calls the host operating system entropy interface
-(`BCryptGenRandom`, `getrandom`, or `/dev/urandom`).
+LiberaCrypt is a free-software C11 cryptography library designed around three
+priorities: **simplicity, portability, and environment independence**. The goal
+is to make cryptographic primitives easy to build, integrate, and use across a
+wide range of systems without tying applications to a particular operating
+system, compiler, architecture, or external cryptographic runtime.
+
+The library keeps one runtime-selected API per primitive family. Every supported
+parameter set is compiled into one library; callers select the algorithm and
+parameter set with the final `AlgID` argument. Algorithm implementations use ISO
+C and project-local headers rather than an external cryptographic library.
+Platform-specific code is kept at narrow system boundaries where it is actually
+required, such as entropy acquisition (`BCryptGenRandom`, `getrandom`, or
+`/dev/urandom`).
+
+## Project principles
+
+- **Simplicity** — keep public interfaces small and consistent, avoid needless
+  configuration, and make common cryptographic operations straightforward to
+  integrate.
+- **Portability** — prefer ISO C, fixed-width types, explicit range reasoning,
+  and well-defined integer behavior so the same code can be built reliably on
+  very different compilers, architectures, and operating systems.
+- **Environment independence** — avoid unnecessary dependencies on a particular
+  cryptographic runtime, system library, compiler extension, character
+  signedness, byte order, or implementation-defined arithmetic behavior.
+- **Software freedom** — LiberaCrypt is developed as free software. Users should
+  be able to study, modify, and redistribute the project under its license. The
+  project's original source is released under `AGPL-3.0-only`; separately
+  identified bundled components retain their upstream licenses.
+
+The public C API and CMake package identifiers currently retain the existing
+`CRYPTO_`, `Crypto.h`, and `Crypto::Crypto` names for compatibility; LiberaCrypt
+is the project name.
 
 > Security note: the RSA interface currently exposes the raw textbook
 > operation. It is useful for implementation tests, but applications must not
@@ -63,9 +90,9 @@ find_package(Crypto CONFIG REQUIRED)
 target_link_libraries(your_target PRIVATE Crypto::Crypto)
 ```
 
-Tests default to enabled for a standalone checkout and disabled when Crypto is
-included by another project with `add_subdirectory()`. An embedding project can
-enable them through the CMake cache (for example,
+Tests default to enabled for a standalone checkout and disabled when the library
+is included by another project with `add_subdirectory()`. An embedding project
+can enable them through the CMake cache (for example,
 `-DCRYPTO_BUILD_TESTS=ON`); its top-level CMake file must also call
 `enable_testing()` for root-level CTest discovery.
 
