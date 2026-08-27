@@ -49,7 +49,7 @@ unsigned int crypto_haetae_rej_uniform(int *a, unsigned int len, const uint8_t  
  * Returns number of sampled coefficients. Can be smaller than len if not enough
  * random bytes were given.
  **************************************************/
-static int mod3(uint8_t  t) {
+static int mod3(uint32_t t) {
     int r;
     r = (t >> 4) + (t & 0xf);
     r = (r >> 2) + (r & 3);
@@ -57,14 +57,14 @@ static int mod3(uint8_t  t) {
     r = (r >> 2) + (r & 3);
     return r - (3 * (r >> 1));
 }
-static int mod3_leq26(uint8_t  t) {
+static int mod3_leq26(uint32_t t) {
     int r;
     r = (t >> 4) + (t & 0xf);
     r = (r >> 2) + (r & 3);
     r = (r >> 2) + (r & 3);
     return r - (3 * (r >> 1));
 }
-static int mod3_leq8(uint8_t  t) {
+static int mod3_leq8(uint32_t t) {
     int r;
     r = (t >> 2) + (t & 3);
     r = (r >> 2) + (r & 3);
@@ -355,7 +355,7 @@ static int sample_gauss_sigma76(
 }
 
 
-int crypto_haetae_sample_gauss(uint64_t *r, crypto_haetae_fp96_76 *sqsum, const uint8_t  *buf, const size_t buflen, const size_t len, const int dont_write_last)
+size_t crypto_haetae_sample_gauss(uint64_t *r, crypto_haetae_fp96_76 *sqsum, const uint8_t  *buf, const size_t buflen, const size_t len, const int dont_write_last)
 {
     const uint8_t  *pos = buf;
     crypto_haetae_fp96_76 sqr;

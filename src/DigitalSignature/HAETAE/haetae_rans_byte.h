@@ -240,7 +240,7 @@ static inline void RansEncSymbolInit(RansEncSymbol* s, uint32_t start, uint32_t 
 
         s->rcp_freq = (uint32_t)(
             ((UINT64_C(1) << (shift + 31)) + freq - 1) / freq);
-        s->rcp_shift = shift - 1;
+        s->rcp_shift = (uint16_t)(shift - 1u);
 
         // With these values, 'q' is the correct quotient, so we
         // have bias=start.

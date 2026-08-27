@@ -284,8 +284,17 @@ int crypto_haetae_unpack_sig(crypto_haetae_poly *c,
         crypto_haetae_poly_decomposed_unpack(&lowbits_z1->vec[i], sig + CRYPTO_HAETAE_N * i);
     sig += haetae_l * CRYPTO_HAETAE_N;
 
-    size_enc_hb_z1 = (uint16_t)sig[0] + parameters->base_encoding_high_bits_z1;
-    size_enc_h = (uint16_t)sig[1] + parameters->base_encoding_hint;
+    {
+        const uint32_t encoded_hb_z1_size =
+            (uint32_t)sig[0] + parameters->base_encoding_high_bits_z1;
+        const uint32_t encoded_h_size =
+            (uint32_t)sig[1] + parameters->base_encoding_hint;
+
+        if (encoded_hb_z1_size > UINT16_MAX || encoded_h_size > UINT16_MAX)
+            return 1;
+        size_enc_hb_z1 = (uint16_t)encoded_hb_z1_size;
+        size_enc_h = (uint16_t)encoded_h_size;
+    }
     sig += 2;
 
     if (sig_size < (2u + (size_t)haetae_l * CRYPTO_HAETAE_N +
