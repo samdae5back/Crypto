@@ -190,7 +190,7 @@ int crypto_ntru_plus_poly_sotp_decode(uint8_t *msg, const crypto_ntru_plus_poly 
     }
 
     result = result >> 1;
-    result = (-(uint32_t)result) >> 31;
+    result = (UINT32_C(0) - result) >> 31;
 
     mask = (uint8_t)(result - 1);
 

@@ -105,35 +105,35 @@ void crypto_aimer_field128_mat_vec_mul(uint64_t *c, const uint64_t *a,
     uint64_t index = *a_ptr;
     for (j = 64; j; j -= 8, index >>= 8, b_ptr += 8)
     {
-      mask = -(index & 1);
+      mask = UINT64_C(0) - (index & UINT64_C(1));
       temp_c0 ^= (b_ptr[0][0] & mask);
       temp_c1 ^= (b_ptr[0][1] & mask);
 
-      mask = -((index >> 1) & 1);
+      mask = UINT64_C(0) - ((index >> 1) & UINT64_C(1));
       temp_c0 ^= (b_ptr[1][0] & mask);
       temp_c1 ^= (b_ptr[1][1] & mask);
 
-      mask = -((index >> 2) & 1);
+      mask = UINT64_C(0) - ((index >> 2) & UINT64_C(1));
       temp_c0 ^= (b_ptr[2][0] & mask);
       temp_c1 ^= (b_ptr[2][1] & mask);
 
-      mask = -((index >> 3) & 1);
+      mask = UINT64_C(0) - ((index >> 3) & UINT64_C(1));
       temp_c0 ^= (b_ptr[3][0] & mask);
       temp_c1 ^= (b_ptr[3][1] & mask);
 
-      mask = -((index >> 4) & 1);
+      mask = UINT64_C(0) - ((index >> 4) & UINT64_C(1));
       temp_c0 ^= (b_ptr[4][0] & mask);
       temp_c1 ^= (b_ptr[4][1] & mask);
 
-      mask = -((index >> 5) & 1);
+      mask = UINT64_C(0) - ((index >> 5) & UINT64_C(1));
       temp_c0 ^= (b_ptr[5][0] & mask);
       temp_c1 ^= (b_ptr[5][1] & mask);
 
-      mask = -((index >> 6) & 1);
+      mask = UINT64_C(0) - ((index >> 6) & UINT64_C(1));
       temp_c0 ^= (b_ptr[6][0] & mask);
       temp_c1 ^= (b_ptr[6][1] & mask);
 
-      mask = -((index >> 7) & 1);
+      mask = UINT64_C(0) - ((index >> 7) & UINT64_C(1));
       temp_c0 ^= (b_ptr[7][0] & mask);
       temp_c1 ^= (b_ptr[7][1] & mask);
     }
@@ -161,35 +161,35 @@ void crypto_aimer_field128_mat_vec_mul_add(uint64_t *c, const uint64_t *a,
     uint64_t index = *a_ptr;
     for (j = 64; j; j -= 8, index >>= 8, b_ptr += 8)
     {
-      mask = -(index & 1);
+      mask = UINT64_C(0) - (index & UINT64_C(1));
       temp_c0 ^= (b_ptr[0][0] & mask);
       temp_c1 ^= (b_ptr[0][1] & mask);
 
-      mask = -((index >> 1) & 1);
+      mask = UINT64_C(0) - ((index >> 1) & UINT64_C(1));
       temp_c0 ^= (b_ptr[1][0] & mask);
       temp_c1 ^= (b_ptr[1][1] & mask);
 
-      mask = -((index >> 2) & 1);
+      mask = UINT64_C(0) - ((index >> 2) & UINT64_C(1));
       temp_c0 ^= (b_ptr[2][0] & mask);
       temp_c1 ^= (b_ptr[2][1] & mask);
 
-      mask = -((index >> 3) & 1);
+      mask = UINT64_C(0) - ((index >> 3) & UINT64_C(1));
       temp_c0 ^= (b_ptr[3][0] & mask);
       temp_c1 ^= (b_ptr[3][1] & mask);
 
-      mask = -((index >> 4) & 1);
+      mask = UINT64_C(0) - ((index >> 4) & UINT64_C(1));
       temp_c0 ^= (b_ptr[4][0] & mask);
       temp_c1 ^= (b_ptr[4][1] & mask);
 
-      mask = -((index >> 5) & 1);
+      mask = UINT64_C(0) - ((index >> 5) & UINT64_C(1));
       temp_c0 ^= (b_ptr[5][0] & mask);
       temp_c1 ^= (b_ptr[5][1] & mask);
 
-      mask = -((index >> 6) & 1);
+      mask = UINT64_C(0) - ((index >> 6) & UINT64_C(1));
       temp_c0 ^= (b_ptr[6][0] & mask);
       temp_c1 ^= (b_ptr[6][1] & mask);
 
-      mask = -((index >> 7) & 1);
+      mask = UINT64_C(0) - ((index >> 7) & UINT64_C(1));
       temp_c0 ^= (b_ptr[7][0] & mask);
       temp_c1 ^= (b_ptr[7][1] & mask);
     }

@@ -152,22 +152,22 @@ void crypto_aimer_field192_mat_vec_mul(uint64_t *c, const uint64_t *a,
     uint64_t index = *a_ptr;
     for (j = 64; j; j -= 4, index >>= 4, b_ptr += 4)
     {
-      mask = -(index & 1);
+      mask = UINT64_C(0) - (index & UINT64_C(1));
       temp_c0 ^= (b_ptr[0][0] & mask);
       temp_c1 ^= (b_ptr[0][1] & mask);
       temp_c2 ^= (b_ptr[0][2] & mask);
 
-      mask = -((index >> 1) & 1);
+      mask = UINT64_C(0) - ((index >> 1) & UINT64_C(1));
       temp_c0 ^= (b_ptr[1][0] & mask);
       temp_c1 ^= (b_ptr[1][1] & mask);
       temp_c2 ^= (b_ptr[1][2] & mask);
 
-      mask = -((index >> 2) & 1);
+      mask = UINT64_C(0) - ((index >> 2) & UINT64_C(1));
       temp_c0 ^= (b_ptr[2][0] & mask);
       temp_c1 ^= (b_ptr[2][1] & mask);
       temp_c2 ^= (b_ptr[2][2] & mask);
 
-      mask = -((index >> 3) & 1);
+      mask = UINT64_C(0) - ((index >> 3) & UINT64_C(1));
       temp_c0 ^= (b_ptr[3][0] & mask);
       temp_c1 ^= (b_ptr[3][1] & mask);
       temp_c2 ^= (b_ptr[3][2] & mask);
@@ -196,22 +196,22 @@ void crypto_aimer_field192_mat_vec_mul_add(uint64_t *c, const uint64_t *a,
     uint64_t index = *a_ptr;
     for (j = 64; j; j -= 4, index >>= 4, b_ptr += 4)
     {
-      mask = -(index & 1);
+      mask = UINT64_C(0) - (index & UINT64_C(1));
       temp_c0 ^= (b_ptr[0][0] & mask);
       temp_c1 ^= (b_ptr[0][1] & mask);
       temp_c2 ^= (b_ptr[0][2] & mask);
 
-      mask = -((index >> 1) & 1);
+      mask = UINT64_C(0) - ((index >> 1) & UINT64_C(1));
       temp_c0 ^= (b_ptr[1][0] & mask);
       temp_c1 ^= (b_ptr[1][1] & mask);
       temp_c2 ^= (b_ptr[1][2] & mask);
 
-      mask = -((index >> 2) & 1);
+      mask = UINT64_C(0) - ((index >> 2) & UINT64_C(1));
       temp_c0 ^= (b_ptr[2][0] & mask);
       temp_c1 ^= (b_ptr[2][1] & mask);
       temp_c2 ^= (b_ptr[2][2] & mask);
 
-      mask = -((index >> 3) & 1);
+      mask = UINT64_C(0) - ((index >> 3) & UINT64_C(1));
       temp_c0 ^= (b_ptr[3][0] & mask);
       temp_c1 ^= (b_ptr[3][1] & mask);
       temp_c2 ^= (b_ptr[3][2] & mask);
