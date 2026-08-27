@@ -351,7 +351,7 @@ static int sample_gauss_sigma76(
 
     return ((((int64_t)(random_rejection ^ (random_rejection & 1u)) -
                (int64_t)approx_exp(exponent_input)) >> 63) &
-            (((*result | -*result) >> 63) | random_rejection)) & 1;
+            (((*result | (UINT64_C(0) - *result)) >> 63) | random_rejection)) & 1;
 }
 
 
