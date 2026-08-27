@@ -66,7 +66,7 @@ static CryptoError crypto_haetae_keygen_core(
     const uint8_t *sigma;
     const uint8_t *key;
     uint16_t nonce = 0u;
-    long long squared_singular_value;
+    uint64_t squared_singular_value;
     CryptoError result;
 
     workspace = calloc(1u, sizeof(*workspace));
