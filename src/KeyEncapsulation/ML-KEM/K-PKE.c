@@ -9,7 +9,7 @@
 
 void K_PKE_KeyGen(unsigned char* d, unsigned char* ek_pke, unsigned char* dk_pke) {
 
-	int N = 0;
+	unsigned char N = 0;
 	unsigned char* buffer_char = NULL;
 	int* buffer_int = NULL;
 
@@ -22,7 +22,7 @@ void K_PKE_KeyGen(unsigned char* d, unsigned char* ek_pke, unsigned char* dk_pke
 
 	//G 함수 사용해서 해시값 생성
 	memcpy(buffer_char, d, 32);
-	buffer_char[32] = k;
+	buffer_char[32] = (unsigned char)k;
 	unsigned char rho[32] = { 0 };
 	unsigned char sigma[32] = { 0 };
 	G(buffer_char, 33, rho, sigma);
@@ -55,8 +55,8 @@ void K_PKE_KeyGen(unsigned char* d, unsigned char* ek_pke, unsigned char* dk_pke
 				exit(EXIT_FAILURE);
 			}
 			memcpy(buffer_char, rho, 32);
-			buffer_char[32] = j;
-			buffer_char[33] = i;
+			buffer_char[32] = (unsigned char)j;
+			buffer_char[33] = (unsigned char)i;
 			SampleNTT(buffer_char, A[i][j], 34);
 		}
 	}
@@ -89,7 +89,7 @@ void K_PKE_KeyGen(unsigned char* d, unsigned char* ek_pke, unsigned char* dk_pke
 	free(buffer_char);
 
 	//NTT연산 위해 zeta불러오기
-	int* zeta = GenZeta();
+	const int* zeta = GenZeta();
 
 	//s_hat, e_hat 선언 및 계산
 	int s_hat[MLKEM_MAX_K][MLKEM_N] = { 0 };
@@ -147,7 +147,7 @@ void K_PKE_KeyGen(unsigned char* d, unsigned char* ek_pke, unsigned char* dk_pke
 
 void K_PKE_Enc(unsigned char* ek_pke, unsigned char* message, unsigned char* randomness, unsigned char* ciphertext) {
 
-	int N = 0;
+	unsigned char N = 0;
 	unsigned char* buffer_char = NULL;
 	int* buffer_int = NULL;
 
@@ -195,8 +195,8 @@ void K_PKE_Enc(unsigned char* ek_pke, unsigned char* message, unsigned char* ran
 				exit(EXIT_FAILURE);
 			}
 			memcpy(buffer_char, rho, 32);
-			buffer_char[32] = j;
-			buffer_char[33] = i;
+			buffer_char[32] = (unsigned char)j;
+			buffer_char[33] = (unsigned char)i;
 			SampleNTT(buffer_char, A[i][j], 34);
 		}
 	}
@@ -243,7 +243,7 @@ void K_PKE_Enc(unsigned char* ek_pke, unsigned char* message, unsigned char* ran
 	free(buffer_char);
 
 	//NTT 연산 위해 zeta가져오기
-	int* zeta = GenZeta();
+	const int* zeta = GenZeta();
 
 	//y_hat 계산
 	int y_hat[MLKEM_MAX_K][MLKEM_N] = { 0 };
@@ -321,6 +321,8 @@ void K_PKE_Enc(unsigned char* ek_pke, unsigned char* message, unsigned char* ran
 			v_hat[j] = (v_hat[j] + buffer_int[j]) % q;
 		}
 	}
+	free(buffer_int);
+	buffer_int = NULL;
 
 	for (int i = 0;i < k;i++) {
 		free(t_hat[i]);
@@ -414,7 +416,7 @@ void K_PKE_Dec(unsigned char* dk_pke, unsigned char* ciphertext, unsigned char* 
 	int w[n] = { 0 };
 
 	//NTT연산위해서 zeta불러오기
-	int* zeta = GenZeta();
+	const int* zeta = GenZeta();
 
 	//NTT 연산 위해 u_hat=NTT(u) 선언, u_hat 계산
 	int u_hat[MLKEM_MAX_K][MLKEM_N] = { 0 };

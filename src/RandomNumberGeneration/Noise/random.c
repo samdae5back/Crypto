@@ -1,6 +1,4 @@
-#include "RANDOM.h"
 #include "random_internal.h"
-#include "Util/Core/crypto_types.h"
 
 #if defined(_WIN32)
 #ifndef WIN32_LEAN_AND_MEAN
@@ -8,7 +6,9 @@
 #endif
 #include <windows.h>
 #include <bcrypt.h>
+#if defined(_MSC_VER)
 #pragma comment(lib, "bcrypt.lib")
+#endif
 
 int random_os_bytes(uint8_t *out, size_t length) {
     if (!out && length) return -1;
@@ -77,7 +77,7 @@ int random_os_bytes(uint8_t *out, size_t length) {
 }
 #endif
 
-CryptoError CRYPTO_RANDOM_BYTES(uint8_t *out, size_t length) {
+CryptoError crypto_random_bytes_internal(uint8_t *out, size_t length) {
     if (!out && length) return CRYPTO_ERROR_INVALID_ARGUMENT;
     return random_os_bytes(out, length) == 0 ? CRYPTO_SUCCESS : CRYPTO_ERROR_RANDOM_FAILED;
 }

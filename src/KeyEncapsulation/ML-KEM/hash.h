@@ -1,8 +1,8 @@
 #ifndef ML_KEM_HASH_H
 #define ML_KEM_HASH_H
 #include <stddef.h>
-#include "SHA3.h"
-typedef SHA3_CONTEXT crypto_sha3_ctx;
+#include "HashFunction/SHA3/sha3_internal.h"
+typedef crypto_sha3_context crypto_sha3_ctx;
 void RBG(unsigned char *seed,size_t len);
 void sha3_256_hash(const unsigned char *input,size_t input_len,unsigned char *output);
 void sha3_512_hash(const unsigned char *input,size_t input_len,unsigned char *output);

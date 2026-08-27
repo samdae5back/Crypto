@@ -1,129 +1,128 @@
-#include "ELGAMAL.h"
-#include "PRIME.h"
 #include "elgamal_internal.h"
 #include "Util/Bignum/bignum_internal.h"
+#include "Util/Prime/prime_internal.h"
 
-void CRYPTO_ELGAMAL_PUBLIC_KEY_INIT(ELGAMAL_PUBLIC_KEY *key) {
+void crypto_elgamal_public_key_init_internal(CRYPTO_ELGAMAL_PUBLIC_KEY *key) {
     if (!key) return;
-    CRYPTO_BIGNUM_INIT(&key->P); CRYPTO_BIGNUM_INIT(&key->Q); CRYPTO_BIGNUM_INIT(&key->G); CRYPTO_BIGNUM_INIT(&key->H);
+    crypto_bignum_init(&key->P); crypto_bignum_init(&key->Q); crypto_bignum_init(&key->G); crypto_bignum_init(&key->H);
 }
-void CRYPTO_ELGAMAL_PUBLIC_KEY_FREE(ELGAMAL_PUBLIC_KEY *key) {
+void crypto_elgamal_public_key_free_internal(CRYPTO_ELGAMAL_PUBLIC_KEY *key) {
     if (!key) return;
-    CRYPTO_BIGNUM_FREE(&key->P); CRYPTO_BIGNUM_FREE(&key->Q); CRYPTO_BIGNUM_FREE(&key->G); CRYPTO_BIGNUM_FREE(&key->H);
+    crypto_bignum_free(&key->P); crypto_bignum_free(&key->Q); crypto_bignum_free(&key->G); crypto_bignum_free(&key->H);
 }
-void CRYPTO_ELGAMAL_PRIVATE_KEY_INIT(ELGAMAL_PRIVATE_KEY *key) {
+void crypto_elgamal_private_key_init_internal(CRYPTO_ELGAMAL_PRIVATE_KEY *key) {
     if (!key) return;
-    CRYPTO_BIGNUM_INIT(&key->X);
+    crypto_bignum_init(&key->X);
 }
-void CRYPTO_ELGAMAL_PRIVATE_KEY_FREE(ELGAMAL_PRIVATE_KEY *key) {
+void crypto_elgamal_private_key_free_internal(CRYPTO_ELGAMAL_PRIVATE_KEY *key) {
     if (!key) return;
-    CRYPTO_BIGNUM_FREE(&key->X);
+    crypto_bignum_free(&key->X);
 }
-void CRYPTO_ELGAMAL_CIPHERTEXT_INIT(ELGAMAL_CIPHERTEXT *ciphertext) {
+void crypto_elgamal_ciphertext_init_internal(CRYPTO_ELGAMAL_CIPHERTEXT *ciphertext) {
     if (!ciphertext) return;
-    CRYPTO_BIGNUM_INIT(&ciphertext->C1); CRYPTO_BIGNUM_INIT(&ciphertext->C2);
+    crypto_bignum_init(&ciphertext->C1); crypto_bignum_init(&ciphertext->C2);
 }
-void CRYPTO_ELGAMAL_CIPHERTEXT_FREE(ELGAMAL_CIPHERTEXT *ciphertext) {
+void crypto_elgamal_ciphertext_free_internal(CRYPTO_ELGAMAL_CIPHERTEXT *ciphertext) {
     if (!ciphertext) return;
-    CRYPTO_BIGNUM_FREE(&ciphertext->C1); CRYPTO_BIGNUM_FREE(&ciphertext->C2);
+    crypto_bignum_free(&ciphertext->C1); crypto_bignum_free(&ciphertext->C2);
 }
 
-int elgamal_random_nonzero(BIGNUM *out, const BIGNUM *upper) {
+int elgamal_random_nonzero(CRYPTO_BIGNUM *out, const CRYPTO_BIGNUM *upper) {
     uint32_t tries;
     for (tries = 0; tries < 128u; ++tries) {
-        if (CRYPTO_BIGNUM_RANDOM_RANGE(out, upper) != CRYPTO_SUCCESS) return -1;
-        if (!CRYPTO_BIGNUM_IS_ZERO(out)) return 0;
-        CRYPTO_BIGNUM_FREE(out); CRYPTO_BIGNUM_INIT(out);
+        if (crypto_bignum_random_range(out, upper) != CRYPTO_SUCCESS) return -1;
+        if (!crypto_bignum_is_zero(out)) return 0;
+        crypto_bignum_free(out); crypto_bignum_init(out);
     }
     return -1;
 }
 
-CryptoError CRYPTO_ELGAMAL_KEYGEN(AlgID alg, ELGAMAL_PUBLIC_KEY *public_key, ELGAMAL_PRIVATE_KEY *private_key, size_t modulus_bits, uint32_t prime_rounds) {
-    BIGNUM p, q, hseed, g, x, h, p_minus_3;
+CryptoError crypto_elgamal_keygen_internal(AlgID alg, CRYPTO_ELGAMAL_PUBLIC_KEY *public_key, CRYPTO_ELGAMAL_PRIVATE_KEY *private_key, size_t modulus_bits, uint32_t prime_rounds) {
+    CRYPTO_BIGNUM p, q, hseed, g, x, h, p_minus_3;
     uint32_t tries;
     CryptoError err = CRYPTO_ERROR_ARITHMETIC;
     if (alg != ALG_ELGAMAL_SAFE_PRIME) return CRYPTO_ERROR_INVALID_ALG_ID;
     if (!public_key || !private_key || modulus_bits < 32u) return CRYPTO_ERROR_INVALID_ARGUMENT;
     if (prime_rounds == 0u) prime_rounds = 32u;
 
-    CRYPTO_BIGNUM_INIT(&p); CRYPTO_BIGNUM_INIT(&q); CRYPTO_BIGNUM_INIT(&hseed); CRYPTO_BIGNUM_INIT(&g);
-    CRYPTO_BIGNUM_INIT(&x); CRYPTO_BIGNUM_INIT(&h); CRYPTO_BIGNUM_INIT(&p_minus_3);
-    if (CRYPTO_PRIME_GENERATE_SAFE(&p, &q, modulus_bits, prime_rounds) != CRYPTO_SUCCESS) {
+    crypto_bignum_init(&p); crypto_bignum_init(&q); crypto_bignum_init(&hseed); crypto_bignum_init(&g);
+    crypto_bignum_init(&x); crypto_bignum_init(&h); crypto_bignum_init(&p_minus_3);
+    if (crypto_prime_generate_safe_internal(&p, &q, modulus_bits, prime_rounds) != CRYPTO_SUCCESS) {
         err = CRYPTO_ERROR_PRIME_GENERATION_FAILED;
         goto fail;
     }
     if (bignum_sub_u32(&p_minus_3, &p, 3u) != 0) goto fail;
 
     for (tries = 0; tries < 128u; ++tries) {
-        BIGNUM two;
-        CRYPTO_BIGNUM_INIT(&two);
-        CRYPTO_BIGNUM_FREE(&hseed); CRYPTO_BIGNUM_INIT(&hseed);
-        CRYPTO_BIGNUM_FREE(&g); CRYPTO_BIGNUM_INIT(&g);
-        if (CRYPTO_BIGNUM_RANDOM_RANGE(&hseed, &p_minus_3) != CRYPTO_SUCCESS || bignum_add_u32(&hseed, 2u) != 0) {
-            CRYPTO_BIGNUM_FREE(&two);
+        CRYPTO_BIGNUM two;
+        crypto_bignum_init(&two);
+        crypto_bignum_free(&hseed); crypto_bignum_init(&hseed);
+        crypto_bignum_free(&g); crypto_bignum_init(&g);
+        if (crypto_bignum_random_range(&hseed, &p_minus_3) != CRYPTO_SUCCESS || bignum_add_u32(&hseed, 2u) != 0) {
+            crypto_bignum_free(&two);
             goto fail;
         }
-        if (CRYPTO_BIGNUM_SET_U64(&two, 2u) != CRYPTO_SUCCESS || CRYPTO_BIGNUM_MOD_EXP(&g, &hseed, &two, &p) != CRYPTO_SUCCESS) {
-            CRYPTO_BIGNUM_FREE(&two);
+        if (crypto_bignum_set_u64(&two, 2u) != CRYPTO_SUCCESS || crypto_bignum_mod_exp(&g, &hseed, &two, &p) != CRYPTO_SUCCESS) {
+            crypto_bignum_free(&two);
             goto fail;
         }
-        CRYPTO_BIGNUM_FREE(&two);
+        crypto_bignum_free(&two);
         if (!(g.LENGTH == 1u && g.LIMBS[0] == 1u)) break;
     }
     if (tries == 128u) goto fail;
-    if (elgamal_random_nonzero(&x, &q) != 0 || CRYPTO_BIGNUM_MOD_EXP(&h, &g, &x, &p) != CRYPTO_SUCCESS) goto fail;
+    if (elgamal_random_nonzero(&x, &q) != 0 || crypto_bignum_mod_exp(&h, &g, &x, &p) != CRYPTO_SUCCESS) goto fail;
 
-    CRYPTO_ELGAMAL_PUBLIC_KEY_FREE(public_key); CRYPTO_ELGAMAL_PUBLIC_KEY_INIT(public_key);
-    CRYPTO_ELGAMAL_PRIVATE_KEY_FREE(private_key); CRYPTO_ELGAMAL_PRIVATE_KEY_INIT(private_key);
-    if (CRYPTO_BIGNUM_COPY(&public_key->P, &p) != CRYPTO_SUCCESS || CRYPTO_BIGNUM_COPY(&public_key->Q, &q) != CRYPTO_SUCCESS ||
-        CRYPTO_BIGNUM_COPY(&public_key->G, &g) != CRYPTO_SUCCESS || CRYPTO_BIGNUM_COPY(&public_key->H, &h) != CRYPTO_SUCCESS ||
-        CRYPTO_BIGNUM_COPY(&private_key->X, &x) != CRYPTO_SUCCESS) {
+    crypto_elgamal_public_key_free_internal(public_key); crypto_elgamal_public_key_init_internal(public_key);
+    crypto_elgamal_private_key_free_internal(private_key); crypto_elgamal_private_key_init_internal(private_key);
+    if (crypto_bignum_copy(&public_key->P, &p) != CRYPTO_SUCCESS || crypto_bignum_copy(&public_key->Q, &q) != CRYPTO_SUCCESS ||
+        crypto_bignum_copy(&public_key->G, &g) != CRYPTO_SUCCESS || crypto_bignum_copy(&public_key->H, &h) != CRYPTO_SUCCESS ||
+        crypto_bignum_copy(&private_key->X, &x) != CRYPTO_SUCCESS) {
         err = CRYPTO_ERROR_ALLOCATION_FAILED;
         goto fail;
     }
 
-    CRYPTO_BIGNUM_FREE(&p); CRYPTO_BIGNUM_FREE(&q); CRYPTO_BIGNUM_FREE(&hseed); CRYPTO_BIGNUM_FREE(&g);
-    CRYPTO_BIGNUM_FREE(&x); CRYPTO_BIGNUM_FREE(&h); CRYPTO_BIGNUM_FREE(&p_minus_3);
+    crypto_bignum_free(&p); crypto_bignum_free(&q); crypto_bignum_free(&hseed); crypto_bignum_free(&g);
+    crypto_bignum_free(&x); crypto_bignum_free(&h); crypto_bignum_free(&p_minus_3);
     return CRYPTO_SUCCESS;
 fail:
-    CRYPTO_BIGNUM_FREE(&p); CRYPTO_BIGNUM_FREE(&q); CRYPTO_BIGNUM_FREE(&hseed); CRYPTO_BIGNUM_FREE(&g);
-    CRYPTO_BIGNUM_FREE(&x); CRYPTO_BIGNUM_FREE(&h); CRYPTO_BIGNUM_FREE(&p_minus_3);
+    crypto_bignum_free(&p); crypto_bignum_free(&q); crypto_bignum_free(&hseed); crypto_bignum_free(&g);
+    crypto_bignum_free(&x); crypto_bignum_free(&h); crypto_bignum_free(&p_minus_3);
     return err;
 }
 
-CryptoError CRYPTO_ELGAMAL_ENCRYPT(AlgID alg, ELGAMAL_CIPHERTEXT *ciphertext, const BIGNUM *message, const ELGAMAL_PUBLIC_KEY *public_key) {
-    BIGNUM y, shared, c1, c2;
+CryptoError crypto_elgamal_encrypt_internal(AlgID alg, CRYPTO_ELGAMAL_CIPHERTEXT *ciphertext, const CRYPTO_BIGNUM *message, const CRYPTO_ELGAMAL_PUBLIC_KEY *public_key) {
+    CRYPTO_BIGNUM y, shared, c1, c2;
     CryptoError err = CRYPTO_ERROR_ARITHMETIC;
     if (alg != ALG_ELGAMAL_SAFE_PRIME) return CRYPTO_ERROR_INVALID_ALG_ID;
     if (!ciphertext || !message || !public_key) return CRYPTO_ERROR_INVALID_ARGUMENT;
-    if (CRYPTO_BIGNUM_COMPARE(message, &public_key->P) >= 0) return CRYPTO_ERROR_MESSAGE_TOO_LARGE;
-    CRYPTO_BIGNUM_INIT(&y); CRYPTO_BIGNUM_INIT(&shared); CRYPTO_BIGNUM_INIT(&c1); CRYPTO_BIGNUM_INIT(&c2);
+    if (crypto_bignum_compare(message, &public_key->P) >= 0) return CRYPTO_ERROR_MESSAGE_TOO_LARGE;
+    crypto_bignum_init(&y); crypto_bignum_init(&shared); crypto_bignum_init(&c1); crypto_bignum_init(&c2);
     if (elgamal_random_nonzero(&y, &public_key->Q) != 0 ||
-        CRYPTO_BIGNUM_MOD_EXP(&c1, &public_key->G, &y, &public_key->P) != CRYPTO_SUCCESS ||
-        CRYPTO_BIGNUM_MOD_EXP(&shared, &public_key->H, &y, &public_key->P) != CRYPTO_SUCCESS ||
-        CRYPTO_BIGNUM_MOD_MUL(&c2, message, &shared, &public_key->P) != CRYPTO_SUCCESS) goto done;
-    CRYPTO_ELGAMAL_CIPHERTEXT_FREE(ciphertext); CRYPTO_ELGAMAL_CIPHERTEXT_INIT(ciphertext);
-    ciphertext->C1 = c1; CRYPTO_BIGNUM_INIT(&c1);
-    ciphertext->C2 = c2; CRYPTO_BIGNUM_INIT(&c2);
+        crypto_bignum_mod_exp(&c1, &public_key->G, &y, &public_key->P) != CRYPTO_SUCCESS ||
+        crypto_bignum_mod_exp(&shared, &public_key->H, &y, &public_key->P) != CRYPTO_SUCCESS ||
+        crypto_bignum_mod_mul(&c2, message, &shared, &public_key->P) != CRYPTO_SUCCESS) goto done;
+    crypto_elgamal_ciphertext_free_internal(ciphertext); crypto_elgamal_ciphertext_init_internal(ciphertext);
+    ciphertext->C1 = c1; crypto_bignum_init(&c1);
+    ciphertext->C2 = c2; crypto_bignum_init(&c2);
     err = CRYPTO_SUCCESS;
 done:
-    CRYPTO_BIGNUM_FREE(&y); CRYPTO_BIGNUM_FREE(&shared); CRYPTO_BIGNUM_FREE(&c1); CRYPTO_BIGNUM_FREE(&c2);
+    crypto_bignum_free(&y); crypto_bignum_free(&shared); crypto_bignum_free(&c1); crypto_bignum_free(&c2);
     return err;
 }
 
-CryptoError CRYPTO_ELGAMAL_DECRYPT(AlgID alg, BIGNUM *message, const ELGAMAL_CIPHERTEXT *ciphertext, const ELGAMAL_PUBLIC_KEY *public_key, const ELGAMAL_PRIVATE_KEY *private_key) {
-    BIGNUM shared, exponent, inverse;
+CryptoError crypto_elgamal_decrypt_internal(AlgID alg, CRYPTO_BIGNUM *message, const CRYPTO_ELGAMAL_CIPHERTEXT *ciphertext, const CRYPTO_ELGAMAL_PUBLIC_KEY *public_key, const CRYPTO_ELGAMAL_PRIVATE_KEY *private_key) {
+    CRYPTO_BIGNUM shared, exponent, inverse;
     CryptoError err = CRYPTO_ERROR_ARITHMETIC;
     if (alg != ALG_ELGAMAL_SAFE_PRIME) return CRYPTO_ERROR_INVALID_ALG_ID;
     if (!message || !ciphertext || !public_key || !private_key) return CRYPTO_ERROR_INVALID_ARGUMENT;
-    if (CRYPTO_BIGNUM_COMPARE(&ciphertext->C1, &public_key->P) >= 0 || CRYPTO_BIGNUM_COMPARE(&ciphertext->C2, &public_key->P) >= 0) return CRYPTO_ERROR_INVALID_ARGUMENT;
-    CRYPTO_BIGNUM_INIT(&shared); CRYPTO_BIGNUM_INIT(&exponent); CRYPTO_BIGNUM_INIT(&inverse);
-    if (CRYPTO_BIGNUM_MOD_EXP(&shared, &ciphertext->C1, &private_key->X, &public_key->P) != CRYPTO_SUCCESS ||
+    if (crypto_bignum_compare(&ciphertext->C1, &public_key->P) >= 0 || crypto_bignum_compare(&ciphertext->C2, &public_key->P) >= 0) return CRYPTO_ERROR_INVALID_ARGUMENT;
+    crypto_bignum_init(&shared); crypto_bignum_init(&exponent); crypto_bignum_init(&inverse);
+    if (crypto_bignum_mod_exp(&shared, &ciphertext->C1, &private_key->X, &public_key->P) != CRYPTO_SUCCESS ||
         bignum_sub_u32(&exponent, &public_key->P, 2u) != 0 ||
-        CRYPTO_BIGNUM_MOD_EXP(&inverse, &shared, &exponent, &public_key->P) != CRYPTO_SUCCESS ||
-        CRYPTO_BIGNUM_MOD_MUL(message, &ciphertext->C2, &inverse, &public_key->P) != CRYPTO_SUCCESS) goto done;
+        crypto_bignum_mod_exp(&inverse, &shared, &exponent, &public_key->P) != CRYPTO_SUCCESS ||
+        crypto_bignum_mod_mul(message, &ciphertext->C2, &inverse, &public_key->P) != CRYPTO_SUCCESS) goto done;
     err = CRYPTO_SUCCESS;
 done:
-    CRYPTO_BIGNUM_FREE(&shared); CRYPTO_BIGNUM_FREE(&exponent); CRYPTO_BIGNUM_FREE(&inverse);
+    crypto_bignum_free(&shared); crypto_bignum_free(&exponent); crypto_bignum_free(&inverse);
     return err;
 }

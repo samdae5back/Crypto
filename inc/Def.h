@@ -1,0 +1,136 @@
+#ifndef CRYPTO_DEF_H
+#define CRYPTO_DEF_H
+
+/* Public types use only ISO C headers. */
+#include <stddef.h>
+#include <stdint.h>
+
+#if defined(__cplusplus)
+#define CRYPTO_BEGIN_DECLS extern "C" {
+#define CRYPTO_END_DECLS }
+#else
+#define CRYPTO_BEGIN_DECLS
+#define CRYPTO_END_DECLS
+#endif
+
+#if defined(_WIN32)
+#if defined(CRYPTO_SHARED)
+#if defined(CRYPTO_BUILDING_LIBRARY)
+#define CRYPTO_API __declspec(dllexport)
+#else
+#define CRYPTO_API __declspec(dllimport)
+#endif
+#else
+#define CRYPTO_API
+#endif
+#elif defined(__sun) && (defined(__SUNPRO_C) || defined(__SUNPRO_CC))
+#if defined(CRYPTO_BUILDING_LIBRARY)
+#define CRYPTO_API __global
+#else
+#define CRYPTO_API
+#endif
+#elif defined(__GNUC__) || defined(__clang__)
+#if defined(CRYPTO_SHARED)
+#define CRYPTO_API __attribute__((visibility("default")))
+#else
+#define CRYPTO_API
+#endif
+#else
+/* AIX XL and HP aCC exports are restricted by generated linker export files. */
+#define CRYPTO_API
+#endif
+
+typedef int32_t AlgID;
+typedef int32_t CryptoError;
+
+enum {
+    ALG_NONE = 0,
+
+    ALG_HASH_SHA3_224 = 0x0100,
+    ALG_HASH_SHA3_256 = 0x0101,
+    ALG_HASH_SHA3_512 = 0x0102,
+    ALG_HASH_SHA3_384 = 0x0103,
+    ALG_HASH_SHAKE128 = 0x0111,
+    ALG_HASH_SHAKE256 = 0x0112,
+
+    ALG_HASH_SHA2_224 = 0x0201,
+    ALG_HASH_SHA2_256 = 0x0202,
+    ALG_HASH_SHA2_384 = 0x0203,
+    ALG_HASH_SHA2_512 = 0x0204,
+    ALG_HASH_SHA2_512_224 = 0x0205,
+    ALG_HASH_SHA2_512_256 = 0x0206,
+
+    ALG_HASH_LSH_256_224 = 0x0301,
+    ALG_HASH_LSH_256_256 = 0x0302,
+    ALG_HASH_LSH_512_224 = 0x0311,
+    ALG_HASH_LSH_512_256 = 0x0312,
+    ALG_HASH_LSH_512_384 = 0x0313,
+    ALG_HASH_LSH_512_512 = 0x0314,
+
+    ALG_ML_KEM_512 = 0x1001,
+    ALG_ML_KEM_768 = 0x1002,
+    ALG_ML_KEM_1024 = 0x1003,
+
+    ALG_RSA_RAW = 0x2001,
+    ALG_ELGAMAL_SAFE_PRIME = 0x3001,
+
+    ALG_AES_128_ECB = 0x00500110,
+    ALG_AES_192_ECB = 0x00500118,
+    ALG_AES_256_ECB = 0x00500120,
+    ALG_AES_128_CBC = 0x00500210,
+    ALG_AES_192_CBC = 0x00500218,
+    ALG_AES_256_CBC = 0x00500220,
+    ALG_AES_128_CTR = 0x00500610,
+    ALG_AES_192_CTR = 0x00500618,
+    ALG_AES_256_CTR = 0x00500620,
+    ALG_AES_128_CCM = 0x00580110,
+    ALG_AES_192_CCM = 0x00580118,
+    ALG_AES_256_CCM = 0x00580120,
+    ALG_AES_128_GCM = 0x00580210,
+    ALG_AES_192_GCM = 0x00580218,
+    ALG_AES_256_GCM = 0x00580220,
+
+    ALG_CTR_DRBG_AES_128_DF = 0x6001,
+    ALG_CTR_DRBG_AES_192_DF = 0x6002,
+    ALG_CTR_DRBG_AES_256_DF = 0x6003,
+    ALG_CTR_DRBG_AES_128_NO_DF = 0x6011,
+    ALG_CTR_DRBG_AES_192_NO_DF = 0x6012,
+    ALG_CTR_DRBG_AES_256_NO_DF = 0x6013,
+
+    ALG_ML_DSA_44 = 0x7001,
+    ALG_ML_DSA_65 = 0x7002,
+    ALG_ML_DSA_87 = 0x7003,
+
+    ALG_SLH_DSA_SHA2_128S = 0x8001,
+    ALG_SLH_DSA_SHA2_128F = 0x8002,
+    ALG_SLH_DSA_SHA2_192S = 0x8003,
+    ALG_SLH_DSA_SHA2_192F = 0x8004,
+    ALG_SLH_DSA_SHA2_256S = 0x8005,
+    ALG_SLH_DSA_SHA2_256F = 0x8006,
+    ALG_SLH_DSA_SHAKE_128S = 0x8011,
+    ALG_SLH_DSA_SHAKE_128F = 0x8012,
+    ALG_SLH_DSA_SHAKE_192S = 0x8013,
+    ALG_SLH_DSA_SHAKE_192F = 0x8014,
+    ALG_SLH_DSA_SHAKE_256S = 0x8015,
+    ALG_SLH_DSA_SHAKE_256F = 0x8016
+};
+
+enum {
+    CRYPTO_SUCCESS = 0,
+    CRYPTO_ERROR_INVALID_ARGUMENT = -1,
+    CRYPTO_ERROR_INVALID_ALG_ID = -2,
+    CRYPTO_ERROR_UNSUPPORTED_ALGORITHM = -3,
+    CRYPTO_ERROR_BUFFER_TOO_SMALL = -4,
+    CRYPTO_ERROR_ALLOCATION_FAILED = -5,
+    CRYPTO_ERROR_RANDOM_FAILED = -6,
+    CRYPTO_ERROR_INVALID_KEY = -7,
+    CRYPTO_ERROR_MESSAGE_TOO_LARGE = -8,
+    CRYPTO_ERROR_PRIME_GENERATION_FAILED = -9,
+    CRYPTO_ERROR_ARITHMETIC = -10,
+    CRYPTO_ERROR_INTERNAL = -11,
+    CRYPTO_ERROR_AUTHENTICATION_FAILED = -12,
+    CRYPTO_ERROR_RESEED_REQUIRED = -13,
+    CRYPTO_ERROR_SIGNATURE_INVALID = -14
+};
+
+#endif

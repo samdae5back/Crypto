@@ -5,7 +5,7 @@
 #include "parameter.h"
 
 
-int zeta[256] = {
+static const int ZETA_TABLE[256] = {
     1, 17, 289, 1584, 296, 1703, 2319, 2804, 1062, 1409,
     650, 1063, 1426, 939, 2647, 1722, 2642, 1637, 1197, 375,
     3046, 1847, 1438, 1143, 2786, 756, 2865, 2099, 2393, 733,
@@ -35,11 +35,11 @@ int zeta[256] = {
 };
 
 
-int* GenZeta() {
-    return zeta;
+const int* GenZeta(void) {
+    return ZETA_TABLE;
 }
 
-//ºñÆ® ¹ÝÀü ÇÔ¼ö
+//ë¹„íŠ¸ ë°˜ì „ í•¨ìˆ˜
 int bit_rev(int x) {
     int t[7] = { 0 };
     for (int i = 0; i < 7; i++) {
@@ -55,13 +55,13 @@ int bit_rev(int x) {
     return r;
 }
 
-void NTT(int* f, int* g, int* zeta) {//input, output, zeta
+void NTT(int* f, int* g, const int* zetas) {//input, output, zeta
     memcpy(g, f, n * sizeof(int));
     int i = 1;
     int t = 0;
     for (int len = n / 2;len >= 2;len = len / 2) {
         for (int start = 0;start < n;start = start + (2 * len)) {
-            int z = zeta[bit_rev(i)];
+            int z = zetas[bit_rev(i)];
             i++;
             for (int j = start;j < start + len;j++) {
                 t = (z * g[j + len]) % q;
@@ -70,22 +70,22 @@ void NTT(int* f, int* g, int* zeta) {//input, output, zeta
             }
         }
     }
-    for (int i = 0;i < n;i++) {
-        g[i] = g[i] % q;
-        while (g[i] < 0) {
-            g[i] = g[i] + q;
+    for (int index = 0;index < n;index++) {
+        g[index] = g[index] % q;
+        while (g[index] < 0) {
+            g[index] = g[index] + q;
         }
     }
     return;
 }
 
 
-void NTT_inv(int* f, int* g, int* zeta) {
+void NTT_inv(int* f, int* g, const int* zetas) {
     memcpy(g, f, n * sizeof(int));
     int i = 127;
     for (int len = 2;len <= 128;len = len * 2) {
         for (int start = 0;start < n;start = start + (2 * len)) {
-            int z = zeta[bit_rev(i)];
+            int z = zetas[bit_rev(i)];
             i--;
             for (int j = start;j < start + len;j++) {
                 int t = g[j];
@@ -94,10 +94,10 @@ void NTT_inv(int* f, int* g, int* zeta) {
             }
         }
     }
-    for (int i = 0;i < n;i++) {
-        g[i] = (g[i] * 3303) % q;
-        while (g[i] < 0) {
-            g[i] = g[i] + q;
+    for (int index = 0;index < n;index++) {
+        g[index] = (g[index] * 3303) % q;
+        while (g[index] < 0) {
+            g[index] = g[index] + q;
         }
     }
     return;
@@ -109,9 +109,9 @@ void Multiply_basic(int a0, int a1, int  b0, int b1, int* c0, int* c1, int r) {
     return;
 }
 
-void Multiply_NTT(int* f, int* g, int* h, int* zeta) {
+void Multiply_NTT(int* f, int* g, int* h, const int* zetas) {
     for (int i = 0;i < 128;i++) {
-        Multiply_basic(f[2 * i], f[2 * i + 1], g[2 * i], g[2 * i + 1], &h[2 * i], &h[2 * i + 1], zeta[(2 * bit_rev(i)) + 1]);
+        Multiply_basic(f[2 * i], f[2 * i + 1], g[2 * i], g[2 * i + 1], &h[2 * i], &h[2 * i + 1], zetas[(2 * bit_rev(i)) + 1]);
     }
     return;
 }

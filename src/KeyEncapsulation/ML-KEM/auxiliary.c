@@ -24,8 +24,8 @@ void Bit2Byte(unsigned char *b, unsigned char *B, size_t output_length) {
         exit(EXIT_FAILURE);
     }
     memset(B, 0, sizeof(unsigned char) * output_length);
-    for (int i = 0; i < 8 * (int)output_length; i++) {
-        B[i / 8] += b[i] * exp_int(2, i % 8);
+    for (size_t i = 0u; i < 8u * output_length; i++) {
+        B[i / 8u] |= (unsigned char)((b[i] & 1u) << (i % 8u));
     }
 }
 
@@ -75,7 +75,7 @@ void ByteDecode(unsigned char *B, size_t d, int *output) {
         perror("Err: bit length incorrect");
         exit(EXIT_FAILURE);
     } else {
-        m = exp_int(2, d);
+        m = exp_int(2, (int)d);
     }
 
     unsigned char *b = (unsigned char *)malloc(sizeof(unsigned char) * d * n);

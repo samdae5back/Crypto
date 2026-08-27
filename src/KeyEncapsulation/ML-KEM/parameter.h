@@ -1,7 +1,7 @@
 #ifndef ML_KEM_PARAMETER_H
 #define ML_KEM_PARAMETER_H
 
-#include "ALGID.h"
+#include "Def.h"
 
 typedef struct {
     AlgID alg;
