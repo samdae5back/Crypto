@@ -3,7 +3,11 @@ name: Apply LiberaCrypt public API rename
 on:
   push:
     branches:
-      - refactor/liberacrypt-public-api
+      - rename/liberacrypt-public-api
+
+concurrency:
+  group: liberacrypt-public-api-rename
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -17,7 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: refactor/liberacrypt-public-api
+          ref: rename/liberacrypt-public-api
           fetch-depth: 0
 
       - name: Apply public API and package rename
@@ -85,4 +89,4 @@ jobs:
           git add -A
           git commit -m "refactor(api): rename public surface to LiberaCrypt" \
             -m "Rename public functions, macros, and algorithm selectors to LIBERAC_; public types to LiberaC*; the umbrella header to LiberaCrypt.h; the CMake package and target to LiberaCrypt::LiberaCrypt; and the library output to liberacrypt. Keep unrelated vendored and private implementation namespaces intact. Validate the installed package with a standalone consumer and representative tests."
-          git push origin HEAD:refactor/liberacrypt-public-api
+          git push origin HEAD:rename/liberacrypt-public-api
