@@ -1,1 +1,4 @@
 *.kat text eol=lf whitespace=-blank-at-eof
+# Preserve the repository-owner-supplied PQC corpus byte for byte so its
+# published SHA-256 manifest is stable on every checkout.
+KAT/*.kat -text -diff !eol
