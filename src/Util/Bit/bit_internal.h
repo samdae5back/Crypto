@@ -28,4 +28,20 @@ static inline uint64_t crypto_rotr64(uint64_t value, unsigned int count) {
     return (value >> count) | (value << ((64u - count) & 63u));
 }
 
+/* Return floor(value / 2^count) without shifting a negative signed value. */
+static inline int32_t crypto_floor_div_pow2_i32(
+    int32_t value, unsigned int count) {
+    const uint32_t negative = (uint32_t)(value < 0);
+    const uint32_t negative_mask = 0u - negative;
+    const uint32_t remainder_mask =
+        (UINT32_C(1) << count) - UINT32_C(1);
+    const uint32_t magnitude =
+        ((uint32_t)value ^ negative_mask) + negative;
+    const uint32_t quotient =
+        (magnitude + (remainder_mask & negative_mask)) >> count;
+
+    return (int32_t)quotient *
+           (INT32_C(1) - INT32_C(2) * (int32_t)negative);
+}
+
 #endif

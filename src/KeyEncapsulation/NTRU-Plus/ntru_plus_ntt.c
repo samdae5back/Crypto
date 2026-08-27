@@ -5,6 +5,7 @@
  */
 #include <stdint.h>
 #include "ntru_plus_ntt.h"
+#include "Util/Bit/bit_internal.h"
 
 /* ------------------------------------------------------------------ */
 /* Shared constants (all variants)                                      */
@@ -129,28 +130,14 @@ const int16_t crypto_ntru_plus_zetas_1152[288] = {
 };
 
 /* ------------------------------------------------------------------ */
-/* Shared field arithmetic (appears once)                               */
+/* Shared field arithmetic (appears once)                             */
 /* ------------------------------------------------------------------ */
-
-/* Return floor(value / 2^shift) without relying on signed right shift. */
-static int32_t crypto_ntru_plus_arshift32(int32_t value, unsigned int shift)
-{
-    uint32_t negative = (uint32_t)(value < 0);
-    uint32_t negative_mask = 0u - negative;
-    uint32_t magnitude;
-    uint32_t quotient;
-    uint32_t remainder_mask = ((uint32_t)1u << shift) - 1u;
-
-    magnitude = ((uint32_t)value ^ negative_mask) + negative;
-    quotient = (magnitude + (remainder_mask & negative_mask)) >> shift;
-    return (int32_t)quotient * (1 - 2 * (int32_t)negative);
-}
 
 static inline int16_t montgomery_reduce(int32_t a)
 {
     int16_t t;
     t = (int16_t)a * CRYPTO_NTRU_PLUS_QINV;
-    t = (int16_t)crypto_ntru_plus_arshift32(
+    t = (int16_t)crypto_floor_div_pow2_i32(
         a - (int32_t)t * CRYPTO_NTRU_PLUS_Q, 16u);
     return t;
 }
@@ -159,7 +146,7 @@ static inline int16_t barrett_reduce(int16_t a)
 {
     int16_t t;
     const int16_t v = ((1 << 26) + CRYPTO_NTRU_PLUS_Q / 2) / CRYPTO_NTRU_PLUS_Q;
-    t = (int16_t)crypto_ntru_plus_arshift32(
+    t = (int16_t)crypto_floor_div_pow2_i32(
         (int32_t)v * a + ((int32_t)1 << 25), 26u);
     t *= CRYPTO_NTRU_PLUS_Q;
     return a - t;

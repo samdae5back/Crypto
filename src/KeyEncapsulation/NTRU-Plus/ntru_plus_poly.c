@@ -5,6 +5,7 @@
  */
 #include "ntru_plus_poly.h"
 #include "ntru_plus_ntt.h"
+#include "Util/Bit/bit_internal.h"
 #include "Util/Core/secure_zero.h"
 
 /*************************************************
@@ -21,12 +22,15 @@ static inline int16_t crepmod3(int16_t a)
     int16_t t;
     const int16_t v = ((1 << 15) + 3 / 2) / 3;
 
-    a += (a >> 15) & CRYPTO_NTRU_PLUS_Q;
+    a = (int16_t)(a +
+        (crypto_floor_div_pow2_i32(a, 15u) & CRYPTO_NTRU_PLUS_Q));
     a -= (CRYPTO_NTRU_PLUS_Q + 1) / 2;
-    a += (a >> 15) & CRYPTO_NTRU_PLUS_Q;
+    a = (int16_t)(a +
+        (crypto_floor_div_pow2_i32(a, 15u) & CRYPTO_NTRU_PLUS_Q));
     a -= (CRYPTO_NTRU_PLUS_Q - 1) / 2;
 
-    t  = (int16_t)(((int32_t)v * a + (1 << 14)) >> 15);
+    t = (int16_t)crypto_floor_div_pow2_i32(
+        (int32_t)v * a + (INT32_C(1) << 14), 15u);
     t *= 3;
     return a - t;
 }
@@ -47,9 +51,13 @@ void crypto_ntru_plus_poly_tobytes(uint8_t *r, const crypto_ntru_plus_poly *a, c
 
     for (i = 0; i < alg->n / 2; i++) {
         t[0] = a->coeffs[2*i];
-        t[0] += (t[0] >> 15) & CRYPTO_NTRU_PLUS_Q;
+        t[0] = (int16_t)(t[0] +
+            (crypto_floor_div_pow2_i32(t[0], 15u) &
+             CRYPTO_NTRU_PLUS_Q));
         t[1] = a->coeffs[2*i+1];
-        t[1] += (t[1] >> 15) & CRYPTO_NTRU_PLUS_Q;
+        t[1] = (int16_t)(t[1] +
+            (crypto_floor_div_pow2_i32(t[1], 15u) &
+             CRYPTO_NTRU_PLUS_Q));
 
         r[3*i+0] = (uint8_t)(t[0] >> 0);
         r[3*i+1] = (uint8_t)((t[0] >> 8) | (t[1] << 4));

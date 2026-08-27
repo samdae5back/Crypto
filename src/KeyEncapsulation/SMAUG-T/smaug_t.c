@@ -633,7 +633,8 @@ static void smaug_t_toom_cook_4way(
 
         r1 = (uint16_t)(r1 + r4);
         r5 = (uint16_t)(r5 - r4);
-        r3 = (uint16_t)((r3 - r2) >> 1);
+        /* This Toom-Cook interpolation difference is exactly divisible by 2. */
+        r3 = (uint16_t)(((int)r3 - (int)r2) / 2);
         r4 = (uint16_t)(r4 - r0);
         r4 = (uint16_t)(r4 - (r6 << 6));
         r4 = (uint16_t)((r4 << 1) + r5);
