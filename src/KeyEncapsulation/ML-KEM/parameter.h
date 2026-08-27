@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 2026 Myungjun Kim
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
 #ifndef ML_KEM_PARAMETER_H
 #define ML_KEM_PARAMETER_H
 

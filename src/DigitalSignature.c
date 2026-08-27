@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 2026 Myungjun Kim
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
 #include "DigitalSignature.h"
 
 #include "DigitalSignature/ML-DSA/ml_dsa_internal.h"

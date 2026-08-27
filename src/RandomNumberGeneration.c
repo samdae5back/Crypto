@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 2026 Myungjun Kim
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
 #include "RandomNumberGeneration.h"
 
 #include "RandomNumberGeneration/CTR_DRBG/ctr_drbg_internal.h"

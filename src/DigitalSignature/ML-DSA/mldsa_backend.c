@@ -1,4 +1,9 @@
 /*
+ * Copyright (C) 2026 Myungjun Kim
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+/*
  * Multi-level build adapter for the pinned mldsa-native backend.
  * The upstream source is multi-licensed Apache-2.0 OR ISC OR MIT.
  */

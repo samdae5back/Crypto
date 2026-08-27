@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 2026 Myungjun Kim
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
 #include "rsa_internal.h"
 #include "Util/Bignum/bignum_internal.h"
 #include "Util/Prime/prime_internal.h"

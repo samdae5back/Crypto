@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 2026 Myungjun Kim
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
 #ifndef crypto_bignum_internal_h
 #define crypto_bignum_internal_h
 

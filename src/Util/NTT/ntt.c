@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 2026 Myungjun Kim
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
 #include "ntt_internal.h"
 
 uint32_t ntt_mod_pow(uint32_t a, uint64_t e, uint32_t q){uint64_t r=1,x=a%q;while(e){if(e&1u)r=(r*x)%q;x=(x*x)%q;e>>=1;}return (uint32_t)r;}

@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 2026 Myungjun Kim
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
 #include "endian_internal.h"
 
 uint16_t crypto_load16_le(const uint8_t *input) {
