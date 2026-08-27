@@ -60,6 +60,7 @@ CryptoError crypto_rsa_keygen_internal(AlgID ALG, CRYPTO_RSA_PUBLIC_KEY *PUBLIC_
     CRYPTO_BIGNUM p, q, n, p1, q1, phi, d;
     size_t p_bits, q_bits;
     int attempts;
+    CryptoError err;
     if (ALG != ALG_RSA_RAW) return CRYPTO_ERROR_INVALID_ALG_ID;
     if (!PUBLIC_KEY || !PRIVATE_KEY || MODULUS_BITS < 32) return CRYPTO_ERROR_INVALID_ARGUMENT;
     if (PRIME_ROUNDS == 0) PRIME_ROUNDS = 32;
@@ -70,7 +71,10 @@ CryptoError crypto_rsa_keygen_internal(AlgID ALG, CRYPTO_RSA_PUBLIC_KEY *PUBLIC_
     for (attempts = 0; attempts < 128; ++attempts) {
         crypto_bignum_free(&p); crypto_bignum_init(&p); crypto_bignum_free(&q); crypto_bignum_init(&q);
         crypto_bignum_free(&n); crypto_bignum_init(&n); crypto_bignum_free(&p1); crypto_bignum_init(&p1); crypto_bignum_free(&q1); crypto_bignum_init(&q1); crypto_bignum_free(&phi); crypto_bignum_init(&phi); crypto_bignum_free(&d); crypto_bignum_init(&d);
-        if (crypto_prime_generate_internal(&p, p_bits, PRIME_ROUNDS) != CRYPTO_SUCCESS || crypto_prime_generate_internal(&q, q_bits, PRIME_ROUNDS) != CRYPTO_SUCCESS) goto prime_fail;
+        err = crypto_prime_generate_internal(&p, p_bits, PRIME_ROUNDS);
+        if (err != CRYPTO_SUCCESS) goto prime_fail;
+        err = crypto_prime_generate_internal(&q, q_bits, PRIME_ROUNDS);
+        if (err != CRYPTO_SUCCESS) goto prime_fail;
         if (crypto_bignum_compare(&p, &q) == 0) continue;
         if (crypto_bignum_mul(&n, &p, &q) != 0) goto arithmetic_fail;
         if (crypto_bignum_bit_length(&n) != MODULUS_BITS) continue;
@@ -86,9 +90,10 @@ CryptoError crypto_rsa_keygen_internal(AlgID ALG, CRYPTO_RSA_PUBLIC_KEY *PUBLIC_
         crypto_bignum_free(&p); crypto_bignum_free(&q); crypto_bignum_free(&n); crypto_bignum_free(&p1); crypto_bignum_free(&q1); crypto_bignum_free(&phi); crypto_bignum_free(&d);
         return CRYPTO_SUCCESS;
     }
+    err = CRYPTO_ERROR_PRIME_GENERATION_FAILED;
 prime_fail:
     crypto_bignum_free(&p); crypto_bignum_free(&q); crypto_bignum_free(&n); crypto_bignum_free(&p1); crypto_bignum_free(&q1); crypto_bignum_free(&phi); crypto_bignum_free(&d);
-    return CRYPTO_ERROR_PRIME_GENERATION_FAILED;
+    return err;
 arithmetic_fail:
     crypto_bignum_free(&p); crypto_bignum_free(&q); crypto_bignum_free(&n); crypto_bignum_free(&p1); crypto_bignum_free(&q1); crypto_bignum_free(&phi); crypto_bignum_free(&d);
     return CRYPTO_ERROR_ARITHMETIC;

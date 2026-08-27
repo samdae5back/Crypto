@@ -3,7 +3,8 @@
 
 #include "AsymmetricCipher.h"
 
-int elgamal_random_nonzero(CRYPTO_BIGNUM *out, const CRYPTO_BIGNUM *upper);
+CryptoError elgamal_random_nonzero(CRYPTO_BIGNUM *out,
+                                    const CRYPTO_BIGNUM *upper);
 void crypto_elgamal_public_key_init_internal(CRYPTO_ELGAMAL_PUBLIC_KEY *key);
 void crypto_elgamal_public_key_free_internal(CRYPTO_ELGAMAL_PUBLIC_KEY *key);
 void crypto_elgamal_private_key_init_internal(CRYPTO_ELGAMAL_PRIVATE_KEY *key);

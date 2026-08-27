@@ -1,5 +1,6 @@
 #include "bignum_internal.h"
 #include "RandomNumberGeneration/Noise/random_internal.h"
+#include "Util/Core/secure_zero.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -14,9 +15,7 @@ void crypto_bignum_init(CRYPTO_BIGNUM *VALUE) {
 void crypto_bignum_free(CRYPTO_BIGNUM *VALUE) {
     if (!VALUE) return;
     if (VALUE->LIMBS) {
-        volatile uint32_t *p = (volatile uint32_t *)VALUE->LIMBS;
-        size_t i;
-        for (i = 0; i < VALUE->CAPACITY; ++i) p[i] = 0;
+        crypto_zeroize(VALUE->LIMBS, VALUE->CAPACITY * sizeof(uint32_t));
         free(VALUE->LIMBS);
     }
     crypto_bignum_init(VALUE);
@@ -27,10 +26,15 @@ int bignum_reserve(CRYPTO_BIGNUM *a, size_t capacity) {
     size_t old;
     if (!a) return -1;
     if (capacity <= a->CAPACITY) return 0;
+    if (capacity > (size_t)-1 / sizeof(uint32_t)) return -1;
     old = a->CAPACITY;
-    p = (uint32_t *)realloc(a->LIMBS, capacity * sizeof(uint32_t));
+    p = (uint32_t *)calloc(capacity, sizeof(uint32_t));
     if (!p) return -1;
-    memset(p + old, 0, (capacity - old) * sizeof(uint32_t));
+    if (old) {
+        memcpy(p, a->LIMBS, old * sizeof(uint32_t));
+        crypto_zeroize(a->LIMBS, old * sizeof(uint32_t));
+        free(a->LIMBS);
+    }
     a->LIMBS = p;
     a->CAPACITY = capacity;
     return 0;
@@ -68,31 +72,43 @@ int crypto_bignum_set_u64(CRYPTO_BIGNUM *OUT, uint64_t VALUE) {
     return 0;
 }
 
-int crypto_bignum_from_bytes_le(CRYPTO_BIGNUM *OUT, const uint8_t *BYTES, size_t LENGTH) {
+CryptoError crypto_bignum_from_bytes_le(CRYPTO_BIGNUM *OUT,
+                                         const uint8_t *BYTES,
+                                         size_t LENGTH) {
     size_t limbs, i;
-    if (!OUT || (!BYTES && LENGTH)) return -1;
+    if (!OUT || (!BYTES && LENGTH)) return CRYPTO_ERROR_INVALID_ARGUMENT;
+    if (LENGTH > (size_t)-1 / 8u)
+        return CRYPTO_ERROR_MESSAGE_TOO_LARGE;
     limbs = (LENGTH + 3u) / 4u;
-    if (bignum_reserve(OUT, limbs) != 0) return -1;
-    if (limbs) memset(OUT->LIMBS, 0, limbs * sizeof(uint32_t));
+    if (bignum_reserve(OUT, limbs) != 0)
+        return CRYPTO_ERROR_ALLOCATION_FAILED;
+    if (OUT->CAPACITY)
+        crypto_zeroize(OUT->LIMBS, OUT->CAPACITY * sizeof(uint32_t));
     for (i = 0; i < LENGTH; ++i) OUT->LIMBS[i / 4u] |= (uint32_t)BYTES[i] << (8u * (i % 4u));
     OUT->LENGTH = limbs;
     bignum_normalize(OUT);
-    return 0;
+    return CRYPTO_SUCCESS;
 }
 
-int crypto_bignum_from_bytes_be(CRYPTO_BIGNUM *OUT, const uint8_t *BYTES, size_t LENGTH) {
+CryptoError crypto_bignum_from_bytes_be(CRYPTO_BIGNUM *OUT,
+                                         const uint8_t *BYTES,
+                                         size_t LENGTH) {
     size_t limbs, i;
-    if (!OUT || (!BYTES && LENGTH)) return -1;
+    if (!OUT || (!BYTES && LENGTH)) return CRYPTO_ERROR_INVALID_ARGUMENT;
+    if (LENGTH > (size_t)-1 / 8u)
+        return CRYPTO_ERROR_MESSAGE_TOO_LARGE;
     limbs = (LENGTH + 3u) / 4u;
-    if (bignum_reserve(OUT, limbs) != 0) return -1;
-    if (limbs) memset(OUT->LIMBS, 0, limbs * sizeof(uint32_t));
+    if (bignum_reserve(OUT, limbs) != 0)
+        return CRYPTO_ERROR_ALLOCATION_FAILED;
+    if (OUT->CAPACITY)
+        crypto_zeroize(OUT->LIMBS, OUT->CAPACITY * sizeof(uint32_t));
     for (i = 0; i < LENGTH; ++i) {
         size_t ri = LENGTH - 1u - i;
         OUT->LIMBS[i / 4u] |= (uint32_t)BYTES[ri] << (8u * (i % 4u));
     }
     OUT->LENGTH = limbs;
     bignum_normalize(OUT);
-    return 0;
+    return CRYPTO_SUCCESS;
 }
 
 size_t crypto_bignum_bit_length(const CRYPTO_BIGNUM *VALUE) {
@@ -110,24 +126,26 @@ size_t crypto_bignum_byte_length(const CRYPTO_BIGNUM *VALUE) {
     return (bits + 7u) / 8u;
 }
 
-int crypto_bignum_to_bytes_le(const CRYPTO_BIGNUM *IN, uint8_t *OUT, size_t OUT_LENGTH) {
+CryptoError crypto_bignum_to_bytes_le(const CRYPTO_BIGNUM *IN, uint8_t *OUT,
+                                       size_t OUT_LENGTH) {
     size_t need, i;
-    if (!IN || (!OUT && OUT_LENGTH)) return -1;
+    if (!IN || (!OUT && OUT_LENGTH)) return CRYPTO_ERROR_INVALID_ARGUMENT;
     need = crypto_bignum_byte_length(IN);
-    if (OUT_LENGTH < need) return -1;
+    if (OUT_LENGTH < need) return CRYPTO_ERROR_BUFFER_TOO_SMALL;
     if (OUT_LENGTH) memset(OUT, 0, OUT_LENGTH);
     for (i = 0; i < need; ++i) OUT[i] = (uint8_t)(IN->LIMBS[i / 4u] >> (8u * (i % 4u)));
-    return 0;
+    return CRYPTO_SUCCESS;
 }
 
-int crypto_bignum_to_bytes_be(const CRYPTO_BIGNUM *IN, uint8_t *OUT, size_t OUT_LENGTH) {
+CryptoError crypto_bignum_to_bytes_be(const CRYPTO_BIGNUM *IN, uint8_t *OUT,
+                                       size_t OUT_LENGTH) {
     size_t need, i;
-    if (!IN || (!OUT && OUT_LENGTH)) return -1;
+    if (!IN || (!OUT && OUT_LENGTH)) return CRYPTO_ERROR_INVALID_ARGUMENT;
     need = crypto_bignum_byte_length(IN);
-    if (OUT_LENGTH < need) return -1;
+    if (OUT_LENGTH < need) return CRYPTO_ERROR_BUFFER_TOO_SMALL;
     if (OUT_LENGTH) memset(OUT, 0, OUT_LENGTH);
     for (i = 0; i < need; ++i) OUT[OUT_LENGTH - 1u - i] = (uint8_t)(IN->LIMBS[i / 4u] >> (8u * (i % 4u)));
-    return 0;
+    return CRYPTO_SUCCESS;
 }
 
 int crypto_bignum_compare(const CRYPTO_BIGNUM *A, const CRYPTO_BIGNUM *B) {
@@ -569,41 +587,55 @@ done:
     return rc;
 }
 
-int crypto_bignum_random_bits(CRYPTO_BIGNUM *OUT, size_t BITS, int SET_TOP_BIT, int SET_ODD) {
+CryptoError crypto_bignum_random_bits(CRYPTO_BIGNUM *OUT, size_t BITS,
+                                       int SET_TOP_BIT, int SET_ODD) {
     uint8_t *buf;
     size_t bytes;
     unsigned unused;
-    int rc;
-    if (!OUT || BITS == 0) return -1;
+    CryptoError err;
+    if (!OUT || BITS == 0) return CRYPTO_ERROR_INVALID_ARGUMENT;
+    if (BITS > (size_t)-1 - 7u) return CRYPTO_ERROR_MESSAGE_TOO_LARGE;
     bytes = (BITS + 7u) / 8u;
     buf = (uint8_t *)malloc(bytes);
-    if (!buf) return -1;
-    if (crypto_random_bytes_internal(buf, bytes) != 0) { free(buf); return -1; }
+    if (!buf) return CRYPTO_ERROR_ALLOCATION_FAILED;
+    err = crypto_random_bytes_internal(buf, bytes);
+    if (err != CRYPTO_SUCCESS) {
+        crypto_zeroize(buf, bytes);
+        free(buf);
+        return err;
+    }
     unused = (unsigned)(bytes * 8u - BITS);
     if (unused) buf[0] &= (uint8_t)(0xffu >> unused);
     if (SET_TOP_BIT) buf[0] |= (uint8_t)(1u << (7u - unused));
     if (SET_ODD) buf[bytes - 1u] |= 1u;
-    rc = crypto_bignum_from_bytes_be(OUT, buf, bytes);
-    memset(buf, 0, bytes);
+    err = crypto_bignum_from_bytes_be(OUT, buf, bytes);
+    crypto_zeroize(buf, bytes);
     free(buf);
-    return rc;
+    return err;
 }
 
-int crypto_bignum_random_range(CRYPTO_BIGNUM *OUT, const CRYPTO_BIGNUM *UPPER_EXCLUSIVE) {
+CryptoError crypto_bignum_random_range(
+    CRYPTO_BIGNUM *OUT, const CRYPTO_BIGNUM *UPPER_EXCLUSIVE) {
     CRYPTO_BIGNUM x;
     size_t bits;
     int tries;
-    if (!OUT || !UPPER_EXCLUSIVE || UPPER_EXCLUSIVE->LENGTH == 0) return -1;
+    CryptoError err;
+    if (!OUT || !UPPER_EXCLUSIVE || UPPER_EXCLUSIVE->LENGTH == 0)
+        return CRYPTO_ERROR_INVALID_ARGUMENT;
     bits = crypto_bignum_bit_length(UPPER_EXCLUSIVE);
     crypto_bignum_init(&x);
     for (tries = 0; tries < 128; ++tries) {
-        if (crypto_bignum_random_bits(&x, bits, 0, 0) != 0) goto fail;
+        err = crypto_bignum_random_bits(&x, bits, 0, 0);
+        if (err != CRYPTO_SUCCESS) goto fail;
         if (crypto_bignum_compare(&x, UPPER_EXCLUSIVE) < 0) {
-            crypto_bignum_free(OUT); *OUT = x; return 0;
+            crypto_bignum_free(OUT);
+            *OUT = x;
+            return CRYPTO_SUCCESS;
         }
         crypto_bignum_free(&x); crypto_bignum_init(&x);
     }
+    err = CRYPTO_ERROR_INTERNAL;
 fail:
     crypto_bignum_free(&x);
-    return -1;
+    return err;
 }
