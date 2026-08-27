@@ -3,6 +3,18 @@
  * The upstream source is multi-licensed Apache-2.0 OR ISC OR MIT.
  */
 
+#include <stddef.h>
+
+static void crypto_mldsa_zeroize(void *target, size_t length) {
+    volatile unsigned char *bytes = (volatile unsigned char *)target;
+    while (length-- != 0u) *bytes++ = 0u;
+}
+
+/* Keep the bundled backend strictly portable and independent of OS headers. */
+#define MLD_CONFIG_NO_ASM
+#define MLD_CONFIG_CUSTOM_ZEROIZE
+#define mld_zeroize crypto_mldsa_zeroize
+
 #define MLD_CONFIG_MULTILEVEL_WITH_SHARED
 #define MLD_CONFIG_MONOBUILD_KEEP_SHARED_HEADERS
 #define MLD_CONFIG_PARAMETER_SET 44

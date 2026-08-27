@@ -1,5 +1,5 @@
-#include "ML_DSA.h"
-#include "RANDOM.h"
+#include "ml_dsa_internal.h"
+#include "RandomNumberGeneration/Noise/random_internal.h"
 #include "Util/Core/secure_zero.h"
 #include "mldsa_native_all.h"
 
@@ -8,22 +8,32 @@
 #define ML_DSA_SEED_BYTES 32u
 #define ML_DSA_RANDOM_BYTES 32u
 
+_Static_assert(ML_DSA_44_PUBLIC_KEY_BYTES == CRYPTO_ML_DSA_44_PUBLIC_KEY_BYTES, "ML-DSA-44 public-key size mismatch");
+_Static_assert(ML_DSA_44_PRIVATE_KEY_BYTES == CRYPTO_ML_DSA_44_PRIVATE_KEY_BYTES, "ML-DSA-44 private-key size mismatch");
+_Static_assert(ML_DSA_44_SIGNATURE_BYTES == CRYPTO_ML_DSA_44_SIGNATURE_BYTES, "ML-DSA-44 signature size mismatch");
+_Static_assert(ML_DSA_65_PUBLIC_KEY_BYTES == CRYPTO_ML_DSA_65_PUBLIC_KEY_BYTES, "ML-DSA-65 public-key size mismatch");
+_Static_assert(ML_DSA_65_PRIVATE_KEY_BYTES == CRYPTO_ML_DSA_65_PRIVATE_KEY_BYTES, "ML-DSA-65 private-key size mismatch");
+_Static_assert(ML_DSA_65_SIGNATURE_BYTES == CRYPTO_ML_DSA_65_SIGNATURE_BYTES, "ML-DSA-65 signature size mismatch");
+_Static_assert(ML_DSA_87_PUBLIC_KEY_BYTES == CRYPTO_ML_DSA_87_PUBLIC_KEY_BYTES, "ML-DSA-87 public-key size mismatch");
+_Static_assert(ML_DSA_87_PRIVATE_KEY_BYTES == CRYPTO_ML_DSA_87_PRIVATE_KEY_BYTES, "ML-DSA-87 private-key size mismatch");
+_Static_assert(ML_DSA_87_SIGNATURE_BYTES == CRYPTO_ML_DSA_87_SIGNATURE_BYTES, "ML-DSA-87 signature size mismatch");
+
 static CryptoError ml_dsa_sizes(AlgID alg, size_t *pk, size_t *sk, size_t *sig) {
     switch (alg) {
         case ALG_ML_DSA_44:
-            if (pk) *pk = ML_DSA_44_PUBLIC_KEY_BYTES;
-            if (sk) *sk = ML_DSA_44_PRIVATE_KEY_BYTES;
-            if (sig) *sig = ML_DSA_44_SIGNATURE_BYTES;
+            if (pk) *pk = CRYPTO_ML_DSA_44_PUBLIC_KEY_BYTES;
+            if (sk) *sk = CRYPTO_ML_DSA_44_PRIVATE_KEY_BYTES;
+            if (sig) *sig = CRYPTO_ML_DSA_44_SIGNATURE_BYTES;
             return CRYPTO_SUCCESS;
         case ALG_ML_DSA_65:
-            if (pk) *pk = ML_DSA_65_PUBLIC_KEY_BYTES;
-            if (sk) *sk = ML_DSA_65_PRIVATE_KEY_BYTES;
-            if (sig) *sig = ML_DSA_65_SIGNATURE_BYTES;
+            if (pk) *pk = CRYPTO_ML_DSA_65_PUBLIC_KEY_BYTES;
+            if (sk) *sk = CRYPTO_ML_DSA_65_PRIVATE_KEY_BYTES;
+            if (sig) *sig = CRYPTO_ML_DSA_65_SIGNATURE_BYTES;
             return CRYPTO_SUCCESS;
         case ALG_ML_DSA_87:
-            if (pk) *pk = ML_DSA_87_PUBLIC_KEY_BYTES;
-            if (sk) *sk = ML_DSA_87_PRIVATE_KEY_BYTES;
-            if (sig) *sig = ML_DSA_87_SIGNATURE_BYTES;
+            if (pk) *pk = CRYPTO_ML_DSA_87_PUBLIC_KEY_BYTES;
+            if (sk) *sk = CRYPTO_ML_DSA_87_PRIVATE_KEY_BYTES;
+            if (sig) *sig = CRYPTO_ML_DSA_87_SIGNATURE_BYTES;
             return CRYPTO_SUCCESS;
         default:
             return CRYPTO_ERROR_INVALID_ALG_ID;
@@ -38,22 +48,22 @@ static CryptoError ml_dsa_backend_error(int rc) {
     return CRYPTO_ERROR_INTERNAL;
 }
 
-size_t CRYPTO_ML_DSA_PUBLIC_KEY_SIZE(AlgID ALG) {
+size_t crypto_ml_dsa_public_key_size_internal(AlgID ALG) {
     size_t value = 0u;
     return ml_dsa_sizes(ALG, &value, NULL, NULL) == CRYPTO_SUCCESS ? value : 0u;
 }
 
-size_t CRYPTO_ML_DSA_PRIVATE_KEY_SIZE(AlgID ALG) {
+size_t crypto_ml_dsa_private_key_size_internal(AlgID ALG) {
     size_t value = 0u;
     return ml_dsa_sizes(ALG, NULL, &value, NULL) == CRYPTO_SUCCESS ? value : 0u;
 }
 
-size_t CRYPTO_ML_DSA_SIGNATURE_SIZE(AlgID ALG) {
+size_t crypto_ml_dsa_signature_size_internal(AlgID ALG) {
     size_t value = 0u;
     return ml_dsa_sizes(ALG, NULL, NULL, &value) == CRYPTO_SUCCESS ? value : 0u;
 }
 
-CryptoError CRYPTO_ML_DSA_KEYGEN(AlgID ALG,
+CryptoError crypto_ml_dsa_keygen_internal(AlgID ALG,
                           uint8_t *PUBLIC_KEY, size_t PUBLIC_KEY_LENGTH,
                           uint8_t *PRIVATE_KEY, size_t PRIVATE_KEY_LENGTH) {
     uint8_t seed[ML_DSA_SEED_BYTES];
@@ -67,7 +77,7 @@ CryptoError CRYPTO_ML_DSA_KEYGEN(AlgID ALG,
     if (PUBLIC_KEY_LENGTH < pk_length || PRIVATE_KEY_LENGTH < sk_length)
         return CRYPTO_ERROR_BUFFER_TOO_SMALL;
 
-    err = CRYPTO_RANDOM_BYTES(seed, sizeof(seed));
+    err = crypto_random_bytes_internal(seed, sizeof(seed));
     if (err != CRYPTO_SUCCESS) {
         crypto_zeroize(PUBLIC_KEY, pk_length);
         crypto_zeroize(PRIVATE_KEY, sk_length);
@@ -90,7 +100,7 @@ CryptoError CRYPTO_ML_DSA_KEYGEN(AlgID ALG,
     return err;
 }
 
-CryptoError CRYPTO_ML_DSA_SIGN(AlgID ALG,
+CryptoError crypto_ml_dsa_sign_internal(AlgID ALG,
                         const uint8_t *PRIVATE_KEY, size_t PRIVATE_KEY_LENGTH,
                         const uint8_t *MESSAGE, size_t MESSAGE_LENGTH,
                         const uint8_t *CONTEXT, size_t CONTEXT_LENGTH,
@@ -103,13 +113,13 @@ CryptoError CRYPTO_ML_DSA_SIGN(AlgID ALG,
 
     if (!PRIVATE_KEY || (!MESSAGE && MESSAGE_LENGTH) || (!CONTEXT && CONTEXT_LENGTH) || !SIGNATURE)
         return CRYPTO_ERROR_INVALID_ARGUMENT;
-    if (CONTEXT_LENGTH > ML_DSA_CONTEXT_MAX_BYTES) return CRYPTO_ERROR_INVALID_ARGUMENT;
+    if (CONTEXT_LENGTH > CRYPTO_SIGNATURE_CONTEXT_MAX_BYTES) return CRYPTO_ERROR_INVALID_ARGUMENT;
     err = ml_dsa_sizes(ALG, NULL, &sk_length, &sig_length);
     if (err != CRYPTO_SUCCESS) return err;
     if (PRIVATE_KEY_LENGTH != sk_length) return CRYPTO_ERROR_INVALID_KEY;
     if (SIGNATURE_LENGTH < sig_length) return CRYPTO_ERROR_BUFFER_TOO_SMALL;
 
-    err = CRYPTO_RANDOM_BYTES(rnd, sizeof(rnd));
+    err = crypto_random_bytes_internal(rnd, sizeof(rnd));
     if (err != CRYPTO_SUCCESS) {
         crypto_zeroize(SIGNATURE, sig_length);
         crypto_zeroize(rnd, sizeof(rnd));
@@ -151,7 +161,7 @@ CryptoError CRYPTO_ML_DSA_SIGN(AlgID ALG,
     return err;
 }
 
-CryptoError CRYPTO_ML_DSA_VERIFY(AlgID ALG,
+CryptoError crypto_ml_dsa_verify_internal(AlgID ALG,
                           const uint8_t *PUBLIC_KEY, size_t PUBLIC_KEY_LENGTH,
                           const uint8_t *MESSAGE, size_t MESSAGE_LENGTH,
                           const uint8_t *CONTEXT, size_t CONTEXT_LENGTH,
@@ -162,7 +172,7 @@ CryptoError CRYPTO_ML_DSA_VERIFY(AlgID ALG,
 
     if (!PUBLIC_KEY || (!MESSAGE && MESSAGE_LENGTH) || (!CONTEXT && CONTEXT_LENGTH) || !SIGNATURE)
         return CRYPTO_ERROR_INVALID_ARGUMENT;
-    if (CONTEXT_LENGTH > ML_DSA_CONTEXT_MAX_BYTES) return CRYPTO_ERROR_INVALID_ARGUMENT;
+    if (CONTEXT_LENGTH > CRYPTO_SIGNATURE_CONTEXT_MAX_BYTES) return CRYPTO_ERROR_INVALID_ARGUMENT;
     err = ml_dsa_sizes(ALG, &pk_length, NULL, &sig_length);
     if (err != CRYPTO_SUCCESS) return err;
     if (PUBLIC_KEY_LENGTH != pk_length) return CRYPTO_ERROR_INVALID_KEY;

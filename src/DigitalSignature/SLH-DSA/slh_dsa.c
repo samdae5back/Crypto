@@ -1,8 +1,7 @@
-#include "SLH_DSA.h"
-#include "RANDOM.h"
+#include "slh_dsa_internal.h"
+#include "RandomNumberGeneration/Noise/random_internal.h"
 #include "Util/Core/secure_zero.h"
-/* Use an explicit path: Windows treats this like the public SLH_DSA.h name. */
-#include "../../../third_party/slhdsa-c/slh_dsa.h"
+#include "Backend/slh_dsa.h"
 
 static const slh_param_t *slh_dsa_parameters(AlgID alg) {
     switch (alg) {
@@ -22,22 +21,22 @@ static const slh_param_t *slh_dsa_parameters(AlgID alg) {
     }
 }
 
-size_t CRYPTO_SLH_DSA_PUBLIC_KEY_SIZE(AlgID ALG) {
+size_t crypto_slh_dsa_public_key_size_internal(AlgID ALG) {
     const slh_param_t *prm = slh_dsa_parameters(ALG);
     return prm ? slh_pk_sz(prm) : 0u;
 }
 
-size_t CRYPTO_SLH_DSA_PRIVATE_KEY_SIZE(AlgID ALG) {
+size_t crypto_slh_dsa_private_key_size_internal(AlgID ALG) {
     const slh_param_t *prm = slh_dsa_parameters(ALG);
     return prm ? slh_sk_sz(prm) : 0u;
 }
 
-size_t CRYPTO_SLH_DSA_SIGNATURE_SIZE(AlgID ALG) {
+size_t crypto_slh_dsa_signature_size_internal(AlgID ALG) {
     const slh_param_t *prm = slh_dsa_parameters(ALG);
     return prm ? slh_sig_sz(prm) : 0u;
 }
 
-CryptoError CRYPTO_SLH_DSA_KEYGEN(AlgID ALG,
+CryptoError crypto_slh_dsa_keygen_internal(AlgID ALG,
                            uint8_t *PUBLIC_KEY, size_t PUBLIC_KEY_LENGTH,
                            uint8_t *PRIVATE_KEY, size_t PRIVATE_KEY_LENGTH) {
     const slh_param_t *prm = slh_dsa_parameters(ALG);
@@ -54,7 +53,7 @@ CryptoError CRYPTO_SLH_DSA_KEYGEN(AlgID ALG,
         return CRYPTO_ERROR_BUFFER_TOO_SMALL;
     n = pk_length / 2u;
 
-    err = CRYPTO_RANDOM_BYTES(seed, 3u * n);
+    err = crypto_random_bytes_internal(seed, 3u * n);
     if (err != CRYPTO_SUCCESS) {
         crypto_zeroize(PUBLIC_KEY, pk_length);
         crypto_zeroize(PRIVATE_KEY, sk_length);
@@ -73,7 +72,7 @@ CryptoError CRYPTO_SLH_DSA_KEYGEN(AlgID ALG,
     return CRYPTO_SUCCESS;
 }
 
-CryptoError CRYPTO_SLH_DSA_SIGN(AlgID ALG,
+CryptoError crypto_slh_dsa_sign_internal(AlgID ALG,
                          const uint8_t *PRIVATE_KEY, size_t PRIVATE_KEY_LENGTH,
                          const uint8_t *MESSAGE, size_t MESSAGE_LENGTH,
                          const uint8_t *CONTEXT, size_t CONTEXT_LENGTH,
@@ -86,14 +85,14 @@ CryptoError CRYPTO_SLH_DSA_SIGN(AlgID ALG,
     if (!prm) return CRYPTO_ERROR_INVALID_ALG_ID;
     if (!PRIVATE_KEY || (!MESSAGE && MESSAGE_LENGTH) || (!CONTEXT && CONTEXT_LENGTH) || !SIGNATURE)
         return CRYPTO_ERROR_INVALID_ARGUMENT;
-    if (CONTEXT_LENGTH > SLH_DSA_CONTEXT_MAX_BYTES) return CRYPTO_ERROR_INVALID_ARGUMENT;
+    if (CONTEXT_LENGTH > CRYPTO_SIGNATURE_CONTEXT_MAX_BYTES) return CRYPTO_ERROR_INVALID_ARGUMENT;
     sk_length = slh_sk_sz(prm);
     sig_length = slh_sig_sz(prm);
     if (PRIVATE_KEY_LENGTH != sk_length) return CRYPTO_ERROR_INVALID_KEY;
     if (SIGNATURE_LENGTH < sig_length) return CRYPTO_ERROR_BUFFER_TOO_SMALL;
     n = slh_pk_sz(prm) / 2u;
 
-    err = CRYPTO_RANDOM_BYTES(addrnd, n);
+    err = crypto_random_bytes_internal(addrnd, n);
     if (err != CRYPTO_SUCCESS) {
         crypto_zeroize(SIGNATURE, sig_length);
         crypto_zeroize(addrnd, sizeof(addrnd));
@@ -110,7 +109,7 @@ CryptoError CRYPTO_SLH_DSA_SIGN(AlgID ALG,
     return CRYPTO_SUCCESS;
 }
 
-CryptoError CRYPTO_SLH_DSA_VERIFY(AlgID ALG,
+CryptoError crypto_slh_dsa_verify_internal(AlgID ALG,
                            const uint8_t *PUBLIC_KEY, size_t PUBLIC_KEY_LENGTH,
                            const uint8_t *MESSAGE, size_t MESSAGE_LENGTH,
                            const uint8_t *CONTEXT, size_t CONTEXT_LENGTH,
@@ -121,7 +120,7 @@ CryptoError CRYPTO_SLH_DSA_VERIFY(AlgID ALG,
     if (!prm) return CRYPTO_ERROR_INVALID_ALG_ID;
     if (!PUBLIC_KEY || (!MESSAGE && MESSAGE_LENGTH) || (!CONTEXT && CONTEXT_LENGTH) || !SIGNATURE)
         return CRYPTO_ERROR_INVALID_ARGUMENT;
-    if (CONTEXT_LENGTH > SLH_DSA_CONTEXT_MAX_BYTES) return CRYPTO_ERROR_INVALID_ARGUMENT;
+    if (CONTEXT_LENGTH > CRYPTO_SIGNATURE_CONTEXT_MAX_BYTES) return CRYPTO_ERROR_INVALID_ARGUMENT;
     pk_length = slh_pk_sz(prm);
     sig_length = slh_sig_sz(prm);
     if (PUBLIC_KEY_LENGTH != pk_length) return CRYPTO_ERROR_INVALID_KEY;
