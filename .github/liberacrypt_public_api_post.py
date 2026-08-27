@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -49,14 +50,15 @@ for path in iter_text_files():
 # Normalize top-level package/target/install identity exactly.
 cmake = ROOT / "CMakeLists.txt"
 text = cmake.read_text(encoding="utf-8")
-required_replacements = {
-    "project(LiberaCrypt VERSION": "project(LiberaCrypt VERSION",
-    "add_library(LiberaCrypt::LiberaCrypt ALIAS LiberaCrypt)": "add_library(LiberaCrypt::LiberaCrypt ALIAS LiberaCrypt)",
-    "OUTPUT_NAME liberacrypt": "OUTPUT_NAME liberacrypt",
-    "include(cmake/LiberaCryptExports.cmake)": "include(cmake/LiberaCryptExports.cmake)",
-    "cmake/LiberaCryptConfig.cmake.in": "cmake/LiberaCryptConfig.cmake.in",
-}
-for needle in required_replacements:
+for needle in (
+    "project(LiberaCrypt VERSION",
+    "add_library(LiberaCrypt::LiberaCrypt ALIAS LiberaCrypt)",
+    "OUTPUT_NAME liberacrypt",
+    "include(cmake/LiberaCryptExports.cmake)",
+    "cmake/LiberaCryptConfig.cmake.in",
+    "LiberaCryptTargets",
+    "NAMESPACE LiberaCrypt::",
+):
     if needle not in text:
         raise RuntimeError(f"missing CMake identity after rename: {needle}")
 cmake.write_text(text, encoding="utf-8")
@@ -67,10 +69,43 @@ config_text = config.read_text(encoding="utf-8")
 if "LiberaCryptTargets.cmake" not in config_text:
     raise RuntimeError("LiberaCryptConfig.cmake.in does not include LiberaCryptTargets.cmake")
 
-# README should advertise only the new public surface.
+# Normalize README wording after all token/package replacements. Earlier passes
+# intentionally operate on exact identifiers, which can leave prose such as a
+# bare `CRYPTO_` prefix or the former compatibility paragraph partially renamed.
 readme = ROOT / "README.md"
 text = readme.read_text(encoding="utf-8")
-for old_name in ("<Crypto.h>", "Crypto::Crypto", "find_package(Crypto", "-DCRYPTO_BUILD_TESTS", "-DCRYPTO_BUILD_DOCS"):
+text = re.sub(
+    r"The public C API and CMake package identifiers currently retain the existing\n"
+    r"`[^`]+`, `LiberaCrypt\.h`, and `LiberaCrypt::LiberaCrypt` names for compatibility; LiberaCrypt\n"
+    r"is the project name\.\n",
+    "LiberaCrypt uses `LIBERAC_` for public C functions, macros, constants, and\n"
+    "algorithm selectors, `LiberaC` for public type names, `LiberaCrypt.h` as its\n"
+    "umbrella header, and the `LiberaCrypt::LiberaCrypt` CMake target.\n",
+    text,
+)
+text = text.replace("`CRYPTO_`", "`LIBERAC_`")
+text = text.replace("@c CRYPTO_", "@c LIBERAC_")
+text = text.replace("`ALG_", "`LIBERAC_ALG_")
+readme.write_text(text, encoding="utf-8")
+
+# Installed headers should not describe the old public namespace even in prose.
+for header in (ROOT / "inc").glob("*.h"):
+    text = header.read_text(encoding="utf-8")
+    text = text.replace("CRYPTO_ functions", "LIBERAC_ functions")
+    text = text.replace("CRYPTO_ identifiers", "LIBERAC_ identifiers")
+    text = text.replace("@c CRYPTO_", "@c LIBERAC_")
+    header.write_text(text, encoding="utf-8")
+
+# README should advertise only the new public surface.
+text = readme.read_text(encoding="utf-8")
+for old_name in (
+    "<Crypto.h>",
+    "Crypto::Crypto",
+    "find_package(Crypto",
+    "-DCRYPTO_BUILD_TESTS",
+    "-DCRYPTO_BUILD_DOCS",
+    "`CRYPTO_`",
+):
     if old_name in text:
         raise RuntimeError(f"old public package name remains in README: {old_name}")
 
