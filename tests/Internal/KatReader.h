@@ -28,5 +28,7 @@ int crypto_test_kat_expect_eof(CRYPTO_TEST_KAT_READER *reader);
 int crypto_test_kat_compare(
     const CRYPTO_TEST_KAT_READER *reader, const char *field,
     const uint8_t *expected, const uint8_t *actual, size_t length);
+int crypto_test_kat_reserve(
+    uint8_t **buffer, size_t *capacity, size_t required_length);
 
 #endif

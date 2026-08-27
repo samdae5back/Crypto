@@ -12,20 +12,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-static int resize_buffer(uint8_t **buffer, size_t length) {
-    uint8_t *resized;
-
-    if (length == 0u) {
-        free(*buffer);
-        *buffer = NULL;
-        return 0;
-    }
-    resized = (uint8_t *)realloc(*buffer, length);
-    if (resized == NULL) return -1;
-    *buffer = resized;
-    return 0;
-}
-
 static int report_crypto_error(
     const CRYPTO_TEST_KAT_READER *reader, const char *operation,
     CryptoError error) {
@@ -52,6 +38,8 @@ int crypto_test_run_signature_kat(
     size_t signature_length;
     size_t message_length;
     size_t context_length;
+    size_t message_capacity = 0u;
+    size_t context_capacity = 0u;
     size_t index;
     int kat_active = 0;
     int status = 1;
@@ -102,13 +90,15 @@ int crypto_test_run_signature_kat(
                 &reader, "seed", seed, sizeof(seed)) != 0 ||
             crypto_test_kat_read_size(
                 &reader, "mlen", &message_length) != 0 ||
-            resize_buffer(&message, message_length) != 0 ||
+            crypto_test_kat_reserve(
+                &message, &message_capacity, message_length) != 0 ||
             crypto_test_kat_read_hex(
                 &reader, "msg", message, message_length) != 0 ||
             crypto_test_kat_read_size(
                 &reader, "ctxlen", &context_length) != 0 ||
             context_length > CRYPTO_SIGNATURE_CONTEXT_MAX_BYTES ||
-            resize_buffer(&context, context_length) != 0 ||
+            crypto_test_kat_reserve(
+                &context, &context_capacity, context_length) != 0 ||
             crypto_test_kat_read_hex(
                 &reader, "ctx", context, context_length) != 0 ||
             crypto_test_kat_read_hex(
@@ -189,6 +179,8 @@ cleanup:
         crypto_zeroize(expected_private_key, private_key_length);
     if (expected_public_key != NULL)
         crypto_zeroize(expected_public_key, public_key_length);
+    if (context != NULL) crypto_zeroize(context, context_capacity);
+    if (message != NULL) crypto_zeroize(message, message_capacity);
     free(actual_signature);
     free(actual_private_key);
     free(actual_public_key);

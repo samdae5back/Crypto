@@ -196,3 +196,17 @@ int crypto_test_kat_compare(
     }
     return 0;
 }
+
+int crypto_test_kat_reserve(
+    uint8_t **buffer, size_t *capacity, size_t required_length) {
+    uint8_t *resized;
+
+    if (buffer == NULL || capacity == NULL) return -1;
+    if (required_length <= *capacity) return 0;
+
+    resized = (uint8_t *)realloc(*buffer, required_length);
+    if (resized == NULL) return -1;
+    *buffer = resized;
+    *capacity = required_length;
+    return 0;
+}

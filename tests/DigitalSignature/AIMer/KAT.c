@@ -26,20 +26,6 @@ static const CRYPTO_TEST_AIMER_CASE aimer_cases[] = {
     { "AIMer-256s", ALG_AIMER_256S }
 };
 
-static int resize_buffer(uint8_t **buffer, size_t length) {
-    uint8_t *resized;
-
-    if (length == 0u) {
-        free(*buffer);
-        *buffer = NULL;
-        return 0;
-    }
-    resized = (uint8_t *)realloc(*buffer, length);
-    if (resized == NULL) return -1;
-    *buffer = resized;
-    return 0;
-}
-
 static int report_crypto_error(
     const CRYPTO_TEST_KAT_READER *reader, const char *operation,
     CryptoError error) {
@@ -62,7 +48,8 @@ static int run_kat(const char *path, const CRYPTO_TEST_AIMER_CASE *test_case) {
     size_t private_key_length;
     size_t signature_length;
     size_t message_length = 0u;
-    size_t signed_message_length = 0u;
+    size_t message_capacity = 0u;
+    size_t signed_message_capacity = 0u;
     size_t index;
     int kat_active = 0;
     int status = 1;
@@ -91,6 +78,7 @@ static int run_kat(const char *path, const CRYPTO_TEST_AIMER_CASE *test_case) {
 
     for (index = 0u; index < 100u; ++index) {
         size_t count;
+        size_t signed_message_length;
         CryptoError error;
 
         reader.record = index;
@@ -105,7 +93,8 @@ static int run_kat(const char *path, const CRYPTO_TEST_AIMER_CASE *test_case) {
                 &reader, "seed", seed, sizeof(seed)) != 0 ||
             crypto_test_kat_read_size(
                 &reader, "mlen", &message_length) != 0 ||
-            resize_buffer(&message, message_length) != 0 ||
+            crypto_test_kat_reserve(
+                &message, &message_capacity, message_length) != 0 ||
             crypto_test_kat_read_hex(
                 &reader, "msg", message, message_length) != 0 ||
             crypto_test_kat_read_hex(
@@ -116,9 +105,11 @@ static int run_kat(const char *path, const CRYPTO_TEST_AIMER_CASE *test_case) {
                 private_key_length) != 0 ||
             crypto_test_kat_read_size(
                 &reader, "smlen", &signed_message_length) != 0 ||
+            message_length > SIZE_MAX - signature_length ||
             signed_message_length != signature_length + message_length ||
-            resize_buffer(&expected_signed_message,
-                          signed_message_length) != 0 ||
+            crypto_test_kat_reserve(
+                &expected_signed_message, &signed_message_capacity,
+                signed_message_length) != 0 ||
             crypto_test_kat_read_hex(
                 &reader, "sm", expected_signed_message,
                 signed_message_length) != 0) {
@@ -200,8 +191,8 @@ cleanup:
     if (actual_signature != NULL)
         crypto_zeroize(actual_signature, signature_length);
     if (expected_signed_message != NULL)
-        crypto_zeroize(expected_signed_message, signed_message_length);
-    if (message != NULL) crypto_zeroize(message, message_length);
+        crypto_zeroize(expected_signed_message, signed_message_capacity);
+    if (message != NULL) crypto_zeroize(message, message_capacity);
     free(actual_signature);
     free(actual_private_key);
     free(actual_public_key);
