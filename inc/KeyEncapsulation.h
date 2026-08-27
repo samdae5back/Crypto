@@ -255,7 +255,9 @@ CRYPTO_API CryptoError CRYPTO_NTRU_PLUS_ENCAPS(const uint8_t *PUBLIC_KEY, size_t
  * @param[out] SHARED_SECRET Buffer receiving CRYPTO_NTRU_PLUS_SHARED_SECRET_BYTES bytes.
  * @param[in] ALG An ALG_NTRU_PLUS_* parameter-set identifier.
  * @return CRYPTO_SUCCESS on success or a negative CryptoError on failure.
- * @note Correctly sized invalid ciphertexts use implicit rejection.
+ * @retval CRYPTO_ERROR_AUTHENTICATION_FAILED The ciphertext is non-canonical
+ *         or fails NTRU+ reencryption validation.
+ * @note Authentication failure clears the shared-secret output.
  */
 CRYPTO_API CryptoError CRYPTO_NTRU_PLUS_DECAPS(const uint8_t *PRIVATE_KEY, size_t PRIVATE_KEY_LENGTH, const uint8_t *CIPHERTEXT, size_t CIPHERTEXT_LENGTH, uint8_t SHARED_SECRET[CRYPTO_NTRU_PLUS_SHARED_SECRET_BYTES], AlgID ALG);
 
