@@ -1,16 +1,15 @@
 #ifndef ML_KEM_HASH_H
 #define ML_KEM_HASH_H
 #include <stddef.h>
+#include "Def.h"
 #include "HashFunction/SHA3/sha3_internal.h"
 typedef crypto_sha3_context crypto_sha3_ctx;
-void RBG(unsigned char *seed,size_t len);
-void sha3_256_hash(const unsigned char *input,size_t input_len,unsigned char *output);
-void sha3_512_hash(const unsigned char *input,size_t input_len,unsigned char *output);
-void shake_256_hash(const unsigned char *input,size_t input_len,unsigned char *output,size_t output_len);
-void PRF(size_t n_,unsigned char *s,unsigned char b,unsigned char *output);
-void H(unsigned char *input,size_t input_length,unsigned char *output);
-void J(unsigned char *input,size_t input_length,unsigned char *output);
-void G(unsigned char *input,size_t input_length,unsigned char *output_1,unsigned char *output_2);
+CryptoError RBG(unsigned char *seed, size_t length);
+int PRF(size_t eta, const unsigned char *seed, unsigned char nonce,
+        unsigned char *output);
+void H(const unsigned char *input,size_t input_length,unsigned char *output);
+void J(const unsigned char *input,size_t input_length,unsigned char *output);
+void G(const unsigned char *input,size_t input_length,unsigned char *output_1,unsigned char *output_2);
 void XOF_init(crypto_sha3_ctx *ctx);
 void XOF_absorb(crypto_sha3_ctx *ctx,const unsigned char *input,size_t input_length);
 int XOF_squeeze(crypto_sha3_ctx *ctx,unsigned char *output,size_t length);

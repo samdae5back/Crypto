@@ -1,22 +1,14 @@
-#ifndef AUXILIARY_H
-#define AUXILIARY_H
+#ifndef ML_KEM_AUXILIARY_H
+#define ML_KEM_AUXILIARY_H
 
-int exp_int(int x, int exp);
+#include <stddef.h>
 
-void Bit2Byte(unsigned char* b, unsigned char* B, size_t output_length);
+int ByteEncode(const int *input, size_t bit_width, unsigned char *output);
+int ByteDecode(const unsigned char *input, size_t bit_width, int *output);
+int SampleNTT(const unsigned char *input, int *output, size_t input_length);
+int SamplePolyCBD(const unsigned char *input, int *output,
+                  size_t input_length);
+int Comp(const int *input, int bit_width, int *output, size_t length);
+int Decomp(const int *input, int bit_width, int *output, size_t length);
 
-void Byte2Bit(unsigned char* B, unsigned char* b, size_t input_length);
-
-void ByteEncode(int* F, size_t d, unsigned char* output);
-
-void ByteDecode(unsigned char* B, size_t d, int* output);
-
-void SampleNTT(unsigned char* B, int* a, size_t input_length);
-
-void SamplePolyCBD(unsigned char* B, int* f, size_t input_length);
-
-void Comp(int* input, int d, int* output, size_t inout_length);
-
-void Decomp(int* input, int d, int* output, size_t inout_length);
-
-#endif // AUXILIARY_H
+#endif

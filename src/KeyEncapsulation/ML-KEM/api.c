@@ -1,8 +1,61 @@
+#include <stdint.h>
+
 #include "api_internal.h"
+#include "hash.h"
 #include "parameter.h"
 #include "ML-KEM.h"
+#include "Util/Core/secure_zero.h"
 
 MLKEM_THREAD_LOCAL const mlkem_parameters *mlkem_active_parameters;
+
+static int mlkem_ranges_overlap(const void *first, size_t first_length,
+                                const void *second, size_t second_length) {
+    uintptr_t first_address;
+    uintptr_t second_address;
+
+    if (first_length == 0u || second_length == 0u) return 0;
+    first_address = (uintptr_t)first;
+    second_address = (uintptr_t)second;
+    if (first_address <= second_address)
+        return second_address - first_address < first_length;
+    return first_address - second_address < second_length;
+}
+
+static int mlkem_public_key_is_canonical(const uint8_t *public_key,
+                                         size_t public_key_length) {
+    size_t encoded_polynomial_length = public_key_length - 32u;
+    size_t offset;
+    uint32_t invalid = 0u;
+
+    for (offset = 0u; offset < encoded_polynomial_length; offset += 3u) {
+        uint32_t first = (uint32_t)public_key[offset] |
+                         (((uint32_t)public_key[offset + 1u] & 0x0fu) << 8);
+        uint32_t second = ((uint32_t)public_key[offset + 1u] >> 4) |
+                          ((uint32_t)public_key[offset + 2u] << 4);
+        invalid |= ((uint32_t)MLKEM_Q - 1u - first) >> 31;
+        invalid |= ((uint32_t)MLKEM_Q - 1u - second) >> 31;
+    }
+    return invalid == 0u;
+}
+
+static int mlkem_private_key_hash_is_valid(const uint8_t *private_key,
+                                           size_t public_key_length,
+                                           size_t private_key_length) {
+    size_t pke_private_key_length =
+        private_key_length - public_key_length - 64u;
+    const uint8_t *embedded_public_key =
+        private_key + pke_private_key_length;
+    const uint8_t *stored_hash = private_key + private_key_length - 64u;
+    uint8_t computed_hash[32];
+    uint32_t difference = 0u;
+    size_t i;
+
+    H(embedded_public_key, public_key_length, computed_hash);
+    for (i = 0u; i < sizeof(computed_hash); ++i)
+        difference |= (uint32_t)(computed_hash[i] ^ stored_hash[i]);
+    crypto_zeroize(computed_hash, sizeof(computed_hash));
+    return difference == 0u;
+}
 
 const mlkem_parameters *mlkem_parameters_for(AlgID alg) {
     size_t i;
@@ -41,32 +94,68 @@ size_t crypto_ml_kem_ciphertext_size_internal(AlgID alg) {
 CryptoError crypto_ml_kem_keygen_internal(AlgID alg, uint8_t *pk, size_t pk_len, uint8_t *sk, size_t sk_len) {
     size_t need_pk = crypto_ml_kem_public_key_size_internal(alg);
     size_t need_sk = crypto_ml_kem_private_key_size_internal(alg);
+    CryptoError result;
     if (!need_pk || !need_sk) return CRYPTO_ERROR_INVALID_ALG_ID;
     if (!pk || !sk) return CRYPTO_ERROR_INVALID_ARGUMENT;
     if (pk_len < need_pk || sk_len < need_sk) return CRYPTO_ERROR_BUFFER_TOO_SMALL;
+    if (mlkem_ranges_overlap(pk, need_pk, sk, need_sk))
+        return CRYPTO_ERROR_INVALID_ARGUMENT;
     mlkem_active_parameters = mlkem_parameters_for(alg);
-    ML_KEM_KeyGen(pk, sk);
-    return CRYPTO_SUCCESS;
+    result = ML_KEM_KeyGen(pk, sk);
+    if (result != CRYPTO_SUCCESS) {
+        crypto_zeroize(pk, need_pk);
+        crypto_zeroize(sk, need_sk);
+    }
+    return result;
 }
 
 CryptoError crypto_ml_kem_encaps_internal(AlgID alg, const uint8_t *pk, size_t pk_len, uint8_t ss[CRYPTO_ML_KEM_SHARED_SECRET_BYTES], uint8_t *ct, size_t ct_len) {
     size_t need_pk = crypto_ml_kem_public_key_size_internal(alg);
     size_t need_ct = crypto_ml_kem_ciphertext_size_internal(alg);
+    CryptoError result;
     if (!need_pk || !need_ct) return CRYPTO_ERROR_INVALID_ALG_ID;
     if (!pk || !ss || !ct) return CRYPTO_ERROR_INVALID_ARGUMENT;
     if (pk_len < need_pk || ct_len < need_ct) return CRYPTO_ERROR_BUFFER_TOO_SMALL;
+    if (mlkem_ranges_overlap(pk, need_pk, ss,
+                             CRYPTO_ML_KEM_SHARED_SECRET_BYTES) ||
+        mlkem_ranges_overlap(pk, need_pk, ct, need_ct) ||
+        mlkem_ranges_overlap(ss, CRYPTO_ML_KEM_SHARED_SECRET_BYTES,
+                             ct, need_ct))
+        return CRYPTO_ERROR_INVALID_ARGUMENT;
+    if (!mlkem_public_key_is_canonical(pk, need_pk)) {
+        crypto_zeroize(ss, CRYPTO_ML_KEM_SHARED_SECRET_BYTES);
+        crypto_zeroize(ct, need_ct);
+        return CRYPTO_ERROR_INVALID_KEY;
+    }
     mlkem_active_parameters = mlkem_parameters_for(alg);
-    ML_KEM_Encaps((unsigned char *)pk, ss, ct);
-    return CRYPTO_SUCCESS;
+    result = ML_KEM_Encaps(pk, ss, ct);
+    if (result != CRYPTO_SUCCESS) {
+        crypto_zeroize(ss, CRYPTO_ML_KEM_SHARED_SECRET_BYTES);
+        crypto_zeroize(ct, need_ct);
+    }
+    return result;
 }
 
 CryptoError crypto_ml_kem_decaps_internal(AlgID alg, const uint8_t *sk, size_t sk_len, const uint8_t *ct, size_t ct_len, uint8_t ss[CRYPTO_ML_KEM_SHARED_SECRET_BYTES]) {
+    size_t need_pk = crypto_ml_kem_public_key_size_internal(alg);
     size_t need_sk = crypto_ml_kem_private_key_size_internal(alg);
     size_t need_ct = crypto_ml_kem_ciphertext_size_internal(alg);
+    CryptoError result;
     if (!need_sk || !need_ct) return CRYPTO_ERROR_INVALID_ALG_ID;
     if (!sk || !ct || !ss) return CRYPTO_ERROR_INVALID_ARGUMENT;
     if (sk_len < need_sk || ct_len < need_ct) return CRYPTO_ERROR_BUFFER_TOO_SMALL;
+    if (mlkem_ranges_overlap(sk, need_sk, ss,
+                             CRYPTO_ML_KEM_SHARED_SECRET_BYTES) ||
+        mlkem_ranges_overlap(ct, need_ct, ss,
+                             CRYPTO_ML_KEM_SHARED_SECRET_BYTES))
+        return CRYPTO_ERROR_INVALID_ARGUMENT;
+    if (!mlkem_private_key_hash_is_valid(sk, need_pk, need_sk)) {
+        crypto_zeroize(ss, CRYPTO_ML_KEM_SHARED_SECRET_BYTES);
+        return CRYPTO_ERROR_INVALID_KEY;
+    }
     mlkem_active_parameters = mlkem_parameters_for(alg);
-    ML_KEM_Decaps((unsigned char *)sk, (unsigned char *)ct, ss);
-    return CRYPTO_SUCCESS;
+    result = ML_KEM_Decaps(sk, ct, ss);
+    if (result != CRYPTO_SUCCESS)
+        crypto_zeroize(ss, CRYPTO_ML_KEM_SHARED_SECRET_BYTES);
+    return result;
 }

@@ -1,5 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include "NTT_.h"
 #include "parameter.h"
@@ -115,4 +113,3 @@ void Multiply_NTT(int* f, int* g, int* h, const int* zetas) {
     }
     return;
 }
-

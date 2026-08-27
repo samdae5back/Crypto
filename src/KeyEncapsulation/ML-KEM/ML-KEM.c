@@ -1,152 +1,169 @@
+#include <stdint.h>
 #include <string.h>
-#include "NTT_.h"
-#include "hash.h"
-#include "auxiliary.h"
+
 #include "K-PKE.h"
 #include "ML-KEM.h"
+#include "hash.h"
 #include "parameter.h"
+#include "Util/Core/secure_zero.h"
 
-void ML_KEM_KeyGen_internal(unsigned char* d, unsigned char* z, unsigned char* ek, unsigned char* dk) {
+CryptoError ML_KEM_KeyGen_internal(const unsigned char seed[32],
+                                   const unsigned char rejection_seed[32],
+                                   unsigned char *public_key,
+                                   unsigned char *private_key) {
+    unsigned char public_key_hash[32] = { 0 };
+    CryptoError result;
 
-	//ek에 키 복사, dk 앞 부분에 키 복사
-	K_PKE_KeyGen(d, ek, dk);
+    result = K_PKE_KeyGen(seed, public_key, private_key);
+    if (result != CRYPTO_SUCCESS) goto cleanup;
 
-	//dk 중간에 ek 복사
-	memcpy(dk + 384 * k, ek, 384 * k + 32);
+    memcpy(private_key + 384u * (size_t)k, public_key,
+           384u * (size_t)k + 32u);
+    H(public_key, 384u * (size_t)k + 32u, public_key_hash);
+    memcpy(private_key + 768u * (size_t)k + 32u, public_key_hash, 32u);
+    memcpy(private_key + 768u * (size_t)k + 64u, rejection_seed, 32u);
 
-	//버퍼에 해쉬값 받기
-	unsigned char buffer_char[32] = { 0 };
-	H(ek, 384 * k + 32, buffer_char);
-
-	//해쉬값 dk에 복사
-	memcpy(dk + 768 * k + 32, buffer_char, 32);
-
-	//z값 dk에 복사
-	memcpy(dk + 768 * k + 64, z, 32);
-
-	//결과 출력
-	//printf("\nML-KEM Internal Key Generatinon Succeed\n");
-
-	return;
+cleanup:
+    if (result != CRYPTO_SUCCESS) {
+        crypto_zeroize(public_key, 384u * (size_t)k + 32u);
+        crypto_zeroize(private_key, 768u * (size_t)k + 96u);
+    }
+    crypto_zeroize(public_key_hash, sizeof(public_key_hash));
+    return result;
 }
 
-void ML_KEM_Encaps_internal(unsigned char* ek, unsigned char* m, unsigned char* SharedSecretKey, unsigned char* ciphertext) {
+CryptoError ML_KEM_Encaps_internal(const unsigned char *public_key,
+                                   const unsigned char message[32],
+                                   unsigned char shared_secret[32],
+                                   unsigned char *ciphertext) {
+    unsigned char hash_input[64] = { 0 };
+    unsigned char randomness[32] = { 0 };
+    CryptoError result;
 
-	unsigned char buffer_char[64] = { 0 };
+    memcpy(hash_input, message, 32u);
+    H(public_key, 384u * (size_t)k + 32u, hash_input + 32u);
+    G(hash_input, sizeof(hash_input), shared_secret, randomness);
+    result = K_PKE_Enc(public_key, message, randomness, ciphertext);
 
-	//G의 입력 생성
-	memcpy(buffer_char, m, 32);
-	H(ek, 384 * k + 32, buffer_char + 32);
-
-	//G 계산
-	unsigned char r[32] = { 0 };
-	G(buffer_char, 64, SharedSecretKey, r);
-
-	//ciphertext 계산
-	K_PKE_Enc(ek, m, r, ciphertext);
-
-	//결과 출력
-	//printf("\nML-KEM Internal Encapsulation Succeed\n");
-	return;
+    if (result != CRYPTO_SUCCESS) {
+        crypto_zeroize(shared_secret, 32u);
+        crypto_zeroize(ciphertext, 32u * (size_t)(d_u * k + d_v));
+    }
+    crypto_zeroize(hash_input, sizeof(hash_input));
+    crypto_zeroize(randomness, sizeof(randomness));
+    return result;
 }
 
-void ML_KEM_Decaps_internal(unsigned char* dk, unsigned char* ciphertext, unsigned char* SharedSecretKey_) {
+CryptoError ML_KEM_Decaps_internal(const unsigned char *private_key,
+                                   const unsigned char *ciphertext,
+                                   unsigned char shared_secret[32]) {
+    unsigned char public_key[MLKEM_MAX_PUBLIC_KEY_BYTES] = { 0 };
+    unsigned char pke_private_key[384u * MLKEM_MAX_K] = { 0 };
+    unsigned char public_key_hash[32] = { 0 };
+    unsigned char rejection_seed[32] = { 0 };
+    unsigned char message[32] = { 0 };
+    unsigned char hash_input[MLKEM_MAX_CIPHERTEXT_BYTES + 32u] = { 0 };
+    unsigned char randomness[32] = { 0 };
+    unsigned char rejected_secret[32] = { 0 };
+    unsigned char expected_ciphertext[MLKEM_MAX_CIPHERTEXT_BYTES] = { 0 };
+    size_t ciphertext_length = 32u * (size_t)(d_u * k + d_v);
+    CryptoError result;
 
-	//ek, dk 추출
-	unsigned char ek_pke[MLKEM_MAX_PUBLIC_KEY_BYTES] = { 0 };
-	unsigned char dk_pke[MLKEM_MAX_PUBLIC_KEY_BYTES] = { 0 };
+    memcpy(pke_private_key, private_key, 384u * (size_t)k);
+    memcpy(public_key, private_key + 384u * (size_t)k,
+           384u * (size_t)k + 32u);
+    memcpy(public_key_hash, private_key + 768u * (size_t)k + 32u, 32u);
+    memcpy(rejection_seed, private_key + 768u * (size_t)k + 64u, 32u);
 
-	memcpy(dk_pke, dk, 384 * k);
-	memcpy(ek_pke, dk + 384 * k, 384 * k + 32);
+    result = K_PKE_Dec(pke_private_key, ciphertext, message);
+    if (result != CRYPTO_SUCCESS) goto cleanup;
 
-	//h, z 추출
-	unsigned char h[32] = { 0 };
-	unsigned char z[32] = { 0 };
+    memcpy(hash_input, message, 32u);
+    memcpy(hash_input + 32u, public_key_hash, 32u);
+    G(hash_input, 64u, shared_secret, randomness);
 
-	memcpy(h, dk + 768 * k + 32, 32);
-	memcpy(z, dk + 768 * k + 64, 32);
+    memcpy(hash_input, rejection_seed, 32u);
+    memcpy(hash_input + 32u, ciphertext, ciphertext_length);
+    J(hash_input, ciphertext_length + 32u, rejected_secret);
 
-	//m_ 생성
-	unsigned char m_[32] = { 0 };
-	K_PKE_Dec(dk_pke, ciphertext, m_);
+    result = K_PKE_Enc(public_key, message, randomness,
+                       expected_ciphertext);
+    if (result != CRYPTO_SUCCESS) goto cleanup;
 
-	//G 계산하여 SharedSecretKey_, r 생성
-	unsigned char buffer_char[MLKEM_MAX_CIPHERTEXT_BYTES + 32] = { 0 };
-	unsigned char r[32] = { 0 };
+    {
+        uint32_t mismatch = 0u;
+        uint8_t rejection_mask;
+        size_t i;
 
-	memcpy(buffer_char, m_, 32);
-	memcpy(buffer_char + 32, h, 32);
+        for (i = 0u; i < ciphertext_length; ++i)
+            mismatch |= (uint32_t)(ciphertext[i] ^ expected_ciphertext[i]);
+        mismatch = (mismatch | (0u - mismatch)) >> 31;
+        rejection_mask = (uint8_t)(0u - mismatch);
+        for (i = 0u; i < 32u; ++i) {
+            shared_secret[i] =
+                (uint8_t)((shared_secret[i] & (uint8_t)~rejection_mask) |
+                          (rejected_secret[i] & rejection_mask));
+        }
+    }
+    result = CRYPTO_SUCCESS;
 
-	G(buffer_char, 64, SharedSecretKey_, r);
-
-	// FIPS 203 implicit rejection key: J(z || ciphertext).
-	memcpy(buffer_char, z, 32);
-	memcpy(buffer_char + 32, ciphertext, 32 * (d_u * k + d_v));
-
-	//거짓 키 생성
-	unsigned char SharedSecretKey__false[32] = { 0 };
-	J(buffer_char, 32 * (d_u * k + d_v + 1), SharedSecretKey__false);
-
-	//ciphertext_ 생성
-	unsigned char ciphertext_[MLKEM_MAX_CIPHERTEXT_BYTES] = { 0 };
-	K_PKE_Enc(ek_pke, m_, r, ciphertext_);
-
-	{
-		uint32_t mismatch = 0;
-		uint8_t rejection_mask;
-		for (int i = 0;i < 32 * (d_u * k + d_v);i++) {
-			mismatch |= (uint32_t)(ciphertext[i] ^ ciphertext_[i]);
-		}
-		mismatch = (mismatch | (0u - mismatch)) >> 31;
-		rejection_mask = (uint8_t)(0u - mismatch);
-		for (int i = 0;i < 32;i++) {
-			SharedSecretKey_[i] =
-				(uint8_t)((SharedSecretKey_[i] & (uint8_t)~rejection_mask) |
-				          (SharedSecretKey__false[i] & rejection_mask));
-		}
-	}
-
-	//결과 출력
-	//printf("\nML-KEM Internal Decapsulation Succeed\n");
-	return;
+cleanup:
+    if (result != CRYPTO_SUCCESS) crypto_zeroize(shared_secret, 32u);
+    crypto_zeroize(public_key, sizeof(public_key));
+    crypto_zeroize(pke_private_key, sizeof(pke_private_key));
+    crypto_zeroize(public_key_hash, sizeof(public_key_hash));
+    crypto_zeroize(rejection_seed, sizeof(rejection_seed));
+    crypto_zeroize(message, sizeof(message));
+    crypto_zeroize(hash_input, sizeof(hash_input));
+    crypto_zeroize(randomness, sizeof(randomness));
+    crypto_zeroize(rejected_secret, sizeof(rejected_secret));
+    crypto_zeroize(expected_ciphertext, sizeof(expected_ciphertext));
+    return result;
 }
 
-void ML_KEM_KeyGen(unsigned char* ek, unsigned char* dk) {
-	//d 생성
-	unsigned char d[32] = { 0 };
-	RBG(d, 32);
+CryptoError ML_KEM_KeyGen(unsigned char *public_key,
+                          unsigned char *private_key) {
+    unsigned char seed[32] = { 0 };
+    unsigned char rejection_seed[32] = { 0 };
+    CryptoError result;
 
-	//z 생성
-	unsigned char z[32] = { 0 };
-	RBG(z, 32);
+    result = RBG(seed, sizeof(seed));
+    if (result != CRYPTO_SUCCESS) goto cleanup;
+    result = RBG(rejection_seed, sizeof(rejection_seed));
+    if (result != CRYPTO_SUCCESS) goto cleanup;
+    result = ML_KEM_KeyGen_internal(seed, rejection_seed, public_key,
+                                    private_key);
 
-	//ek, dk 생성
-	ML_KEM_KeyGen_internal(d, z, ek, dk);
-	
-	//결과 출력
-	//printf("\nML-KEM Key Generatinon Succeed\n");
-
-	return;
+cleanup:
+    if (result != CRYPTO_SUCCESS) {
+        crypto_zeroize(public_key, 384u * (size_t)k + 32u);
+        crypto_zeroize(private_key, 768u * (size_t)k + 96u);
+    }
+    crypto_zeroize(seed, sizeof(seed));
+    crypto_zeroize(rejection_seed, sizeof(rejection_seed));
+    return result;
 }
 
-void ML_KEM_Encaps(unsigned char* ek, unsigned char* SharedSecretKey, unsigned char* c) {
+CryptoError ML_KEM_Encaps(const unsigned char *public_key,
+                          unsigned char shared_secret[32],
+                          unsigned char *ciphertext) {
+    unsigned char message[32] = { 0 };
+    CryptoError result;
 
-	//m 생성
-	unsigned char m[32] = { 0 };
-	RBG(m, 32);
+    result = RBG(message, sizeof(message));
+    if (result == CRYPTO_SUCCESS)
+        result = ML_KEM_Encaps_internal(public_key, message, shared_secret,
+                                        ciphertext);
+    if (result != CRYPTO_SUCCESS) {
+        crypto_zeroize(shared_secret, 32u);
+        crypto_zeroize(ciphertext, 32u * (size_t)(d_u * k + d_v));
+    }
+    crypto_zeroize(message, sizeof(message));
+    return result;
+}
 
-	ML_KEM_Encaps_internal(ek, m, SharedSecretKey, c);
-
-	//결과 출력
-	//printf("\nML-KEM Encapsulation Succeed\n");
-
-	return;
-} 
-
-void ML_KEM_Decaps(unsigned char* dk, unsigned char* c, unsigned char* SharedSecretKey_) {
-
-	ML_KEM_Decaps_internal(dk, c, SharedSecretKey_);
-
-	//결과 출력
-	//printf("\nML-KEM Decapsulation Succeed\n");
+CryptoError ML_KEM_Decaps(const unsigned char *private_key,
+                          const unsigned char *ciphertext,
+                          unsigned char shared_secret[32]) {
+    return ML_KEM_Decaps_internal(private_key, ciphertext, shared_secret);
 }

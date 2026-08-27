@@ -1,169 +1,131 @@
-#include <stdio.h>
-#include <stdlib.h>
+#include <stddef.h>
 #include <string.h>
-#include "hash.h"
-#include "NTT_.h"
+
 #include "auxiliary.h"
+#include "hash.h"
 #include "parameter.h"
 
-int exp_int(int x, int exp) {
-    int r = 1;
-    while (exp > 0) {
-        if (exp % 2 == 1) {
-            r = r * x;
-        }
-        x = x * x;
-        exp /= 2;
-    }
-    return r;
+static unsigned int mlkem_bit_at(const unsigned char *input,
+                                 size_t bit_index) {
+    return ((unsigned int)input[bit_index / 8u] >> (bit_index % 8u)) & 1u;
 }
 
-void Bit2Byte(unsigned char *b, unsigned char *B, size_t output_length) {
-    if (B == NULL) {
-        perror("Bit2Byte Failed");
-        exit(EXIT_FAILURE);
-    }
-    memset(B, 0, sizeof(unsigned char) * output_length);
-    for (size_t i = 0u; i < 8u * output_length; i++) {
-        B[i / 8u] |= (unsigned char)((b[i] & 1u) << (i % 8u));
-    }
+static int mlkem_power_of_two(int exponent) {
+    return 1 << exponent;
 }
 
-void Byte2Bit(unsigned char *B, unsigned char *b, size_t input_length) {
-    if (B == NULL) {
-        perror("Byte2Bit Failed");
-        exit(EXIT_FAILURE);
-    }
-    for (int i = 0; i < (int)input_length; i++) {
-        unsigned char t = B[i];
-        for (int j = 0; j < 8; j++) {
-            b[(8 * i) + j] = t % 2;
-            t /= 2;
+int ByteEncode(const int *input, size_t bit_width, unsigned char *output) {
+    size_t coefficient;
+    size_t bit;
+
+    if (!input || !output || bit_width < 1u || bit_width > 12u) return -1;
+
+    memset(output, 0, bit_width * 32u);
+    for (coefficient = 0u; coefficient < MLKEM_N; ++coefficient) {
+        unsigned int value = (unsigned int)input[coefficient];
+        for (bit = 0u; bit < bit_width; ++bit) {
+            size_t output_bit = coefficient * bit_width + bit;
+            output[output_bit / 8u] |=
+                (unsigned char)(((value >> bit) & 1u)
+                                << (output_bit % 8u));
         }
     }
+    return 0;
 }
 
-void ByteEncode(int *F, size_t d, unsigned char *output) {
-    if (d < 1 || d > 12) {
-        perror("Err: bit length incorrect");
-        exit(EXIT_FAILURE);
-    }
+int ByteDecode(const unsigned char *input, size_t bit_width, int *output) {
+    int modulus;
+    size_t coefficient;
+    size_t bit;
 
-    unsigned char *b = (unsigned char *)malloc(sizeof(unsigned char) * d * 256);
-    if (b == NULL) {
-        perror("Failed to allocate memory for b");
-        exit(EXIT_FAILURE);
-    }
+    if (!input || !output || bit_width < 1u || bit_width > 12u) return -1;
+    modulus = bit_width == 12u ? MLKEM_Q : mlkem_power_of_two((int)bit_width);
 
-    for (int i = 0; i < 256; i++) {
-        int t = F[i];
-        for (int j = 0; j < (int)d; j++) {
-            b[i * d + j] = t % 2;
-            t = (t - b[i * d + j]) / 2;
+    memset(output, 0, sizeof(*output) * MLKEM_N);
+    for (coefficient = 0u; coefficient < MLKEM_N; ++coefficient) {
+        unsigned int value = 0u;
+        for (bit = 0u; bit < bit_width; ++bit) {
+            size_t input_bit = coefficient * bit_width + bit;
+            value |= mlkem_bit_at(input, input_bit) << bit;
         }
+        output[coefficient] = (int)(value % (unsigned int)modulus);
     }
-
-    Bit2Byte(b, output, sizeof(unsigned char) * d * 32);
-    free(b);
+    return 0;
 }
 
-void ByteDecode(unsigned char *B, size_t d, int *output) {
-    int m = 0;
-    if (d == 12) {
-        m = q;
-    } else if (d > 13 || d < 1) {
-        perror("Err: bit length incorrect");
-        exit(EXIT_FAILURE);
-    } else {
-        m = exp_int(2, (int)d);
-    }
+int SampleNTT(const unsigned char *input, int *output, size_t input_length) {
+    crypto_sha3_ctx context;
+    unsigned char bytes[3];
+    size_t index = 0u;
+    int result = -1;
 
-    unsigned char *b = (unsigned char *)malloc(sizeof(unsigned char) * d * n);
-    if (b == NULL) {
-        perror("Failed to allocate memory for b");
-        exit(EXIT_FAILURE);
-    }
+    if (!input || !output) return -1;
 
-    Byte2Bit(B, b, sizeof(unsigned char) * d * 32);
-    memset(output, 0, sizeof(int) * n);
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < (int)d; j++) {
-            output[i] = (output[i] + (b[i * d + j] * exp_int(2, j))) % m;
-        }
+    XOF_init(&context);
+    XOF_absorb(&context, input, input_length);
+    while (index < MLKEM_N) {
+        int first;
+        int second;
+
+        if (XOF_squeeze(&context, bytes, sizeof(bytes)) != 0) goto cleanup;
+        first = (int)bytes[0] + MLKEM_N * ((int)bytes[1] % 16);
+        second = ((int)bytes[1] / 16) + 16 * (int)bytes[2];
+        if (first < MLKEM_Q) output[index++] = first;
+        if (second < MLKEM_Q && index < MLKEM_N) output[index++] = second;
     }
-    free(b);
+    result = 0;
+
+cleanup:
+    XOF_clear(&context);
+    return result;
 }
 
-void SampleNTT(unsigned char *B, int *a, size_t input_length) {
-    crypto_sha3_ctx ctx;
-    unsigned char m[3];
-    int j = 0;
+int SamplePolyCBD(const unsigned char *input, int *output,
+                  size_t input_length) {
+    size_t eta;
+    size_t coefficient;
+    size_t bit;
 
-    XOF_init(&ctx);
-    XOF_absorb(&ctx, B, input_length);
+    if (!input || !output || (input_length != 128u && input_length != 192u))
+        return -1;
+    eta = input_length / 64u;
 
-    while (j < n) {
-        int d1, d2;
-        if (XOF_squeeze(&ctx, m, sizeof(m)) != 0) {
-            fprintf(stderr, "SHAKE-128 squeeze failed in SampleNTT\n");
-            XOF_clear(&ctx);
-            return;
-        }
-
-        d1 = (int)m[0] + n * ((int)m[1] % 16);
-        d2 = ((int)m[1] / 16) + 16 * (int)m[2];
-        if (d1 < q) {
-            a[j++] = d1;
-        }
-        if (d2 < q && j < n) {
-            a[j++] = d2;
-        }
-    }
-
-    XOF_clear(&ctx);
-}
-
-void SamplePolyCBD(unsigned char *B, int *f, size_t input_length) {
-    int n_ = (int)(input_length / 64);
-    if (n_ != 2 && n_ != 3) {
-        perror("Input length error SamplePolyCBD");
-        exit(EXIT_FAILURE);
-    }
-
-    unsigned char *b = (unsigned char *)malloc(sizeof(unsigned char) * input_length * 8);
-    if (b == NULL) {
-        perror("Failed to allocate memory for b");
-        exit(EXIT_FAILURE);
-    }
-
-    Byte2Bit(B, b, input_length);
-    for (int i = 0; i < 256; i++) {
+    for (coefficient = 0u; coefficient < MLKEM_N; ++coefficient) {
         int x = 0;
         int y = 0;
-        unsigned char *b_p_x = b + (2 * i) * n_;
-        unsigned char *b_p_y = b + (2 * i + 1) * n_;
-        for (int j = 0; j < n_; j++) {
-            x += b_p_x[j];
-            y += b_p_y[j];
+        size_t x_offset = (2u * coefficient) * eta;
+        size_t y_offset = (2u * coefficient + 1u) * eta;
+        for (bit = 0u; bit < eta; ++bit) {
+            x += (int)mlkem_bit_at(input, x_offset + bit);
+            y += (int)mlkem_bit_at(input, y_offset + bit);
         }
-        f[i] = (x - y + q) % q;
+        output[coefficient] = (x - y + MLKEM_Q) % MLKEM_Q;
     }
-    free(b);
+    return 0;
 }
 
-void Comp(int *input, int d, int *output, size_t inout_length) {
-    int pow2 = exp_int(2, d);
-    int half_q = q / 2;
-    for (int i = 0; i < (int)inout_length; i++) {
-        output[i] = (pow2 * input[i] + half_q) / q;
-        output[i] = output[i] % pow2;
+int Comp(const int *input, int bit_width, int *output, size_t length) {
+    int power;
+    size_t i;
+
+    if (!input || !output || bit_width < 1 || bit_width > 12) return -1;
+    power = mlkem_power_of_two(bit_width);
+    for (i = 0u; i < length; ++i) {
+        output[i] = (power * input[i] + MLKEM_Q / 2) / MLKEM_Q;
+        output[i] %= power;
     }
+    return 0;
 }
 
-void Decomp(int *input, int d, int *output, size_t inout_length) {
-    int pow2 = exp_int(2, d);
-    int half_pow2 = exp_int(2, d - 1);
-    for (int i = 0; i < (int)inout_length; i++) {
-        output[i] = (q * input[i] + half_pow2) / pow2;
-    }
+int Decomp(const int *input, int bit_width, int *output, size_t length) {
+    int power;
+    int half_power;
+    size_t i;
+
+    if (!input || !output || bit_width < 1 || bit_width > 12) return -1;
+    power = mlkem_power_of_two(bit_width);
+    half_power = mlkem_power_of_two(bit_width - 1);
+    for (i = 0u; i < length; ++i)
+        output[i] = (MLKEM_Q * input[i] + half_power) / power;
+    return 0;
 }

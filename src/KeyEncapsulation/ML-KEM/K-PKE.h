@@ -1,11 +1,16 @@
 #ifndef K_PKE_H
 #define K_PKE_H
 
-#include <stddef.h>
-#include <stdlib.h>
+#include "Def.h"
 
-void K_PKE_KeyGen(unsigned char *d, unsigned char *ek_pke, unsigned char *dk_pke);
-void K_PKE_Enc(unsigned char *ek_pke, unsigned char *message, unsigned char *randomness, unsigned char *ciphertext);
-void K_PKE_Dec(unsigned char *dk_pke, unsigned char *ciphertext, unsigned char *message_);
+CryptoError K_PKE_KeyGen(const unsigned char *seed, unsigned char *public_key,
+                         unsigned char *private_key);
+CryptoError K_PKE_Enc(const unsigned char *public_key,
+                      const unsigned char *message,
+                      const unsigned char *randomness,
+                      unsigned char *ciphertext);
+CryptoError K_PKE_Dec(const unsigned char *private_key,
+                      const unsigned char *ciphertext,
+                      unsigned char *message);
 
 #endif
