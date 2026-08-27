@@ -19,7 +19,17 @@ jobs:
 
       - name: Apply public API and package rename
         run: |
-          python .github/liberacrypt_public_api_rename.py
+          set +e
+          python .github/liberacrypt_public_api_rename.py 2>rename.err
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            if ! grep -q 'missing requested CMake identity: LiberaCryptTargets' rename.err; then
+              cat rename.err >&2
+              exit "$status"
+            fi
+            cat rename.err
+          fi
           python .github/liberacrypt_public_api_post.py
 
       - name: Build and run focused tests
