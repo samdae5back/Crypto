@@ -14,6 +14,7 @@
 #include "ntru_plus_poly.h"
 #include "HashFunction/SHA3/sha3_internal.h"
 #include "RandomNumberGeneration/KAT/pqc_kat_rng_internal.h"
+#include "Util/Core/memory_internal.h"
 #include "Util/Core/secure_zero.h"
 #include "Util/PQC/pqc_internal.h"
 
@@ -60,23 +61,6 @@ const crypto_ntru_plus_parameters *crypto_ntru_plus_parameters_for(AlgID alg)
     }
 
     return NULL;
-}
-
-static int crypto_ntru_plus_ranges_overlap(
-    const void *first, size_t first_length,
-    const void *second, size_t second_length)
-{
-    uintptr_t first_address;
-    uintptr_t second_address;
-
-    if (first_length == 0u || second_length == 0u)
-        return 0;
-
-    first_address = (uintptr_t)first;
-    second_address = (uintptr_t)second;
-    if (first_address <= second_address)
-        return second_address - first_address < first_length;
-    return first_address - second_address < second_length;
 }
 
 static int crypto_ntru_plus_generate_f(
@@ -238,7 +222,7 @@ CryptoError crypto_ntru_plus_keygen_internal(
     if (public_key_length < parameters->public_key_bytes ||
         private_key_length < parameters->private_key_bytes)
         return CRYPTO_ERROR_BUFFER_TOO_SMALL;
-    if (crypto_ntru_plus_ranges_overlap(
+    if (crypto_ranges_overlap(
             public_key, parameters->public_key_bytes,
             private_key, parameters->private_key_bytes))
         return CRYPTO_ERROR_INVALID_ARGUMENT;
@@ -293,13 +277,13 @@ CryptoError crypto_ntru_plus_encaps_internal(
     if (public_key_length < parameters->public_key_bytes ||
         ciphertext_length < parameters->ciphertext_bytes)
         return CRYPTO_ERROR_BUFFER_TOO_SMALL;
-    if (crypto_ntru_plus_ranges_overlap(
+    if (crypto_ranges_overlap(
             public_key, parameters->public_key_bytes,
             shared_secret, CRYPTO_NTRU_PLUS_SHARED_SECRET_BYTES) ||
-        crypto_ntru_plus_ranges_overlap(
+        crypto_ranges_overlap(
             public_key, parameters->public_key_bytes,
             ciphertext, parameters->ciphertext_bytes) ||
-        crypto_ntru_plus_ranges_overlap(
+        crypto_ranges_overlap(
             shared_secret, CRYPTO_NTRU_PLUS_SHARED_SECRET_BYTES,
             ciphertext, parameters->ciphertext_bytes))
         return CRYPTO_ERROR_INVALID_ARGUMENT;
@@ -349,10 +333,10 @@ CryptoError crypto_ntru_plus_decaps_internal(
     if (private_key_length < parameters->private_key_bytes ||
         ciphertext_length < parameters->ciphertext_bytes)
         return CRYPTO_ERROR_BUFFER_TOO_SMALL;
-    if (crypto_ntru_plus_ranges_overlap(
+    if (crypto_ranges_overlap(
             private_key, parameters->private_key_bytes,
             shared_secret, CRYPTO_NTRU_PLUS_SHARED_SECRET_BYTES) ||
-        crypto_ntru_plus_ranges_overlap(
+        crypto_ranges_overlap(
             ciphertext, parameters->ciphertext_bytes,
             shared_secret, CRYPTO_NTRU_PLUS_SHARED_SECRET_BYTES))
         return CRYPTO_ERROR_INVALID_ARGUMENT;

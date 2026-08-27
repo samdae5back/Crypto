@@ -9,22 +9,10 @@
 #include "hash.h"
 #include "parameter.h"
 #include "ML-KEM.h"
+#include "Util/Core/memory_internal.h"
 #include "Util/Core/secure_zero.h"
 
 MLKEM_THREAD_LOCAL const mlkem_parameters *mlkem_active_parameters;
-
-static int mlkem_ranges_overlap(const void *first, size_t first_length,
-                                const void *second, size_t second_length) {
-    uintptr_t first_address;
-    uintptr_t second_address;
-
-    if (first_length == 0u || second_length == 0u) return 0;
-    first_address = (uintptr_t)first;
-    second_address = (uintptr_t)second;
-    if (first_address <= second_address)
-        return second_address - first_address < first_length;
-    return first_address - second_address < second_length;
-}
 
 static int mlkem_public_key_is_canonical(const uint8_t *public_key,
                                          size_t public_key_length) {
@@ -103,7 +91,7 @@ CryptoError crypto_ml_kem_keygen_internal(AlgID alg, uint8_t *pk, size_t pk_len,
     if (!need_pk || !need_sk) return CRYPTO_ERROR_INVALID_ALG_ID;
     if (!pk || !sk) return CRYPTO_ERROR_INVALID_ARGUMENT;
     if (pk_len < need_pk || sk_len < need_sk) return CRYPTO_ERROR_BUFFER_TOO_SMALL;
-    if (mlkem_ranges_overlap(pk, need_pk, sk, need_sk))
+    if (crypto_ranges_overlap(pk, need_pk, sk, need_sk))
         return CRYPTO_ERROR_INVALID_ARGUMENT;
     mlkem_active_parameters = mlkem_parameters_for(alg);
     result = ML_KEM_KeyGen(pk, sk);
@@ -121,10 +109,10 @@ CryptoError crypto_ml_kem_encaps_internal(AlgID alg, const uint8_t *pk, size_t p
     if (!need_pk || !need_ct) return CRYPTO_ERROR_INVALID_ALG_ID;
     if (!pk || !ss || !ct) return CRYPTO_ERROR_INVALID_ARGUMENT;
     if (pk_len < need_pk || ct_len < need_ct) return CRYPTO_ERROR_BUFFER_TOO_SMALL;
-    if (mlkem_ranges_overlap(pk, need_pk, ss,
+    if (crypto_ranges_overlap(pk, need_pk, ss,
                              CRYPTO_ML_KEM_SHARED_SECRET_BYTES) ||
-        mlkem_ranges_overlap(pk, need_pk, ct, need_ct) ||
-        mlkem_ranges_overlap(ss, CRYPTO_ML_KEM_SHARED_SECRET_BYTES,
+        crypto_ranges_overlap(pk, need_pk, ct, need_ct) ||
+        crypto_ranges_overlap(ss, CRYPTO_ML_KEM_SHARED_SECRET_BYTES,
                              ct, need_ct))
         return CRYPTO_ERROR_INVALID_ARGUMENT;
     if (!mlkem_public_key_is_canonical(pk, need_pk)) {
@@ -149,9 +137,9 @@ CryptoError crypto_ml_kem_decaps_internal(AlgID alg, const uint8_t *sk, size_t s
     if (!need_sk || !need_ct) return CRYPTO_ERROR_INVALID_ALG_ID;
     if (!sk || !ct || !ss) return CRYPTO_ERROR_INVALID_ARGUMENT;
     if (sk_len < need_sk || ct_len < need_ct) return CRYPTO_ERROR_BUFFER_TOO_SMALL;
-    if (mlkem_ranges_overlap(sk, need_sk, ss,
+    if (crypto_ranges_overlap(sk, need_sk, ss,
                              CRYPTO_ML_KEM_SHARED_SECRET_BYTES) ||
-        mlkem_ranges_overlap(ct, need_ct, ss,
+        crypto_ranges_overlap(ct, need_ct, ss,
                              CRYPTO_ML_KEM_SHARED_SECRET_BYTES))
         return CRYPTO_ERROR_INVALID_ARGUMENT;
     if (!mlkem_private_key_hash_is_valid(sk, need_pk, need_sk)) {

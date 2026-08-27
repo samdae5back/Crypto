@@ -63,6 +63,7 @@ set(CRYPTO_SOURCES
 
     # Private implementations grouped by primitive family and algorithm.
     src/Util/Core/secure_zero.c
+    src/Util/Core/memory.c
     src/BlockCipher/AES/aes.c
     src/BlockCipher/AES/aes_aead.c
     src/RandomNumberGeneration/CTR_DRBG/ctr_drbg.c
