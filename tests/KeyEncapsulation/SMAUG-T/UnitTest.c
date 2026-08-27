@@ -14,6 +14,7 @@ static const AlgID algorithms[] = {
 };
 
 static int run_case(AlgID alg) {
+    static const uint8_t zero_secret[CRYPTO_SMAUG_T_SHARED_SECRET_BYTES] = {0};
     const size_t public_key_length = CRYPTO_SMAUG_T_PUBLIC_KEY_SIZE(alg);
     const size_t private_key_length = CRYPTO_SMAUG_T_PRIVATE_KEY_SIZE(alg);
     const size_t ciphertext_length = CRYPTO_SMAUG_T_CIPHERTEXT_SIZE(alg);
@@ -39,6 +40,26 @@ static int run_case(AlgID alg) {
         decapsulated, alg);
     if (error != CRYPTO_SUCCESS ||
         memcmp(encapsulated, decapsulated, sizeof(encapsulated)) != 0) {
+        goto cleanup;
+    }
+
+    ciphertext[0] ^= 1u;
+    error = CRYPTO_SMAUG_T_DECAPS(
+        private_key, private_key_length, ciphertext, ciphertext_length,
+        decapsulated, alg);
+    ciphertext[0] ^= 1u;
+    if (error != CRYPTO_SUCCESS ||
+        memcmp(encapsulated, decapsulated, sizeof(encapsulated)) == 0) {
+        goto cleanup;
+    }
+
+    private_key[0] |= 3u;
+    memset(decapsulated, 0xa5, sizeof(decapsulated));
+    error = CRYPTO_SMAUG_T_DECAPS(
+        private_key, private_key_length, ciphertext, ciphertext_length,
+        decapsulated, alg);
+    if (error != CRYPTO_ERROR_INVALID_KEY ||
+        memcmp(decapsulated, zero_secret, sizeof(decapsulated)) != 0) {
         goto cleanup;
     }
     result = 0;
