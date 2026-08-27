@@ -9,6 +9,7 @@
 #include "Def.h"
 
 uint16_t crypto_load16_le(const uint8_t *p);
+uint32_t crypto_load24_le(const uint8_t *p);
 uint32_t crypto_load32_le(const uint8_t *p);
 uint64_t crypto_load64_le(const uint8_t *p);
 uint16_t crypto_load16_be(const uint8_t *p);

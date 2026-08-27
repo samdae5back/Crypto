@@ -77,6 +77,7 @@ set(CRYPTO_SOURCES
     src/RandomNumberGeneration/Noise/random.c
     src/Util/Endian/endian.c
     src/Util/NTT/ntt.c
+    src/Util/PQC/pqc.c
     src/KeyEncapsulation/ML-KEM/api.c
     src/DigitalSignature/ML-DSA/ml_dsa.c
     src/DigitalSignature/SLH-DSA/slh_dsa.c

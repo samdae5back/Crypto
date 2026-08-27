@@ -137,6 +137,20 @@ enum {
     /** ML-KEM-1024 key-encapsulation parameter set. */
     ALG_ML_KEM_1024 = 0x1003,
 
+    /** NTRU+768 key-encapsulation parameter set. */
+    ALG_NTRU_PLUS_768 = 0x1101,
+    /** NTRU+864 key-encapsulation parameter set. */
+    ALG_NTRU_PLUS_864 = 0x1102,
+    /** NTRU+1152 key-encapsulation parameter set. */
+    ALG_NTRU_PLUS_1152 = 0x1103,
+
+    /** SMAUG-T 128-bit security parameter set. */
+    ALG_SMAUG_T_128 = 0x1201,
+    /** SMAUG-T 192-bit security parameter set. */
+    ALG_SMAUG_T_192 = 0x1202,
+    /** SMAUG-T 256-bit security parameter set. */
+    ALG_SMAUG_T_256 = 0x1203,
+
     /** Raw textbook RSA operation without padding or message encoding. */
     ALG_RSA_RAW = 0x2001,
     /** ElGamal over a generated safe-prime group. */
@@ -192,6 +206,26 @@ enum {
     ALG_ML_DSA_65 = 0x7002,
     /** ML-DSA-87 digital-signature parameter set. */
     ALG_ML_DSA_87 = 0x7003,
+
+    /** AIMer-128f digital-signature parameter set. */
+    ALG_AIMER_128F = 0x7101,
+    /** AIMer-128s digital-signature parameter set. */
+    ALG_AIMER_128S = 0x7102,
+    /** AIMer-192f digital-signature parameter set. */
+    ALG_AIMER_192F = 0x7103,
+    /** AIMer-192s digital-signature parameter set. */
+    ALG_AIMER_192S = 0x7104,
+    /** AIMer-256f digital-signature parameter set. */
+    ALG_AIMER_256F = 0x7105,
+    /** AIMer-256s digital-signature parameter set. */
+    ALG_AIMER_256S = 0x7106,
+
+    /** HAETAE-120 digital-signature parameter set. */
+    ALG_HAETAE_120 = 0x7201,
+    /** HAETAE-180 digital-signature parameter set. */
+    ALG_HAETAE_180 = 0x7202,
+    /** HAETAE-260 digital-signature parameter set. */
+    ALG_HAETAE_260 = 0x7203,
 
     /** SLH-DSA-SHA2-128s digital-signature parameter set. */
     ALG_SLH_DSA_SHA2_128S = 0x8001,

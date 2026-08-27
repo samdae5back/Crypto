@@ -9,6 +9,12 @@ uint16_t crypto_load16_le(const uint8_t *input) {
     return (uint16_t)input[0] | ((uint16_t)input[1] << 8);
 }
 
+uint32_t crypto_load24_le(const uint8_t *input) {
+    return (uint32_t)input[0] |
+           ((uint32_t)input[1] << 8) |
+           ((uint32_t)input[2] << 16);
+}
+
 uint32_t crypto_load32_le(const uint8_t *input) {
     return (uint32_t)input[0] |
            ((uint32_t)input[1] << 8) |

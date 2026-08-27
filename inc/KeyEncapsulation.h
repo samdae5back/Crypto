@@ -8,7 +8,7 @@
 
 /**
  * @file KeyEncapsulation.h
- * @brief Runtime-selected ML-KEM key generation and encapsulation APIs.
+ * @brief Runtime-selected post-quantum key-encapsulation APIs.
  *
  * ML-KEM keys and ciphertexts are fixed-size encoded byte strings. Query the
  * selected parameter set's sizes before allocating buffers. Every successful
@@ -16,7 +16,7 @@
  * CRYPTO_ML_KEM_SHARED_SECRET_BYTES bytes of shared secret material.
  *
  * @defgroup crypto_key_encapsulation Key-encapsulation API
- * @brief ML-KEM key generation, encapsulation, and decapsulation.
+ * @brief Key generation, encapsulation, and decapsulation for supported KEMs.
  * @{
  */
 
@@ -42,6 +42,48 @@
 #define CRYPTO_ML_KEM_1024_CIPHERTEXT_BYTES 1568u
 /** @brief Shared-secret length produced by every supported ML-KEM parameter set. */
 #define CRYPTO_ML_KEM_SHARED_SECRET_BYTES 32u
+
+/** @brief NTRU+768 encoded public-key length in bytes. */
+#define CRYPTO_NTRU_PLUS_768_PUBLIC_KEY_BYTES 1152u
+/** @brief NTRU+768 encoded private-key length in bytes. */
+#define CRYPTO_NTRU_PLUS_768_PRIVATE_KEY_BYTES 2336u
+/** @brief NTRU+768 encoded ciphertext length in bytes. */
+#define CRYPTO_NTRU_PLUS_768_CIPHERTEXT_BYTES 1152u
+/** @brief NTRU+864 encoded public-key length in bytes. */
+#define CRYPTO_NTRU_PLUS_864_PUBLIC_KEY_BYTES 1296u
+/** @brief NTRU+864 encoded private-key length in bytes. */
+#define CRYPTO_NTRU_PLUS_864_PRIVATE_KEY_BYTES 2624u
+/** @brief NTRU+864 encoded ciphertext length in bytes. */
+#define CRYPTO_NTRU_PLUS_864_CIPHERTEXT_BYTES 1296u
+/** @brief NTRU+1152 encoded public-key length in bytes. */
+#define CRYPTO_NTRU_PLUS_1152_PUBLIC_KEY_BYTES 1728u
+/** @brief NTRU+1152 encoded private-key length in bytes. */
+#define CRYPTO_NTRU_PLUS_1152_PRIVATE_KEY_BYTES 3488u
+/** @brief NTRU+1152 encoded ciphertext length in bytes. */
+#define CRYPTO_NTRU_PLUS_1152_CIPHERTEXT_BYTES 1728u
+/** @brief Shared-secret length produced by every supported NTRU+ parameter set. */
+#define CRYPTO_NTRU_PLUS_SHARED_SECRET_BYTES 32u
+
+/** @brief SMAUG-T-128 encoded public-key length in bytes. */
+#define CRYPTO_SMAUG_T_128_PUBLIC_KEY_BYTES 672u
+/** @brief SMAUG-T-128 encoded private-key length in bytes. */
+#define CRYPTO_SMAUG_T_128_PRIVATE_KEY_BYTES 832u
+/** @brief SMAUG-T-128 encoded ciphertext length in bytes. */
+#define CRYPTO_SMAUG_T_128_CIPHERTEXT_BYTES 672u
+/** @brief SMAUG-T-192 encoded public-key length in bytes. */
+#define CRYPTO_SMAUG_T_192_PUBLIC_KEY_BYTES 1088u
+/** @brief SMAUG-T-192 encoded private-key length in bytes. */
+#define CRYPTO_SMAUG_T_192_PRIVATE_KEY_BYTES 1312u
+/** @brief SMAUG-T-192 encoded ciphertext length in bytes. */
+#define CRYPTO_SMAUG_T_192_CIPHERTEXT_BYTES 992u
+/** @brief SMAUG-T-256 encoded public-key length in bytes. */
+#define CRYPTO_SMAUG_T_256_PUBLIC_KEY_BYTES 1440u
+/** @brief SMAUG-T-256 encoded private-key length in bytes. */
+#define CRYPTO_SMAUG_T_256_PRIVATE_KEY_BYTES 1728u
+/** @brief SMAUG-T-256 encoded ciphertext length in bytes. */
+#define CRYPTO_SMAUG_T_256_CIPHERTEXT_BYTES 1376u
+/** @brief Shared-secret length produced by every supported SMAUG-T parameter set. */
+#define CRYPTO_SMAUG_T_SHARED_SECRET_BYTES 32u
 
 CRYPTO_BEGIN_DECLS
 
@@ -157,6 +199,123 @@ CRYPTO_API CryptoError CRYPTO_ML_KEM_ENCAPS(const uint8_t *PUBLIC_KEY, size_t PU
  *       internal failure clears the shared-secret output.
  */
 CRYPTO_API CryptoError CRYPTO_ML_KEM_DECAPS(const uint8_t *PRIVATE_KEY, size_t PRIVATE_KEY_LENGTH, const uint8_t *CIPHERTEXT, size_t CIPHERTEXT_LENGTH, uint8_t SHARED_SECRET[CRYPTO_ML_KEM_SHARED_SECRET_BYTES], AlgID ALG);
+
+/**
+ * @brief Return the encoded NTRU+ public-key size for an algorithm.
+ * @param[in] ALG An ALG_NTRU_PLUS_* parameter-set identifier.
+ * @return Required size in bytes, or zero if ALG is unsupported.
+ */
+CRYPTO_API size_t CRYPTO_NTRU_PLUS_PUBLIC_KEY_SIZE(AlgID ALG);
+
+/**
+ * @brief Return the encoded NTRU+ private-key size for an algorithm.
+ * @param[in] ALG An ALG_NTRU_PLUS_* parameter-set identifier.
+ * @return Required size in bytes, or zero if ALG is unsupported.
+ */
+CRYPTO_API size_t CRYPTO_NTRU_PLUS_PRIVATE_KEY_SIZE(AlgID ALG);
+
+/**
+ * @brief Return the encoded NTRU+ ciphertext size for an algorithm.
+ * @param[in] ALG An ALG_NTRU_PLUS_* parameter-set identifier.
+ * @return Required size in bytes, or zero if ALG is unsupported.
+ */
+CRYPTO_API size_t CRYPTO_NTRU_PLUS_CIPHERTEXT_SIZE(AlgID ALG);
+
+/**
+ * @brief Generate an NTRU+ key pair using operating-system randomness.
+ * @param[out] PUBLIC_KEY Buffer receiving the encoded public key.
+ * @param[in] PUBLIC_KEY_LENGTH Available bytes in PUBLIC_KEY.
+ * @param[out] PRIVATE_KEY Buffer receiving the encoded private key.
+ * @param[in] PRIVATE_KEY_LENGTH Available bytes in PRIVATE_KEY.
+ * @param[in] ALG An ALG_NTRU_PLUS_* parameter-set identifier.
+ * @return CRYPTO_SUCCESS on success or a negative CryptoError on failure.
+ * @note Validated output regions are cleared if generation fails.
+ */
+CRYPTO_API CryptoError CRYPTO_NTRU_PLUS_KEYGEN(uint8_t *PUBLIC_KEY, size_t PUBLIC_KEY_LENGTH, uint8_t *PRIVATE_KEY, size_t PRIVATE_KEY_LENGTH, AlgID ALG);
+
+/**
+ * @brief Encapsulate a fresh shared secret to an NTRU+ public key.
+ * @param[in] PUBLIC_KEY Encoded public key selected by ALG.
+ * @param[in] PUBLIC_KEY_LENGTH Available public-key bytes.
+ * @param[out] SHARED_SECRET Buffer receiving CRYPTO_NTRU_PLUS_SHARED_SECRET_BYTES bytes.
+ * @param[out] CIPHERTEXT Buffer receiving the encoded ciphertext.
+ * @param[in] CIPHERTEXT_LENGTH Available ciphertext bytes.
+ * @param[in] ALG An ALG_NTRU_PLUS_* parameter-set identifier.
+ * @return CRYPTO_SUCCESS on success or a negative CryptoError on failure.
+ * @note Non-canonical public-key encodings are rejected.
+ */
+CRYPTO_API CryptoError CRYPTO_NTRU_PLUS_ENCAPS(const uint8_t *PUBLIC_KEY, size_t PUBLIC_KEY_LENGTH, uint8_t SHARED_SECRET[CRYPTO_NTRU_PLUS_SHARED_SECRET_BYTES], uint8_t *CIPHERTEXT, size_t CIPHERTEXT_LENGTH, AlgID ALG);
+
+/**
+ * @brief Decapsulate an NTRU+ ciphertext with the corresponding private key.
+ * @param[in] PRIVATE_KEY Encoded private key selected by ALG.
+ * @param[in] PRIVATE_KEY_LENGTH Available private-key bytes.
+ * @param[in] CIPHERTEXT Encoded ciphertext selected by ALG.
+ * @param[in] CIPHERTEXT_LENGTH Available ciphertext bytes.
+ * @param[out] SHARED_SECRET Buffer receiving CRYPTO_NTRU_PLUS_SHARED_SECRET_BYTES bytes.
+ * @param[in] ALG An ALG_NTRU_PLUS_* parameter-set identifier.
+ * @return CRYPTO_SUCCESS on success or a negative CryptoError on failure.
+ * @note Correctly sized invalid ciphertexts use implicit rejection.
+ */
+CRYPTO_API CryptoError CRYPTO_NTRU_PLUS_DECAPS(const uint8_t *PRIVATE_KEY, size_t PRIVATE_KEY_LENGTH, const uint8_t *CIPHERTEXT, size_t CIPHERTEXT_LENGTH, uint8_t SHARED_SECRET[CRYPTO_NTRU_PLUS_SHARED_SECRET_BYTES], AlgID ALG);
+
+/**
+ * @brief Return the encoded SMAUG-T public-key size for an algorithm.
+ * @param[in] ALG An ALG_SMAUG_T_* parameter-set identifier.
+ * @return Required size in bytes, or zero if ALG is unsupported.
+ */
+CRYPTO_API size_t CRYPTO_SMAUG_T_PUBLIC_KEY_SIZE(AlgID ALG);
+
+/**
+ * @brief Return the encoded SMAUG-T private-key size for an algorithm.
+ * @param[in] ALG An ALG_SMAUG_T_* parameter-set identifier.
+ * @return Required size in bytes, or zero if ALG is unsupported.
+ */
+CRYPTO_API size_t CRYPTO_SMAUG_T_PRIVATE_KEY_SIZE(AlgID ALG);
+
+/**
+ * @brief Return the encoded SMAUG-T ciphertext size for an algorithm.
+ * @param[in] ALG An ALG_SMAUG_T_* parameter-set identifier.
+ * @return Required size in bytes, or zero if ALG is unsupported.
+ */
+CRYPTO_API size_t CRYPTO_SMAUG_T_CIPHERTEXT_SIZE(AlgID ALG);
+
+/**
+ * @brief Generate a SMAUG-T key pair using operating-system randomness.
+ * @param[out] PUBLIC_KEY Buffer receiving the encoded public key.
+ * @param[in] PUBLIC_KEY_LENGTH Available bytes in PUBLIC_KEY.
+ * @param[out] PRIVATE_KEY Buffer receiving the encoded private key.
+ * @param[in] PRIVATE_KEY_LENGTH Available bytes in PRIVATE_KEY.
+ * @param[in] ALG An ALG_SMAUG_T_* parameter-set identifier.
+ * @return CRYPTO_SUCCESS on success or a negative CryptoError on failure.
+ * @note Validated output regions are cleared if generation fails.
+ */
+CRYPTO_API CryptoError CRYPTO_SMAUG_T_KEYGEN(uint8_t *PUBLIC_KEY, size_t PUBLIC_KEY_LENGTH, uint8_t *PRIVATE_KEY, size_t PRIVATE_KEY_LENGTH, AlgID ALG);
+
+/**
+ * @brief Encapsulate a fresh shared secret to a SMAUG-T public key.
+ * @param[in] PUBLIC_KEY Encoded public key selected by ALG.
+ * @param[in] PUBLIC_KEY_LENGTH Available public-key bytes.
+ * @param[out] SHARED_SECRET Buffer receiving CRYPTO_SMAUG_T_SHARED_SECRET_BYTES bytes.
+ * @param[out] CIPHERTEXT Buffer receiving the encoded ciphertext.
+ * @param[in] CIPHERTEXT_LENGTH Available ciphertext bytes.
+ * @param[in] ALG An ALG_SMAUG_T_* parameter-set identifier.
+ * @return CRYPTO_SUCCESS on success or a negative CryptoError on failure.
+ */
+CRYPTO_API CryptoError CRYPTO_SMAUG_T_ENCAPS(const uint8_t *PUBLIC_KEY, size_t PUBLIC_KEY_LENGTH, uint8_t SHARED_SECRET[CRYPTO_SMAUG_T_SHARED_SECRET_BYTES], uint8_t *CIPHERTEXT, size_t CIPHERTEXT_LENGTH, AlgID ALG);
+
+/**
+ * @brief Decapsulate a SMAUG-T ciphertext with the corresponding private key.
+ * @param[in] PRIVATE_KEY Encoded private key selected by ALG.
+ * @param[in] PRIVATE_KEY_LENGTH Available private-key bytes.
+ * @param[in] CIPHERTEXT Encoded ciphertext selected by ALG.
+ * @param[in] CIPHERTEXT_LENGTH Available ciphertext bytes.
+ * @param[out] SHARED_SECRET Buffer receiving CRYPTO_SMAUG_T_SHARED_SECRET_BYTES bytes.
+ * @param[in] ALG An ALG_SMAUG_T_* parameter-set identifier.
+ * @return CRYPTO_SUCCESS on success or a negative CryptoError on failure.
+ * @note Correctly sized invalid ciphertexts use implicit rejection.
+ */
+CRYPTO_API CryptoError CRYPTO_SMAUG_T_DECAPS(const uint8_t *PRIVATE_KEY, size_t PRIVATE_KEY_LENGTH, const uint8_t *CIPHERTEXT, size_t CIPHERTEXT_LENGTH, uint8_t SHARED_SECRET[CRYPTO_SMAUG_T_SHARED_SECRET_BYTES], AlgID ALG);
 CRYPTO_END_DECLS
 
 #endif
