@@ -3,6 +3,7 @@ project(Crypto VERSION 0.6.0 LANGUAGES C)
 
 option(BUILD_SHARED_LIBS "Build Crypto as a shared library" ON)
 option(CRYPTO_BUILD_TESTS "Build Crypto tests" ON)
+option(CRYPTO_BUILD_DOCS "Generate the public API reference with Doxygen" OFF)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -158,6 +159,41 @@ install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/CryptoConfigVersion.cmake
     DESTINATION ${CRYPTO_CMAKE_INSTALL_DIR}
 )
+
+if(CRYPTO_BUILD_DOCS)
+    find_package(Doxygen 1.12 REQUIRED)
+    set(CRYPTO_PUBLIC_HEADERS
+        ${CMAKE_CURRENT_SOURCE_DIR}/inc/AsymmetricCipher.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/inc/BlockCipher.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/inc/Crypto.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/inc/Def.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/inc/DigitalSignature.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/inc/HashFunction.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/inc/KeyEncapsulation.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/inc/RandomNumberGeneration.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/inc/Util.h
+    )
+    set(CRYPTO_DOXYGEN_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/docs")
+    set(CRYPTO_DOXYGEN_INDEX
+        "${CRYPTO_DOXYGEN_OUTPUT_DIR}/html/index.html")
+    set(CRYPTO_DOXYGEN_WARNINGS
+        "${CRYPTO_DOXYGEN_OUTPUT_DIR}/warnings.log")
+    configure_file(
+        cmake/Doxyfile.in
+        ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
+        @ONLY
+    )
+    add_custom_target(crypto_docs
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+                ${CRYPTO_DOXYGEN_OUTPUT_DIR}
+        COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
+        DEPENDS ${CRYPTO_PUBLIC_HEADERS} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
+        BYPRODUCTS ${CRYPTO_DOXYGEN_INDEX} ${CRYPTO_DOXYGEN_WARNINGS}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        COMMENT "Generating Crypto public API documentation"
+        VERBATIM
+    )
+endif()
 
 if(CRYPTO_BUILD_TESTS)
     enable_testing()

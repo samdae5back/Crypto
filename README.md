@@ -39,18 +39,20 @@ operational public header has a same-named entry-point source directly under
 No submodule checkout or external crypto package is required.
 
 ```sh
-cmake -S . -B build \
+cmake -E make_directory build
+cmake -E chdir build cmake .. \
   -DBUILD_SHARED_LIBS=ON \
   -DCRYPTO_BUILD_TESTS=ON
 cmake --build build --config Release
-ctest --test-dir build -C Release --output-on-failure
+cmake -E chdir build ctest -C Release --output-on-failure
 ```
 
 For a static library, configure with `-DBUILD_SHARED_LIBS=OFF`. To install the
 library and its public headers:
 
 ```sh
-cmake --install build --prefix /your/prefix
+cmake -E chdir build cmake .. -DCMAKE_INSTALL_PREFIX=/your/prefix
+cmake --build build --target install --config Release
 ```
 
 CMake consumers can discover the installed package and link its imported target:
@@ -67,6 +69,18 @@ umbrella header as follows:
 #include <Crypto.h>
 ```
 
+To generate the public API reference, install Doxygen 1.12 or newer and enable
+the optional documentation target:
+
+```sh
+cmake -E make_directory build-docs
+cmake -E chdir build-docs cmake .. -DCRYPTO_BUILD_DOCS=ON
+cmake --build build-docs --target crypto_docs
+```
+
+The generated entry page is `build-docs/docs/html/index.html`. Only the public
+headers in `inc/` are included in this reference.
+
 ## Runtime algorithm dispatch
 
 Public operation names start with `CRYPTO_`. For APIs that accept an algorithm
@@ -74,6 +88,20 @@ identifier, `AlgID` is the last argument. The complete identifier set is in
 `inc/Def.h` and is available from `Crypto.h`.
 
 AES encryption and decryption use one API pair for all key sizes and modes:
+
+AES does not define a separate master-key construction algorithm. Generate a
+uniform random key with the size required by the selected identifier; round-key
+expansion remains an internal implementation detail:
+
+```c
+uint8_t key[CRYPTO_AES_256_KEY_BYTES];
+size_t key_length = CRYPTO_BLOCK_CIPHER_KEY_SIZE(ALG_AES_256_GCM);
+
+CryptoError error = CRYPTO_RANDOM_BYTES(key, key_length);
+```
+
+Applications deriving keys from passwords or shared secrets must use an
+appropriate key-derivation protocol instead of copying or truncating that input.
 
 ```c
 uint8_t ciphertext[32];
