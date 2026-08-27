@@ -19,17 +19,7 @@ jobs:
 
       - name: Apply public API and package rename
         run: |
-          set +e
-          python .github/liberacrypt_public_api_rename.py 2>rename.err
-          status=$?
-          set -e
-          if [ "$status" -ne 0 ]; then
-            if ! grep -q 'missing requested CMake identity: LiberaCryptTargets' rename.err; then
-              cat rename.err >&2
-              exit "$status"
-            fi
-            cat rename.err
-          fi
+          python .github/liberacrypt_public_api_rename.py
           python .github/liberacrypt_public_api_post.py
 
       - name: Build and run focused tests
@@ -73,7 +63,8 @@ jobs:
           int main(void) {
               uint8_t digest[LIBERAC_SHA2_256_DIGEST_BYTES];
               const LiberaCError error = LIBERAC_HASH(
-                  digest, sizeof(digest), NULL, 0u, ALG_HASH_SHA2_256);
+                  digest, sizeof(digest), NULL, 0u,
+                  LIBERAC_ALG_HASH_SHA2_256);
               return error == LIBERAC_SUCCESS ? 0 : 1;
           }
           EOF
@@ -91,5 +82,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "refactor(api): rename public surface to LiberaCrypt" \
-            -m "Rename the public C namespace to LIBERAC_, public types to LiberaC*, the umbrella header to LiberaCrypt.h, the CMake package and target to LiberaCrypt::LiberaCrypt, and the Unix library to libliberacrypt. Keep internal lowercase crypto_* implementation symbols private. Validate the installed package with a standalone consumer and representative tests."
+            -m "Rename public functions, macros, and algorithm selectors to LIBERAC_; public types to LiberaC*; the umbrella header to LiberaCrypt.h; the CMake package and target to LiberaCrypt::LiberaCrypt; and the Unix library to libliberacrypt. Keep unrelated vendored and private implementation namespaces intact. Validate the installed package with a standalone consumer and representative tests."
           git push origin HEAD:refactor/liberacrypt-public-api
