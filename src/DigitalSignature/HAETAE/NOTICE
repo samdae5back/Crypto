@@ -1,0 +1,17 @@
+# HAETAE third-party provenance
+
+The HAETAE implementation in this directory is derived from the official
+HAETAE 1.2.0 reference implementation published by Team HAETAE:
+
+- Project: <https://www.kpqc.cryptolab.co.kr/haetae>
+- Release archive SHA-256:
+  `e54f8f962eefadbb2929bca292797bc7ca18769fb9a273c10204f3887fd83e84`
+- License: MIT; see `LICENSE` in this directory.
+
+The byte-aligned rANS implementation in `haetae_rans_byte.h` retains its
+upstream notice verbatim:
+
+> Simple byte-aligned rANS encoder/decoder - public domain - Fabian 'ryg'
+> Giesen 2014
+
+That rANS implementation is dedicated to the public domain by its author.
