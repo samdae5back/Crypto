@@ -42,7 +42,7 @@ const int* GenZeta(void) {
     return ZETA_TABLE;
 }
 
-//비트 반전 함수
+/* Reverse the low-order bits of an index. */
 int bit_rev(int x) {
     int t[7] = { 0 };
     for (int i = 0; i < 7; i++) {
