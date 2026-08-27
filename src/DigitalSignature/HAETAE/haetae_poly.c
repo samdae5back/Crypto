@@ -345,18 +345,26 @@ void crypto_haetae_poly_challenge(crypto_haetae_poly *c,
     crypto_sha3_clear(&context);
 }
 
-void crypto_haetae_poly_decomposed_pack(uint8_t  *buf, const crypto_haetae_poly *a) {
+/*
+ * crypto_haetae_decompose_z1 centers the low byte in [-128, 127].
+ * Store that value modulo 256 and reconstruct it arithmetically so
+ * the wire format does not depend on the target's char signedness.
+ */
+void crypto_haetae_poly_decomposed_pack(uint8_t *buf,
+                                         const crypto_haetae_poly *a) {
     unsigned int i;
     for (i = 0; i < CRYPTO_HAETAE_N; i++) {
-        buf[i] = a->coeffs[i];
+        buf[i] = (uint8_t)a->coeffs[i];
     }
 }
 
-//The type "char" is "unsigned char" by default in AIX-Power. If you need "signed char", use "signed char" instead of "char".
-void crypto_haetae_poly_decomposed_unpack(crypto_haetae_poly *a, const uint8_t  *buf) {
+void crypto_haetae_poly_decomposed_unpack(crypto_haetae_poly *a,
+                                           const uint8_t *buf) {
     unsigned int i;
     for (i = 0; i < CRYPTO_HAETAE_N; i++) {
-        a->coeffs[i] = (signed char)buf[i];
+        const uint32_t encoded = (uint32_t)buf[i];
+        a->coeffs[i] = (int32_t)encoded -
+            (int32_t)((encoded >> 7) << 8);
     }
 }
 
