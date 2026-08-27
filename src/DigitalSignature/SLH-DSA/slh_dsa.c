@@ -4,7 +4,7 @@
  */
 
 #include "slh_dsa_internal.h"
-#include "RandomNumberGeneration/Noise/random_internal.h"
+#include "RandomNumberGeneration/KAT/pqc_kat_rng_internal.h"
 #include "Util/Core/secure_zero.h"
 #include "Backend/slh_dsa.h"
 
@@ -41,6 +41,35 @@ size_t crypto_slh_dsa_signature_size_internal(AlgID ALG) {
     return prm ? slh_sig_sz(prm) : 0u;
 }
 
+CryptoError crypto_slh_dsa_keygen_seeded_internal(
+                           AlgID ALG,
+                           const uint8_t *SEED, size_t SEED_LENGTH,
+                           uint8_t *PUBLIC_KEY, size_t PUBLIC_KEY_LENGTH,
+                           uint8_t *PRIVATE_KEY, size_t PRIVATE_KEY_LENGTH) {
+    const slh_param_t *prm = slh_dsa_parameters(ALG);
+    size_t pk_length, sk_length, n;
+    int rc;
+
+    if (!prm) return CRYPTO_ERROR_INVALID_ALG_ID;
+    if (!SEED || !PUBLIC_KEY || !PRIVATE_KEY)
+        return CRYPTO_ERROR_INVALID_ARGUMENT;
+    pk_length = slh_pk_sz(prm);
+    sk_length = slh_sk_sz(prm);
+    if (PUBLIC_KEY_LENGTH < pk_length || PRIVATE_KEY_LENGTH < sk_length)
+        return CRYPTO_ERROR_BUFFER_TOO_SMALL;
+    n = pk_length / 2u;
+    if (SEED_LENGTH != 3u * n) return CRYPTO_ERROR_INVALID_ARGUMENT;
+
+    rc = slh_keygen_internal(PRIVATE_KEY, PUBLIC_KEY,
+                             SEED, SEED + n, SEED + 2u * n, prm);
+    if (rc != 0) {
+        crypto_zeroize(PUBLIC_KEY, pk_length);
+        crypto_zeroize(PRIVATE_KEY, sk_length);
+        return CRYPTO_ERROR_INTERNAL;
+    }
+    return CRYPTO_SUCCESS;
+}
+
 CryptoError crypto_slh_dsa_keygen_internal(AlgID ALG,
                            uint8_t *PUBLIC_KEY, size_t PUBLIC_KEY_LENGTH,
                            uint8_t *PRIVATE_KEY, size_t PRIVATE_KEY_LENGTH) {
@@ -48,7 +77,6 @@ CryptoError crypto_slh_dsa_keygen_internal(AlgID ALG,
     uint8_t seed[96];
     size_t pk_length, sk_length, n;
     CryptoError err;
-    int rc;
 
     if (!prm) return CRYPTO_ERROR_INVALID_ALG_ID;
     if (!PUBLIC_KEY || !PRIVATE_KEY) return CRYPTO_ERROR_INVALID_ARGUMENT;
@@ -58,20 +86,45 @@ CryptoError crypto_slh_dsa_keygen_internal(AlgID ALG,
         return CRYPTO_ERROR_BUFFER_TOO_SMALL;
     n = pk_length / 2u;
 
-    err = crypto_random_bytes_internal(seed, 3u * n);
-    if (err != CRYPTO_SUCCESS) {
+    err = crypto_pqc_random_bytes_internal(seed, 3u * n);
+    if (err == CRYPTO_SUCCESS) {
+        err = crypto_slh_dsa_keygen_seeded_internal(
+            ALG, seed, 3u * n, PUBLIC_KEY, PUBLIC_KEY_LENGTH,
+            PRIVATE_KEY, PRIVATE_KEY_LENGTH);
+    } else {
         crypto_zeroize(PUBLIC_KEY, pk_length);
         crypto_zeroize(PRIVATE_KEY, sk_length);
-        crypto_zeroize(seed, sizeof(seed));
-        return err;
     }
-
-    rc = slh_keygen_internal(PRIVATE_KEY, PUBLIC_KEY,
-                             seed, seed + n, seed + 2u * n, prm);
     crypto_zeroize(seed, sizeof(seed));
-    if (rc != 0) {
-        crypto_zeroize(PUBLIC_KEY, pk_length);
-        crypto_zeroize(PRIVATE_KEY, sk_length);
+    return err;
+}
+
+CryptoError crypto_slh_dsa_sign_seeded_internal(
+                         AlgID ALG,
+                         const uint8_t *RANDOMNESS, size_t RANDOMNESS_LENGTH,
+                         const uint8_t *PRIVATE_KEY, size_t PRIVATE_KEY_LENGTH,
+                         const uint8_t *MESSAGE, size_t MESSAGE_LENGTH,
+                         const uint8_t *CONTEXT, size_t CONTEXT_LENGTH,
+                         uint8_t *SIGNATURE, size_t SIGNATURE_LENGTH) {
+    const slh_param_t *prm = slh_dsa_parameters(ALG);
+    size_t sk_length, sig_length, n, written;
+
+    if (!prm) return CRYPTO_ERROR_INVALID_ALG_ID;
+    if (!RANDOMNESS || !PRIVATE_KEY || (!MESSAGE && MESSAGE_LENGTH) ||
+        (!CONTEXT && CONTEXT_LENGTH) || !SIGNATURE)
+        return CRYPTO_ERROR_INVALID_ARGUMENT;
+    if (CONTEXT_LENGTH > CRYPTO_SIGNATURE_CONTEXT_MAX_BYTES) return CRYPTO_ERROR_INVALID_ARGUMENT;
+    sk_length = slh_sk_sz(prm);
+    sig_length = slh_sig_sz(prm);
+    if (PRIVATE_KEY_LENGTH != sk_length) return CRYPTO_ERROR_INVALID_KEY;
+    if (SIGNATURE_LENGTH < sig_length) return CRYPTO_ERROR_BUFFER_TOO_SMALL;
+    n = slh_pk_sz(prm) / 2u;
+    if (RANDOMNESS_LENGTH != n) return CRYPTO_ERROR_INVALID_ARGUMENT;
+
+    written = slh_sign(SIGNATURE, MESSAGE, MESSAGE_LENGTH,
+                       CONTEXT, CONTEXT_LENGTH, PRIVATE_KEY, RANDOMNESS, prm);
+    if (written != sig_length) {
+        crypto_zeroize(SIGNATURE, sig_length);
         return CRYPTO_ERROR_INTERNAL;
     }
     return CRYPTO_SUCCESS;
@@ -84,34 +137,32 @@ CryptoError crypto_slh_dsa_sign_internal(AlgID ALG,
                          uint8_t *SIGNATURE, size_t SIGNATURE_LENGTH) {
     const slh_param_t *prm = slh_dsa_parameters(ALG);
     uint8_t addrnd[32];
-    size_t sk_length, sig_length, n, written;
+    size_t sk_length, sig_length, n;
     CryptoError err;
 
     if (!prm) return CRYPTO_ERROR_INVALID_ALG_ID;
-    if (!PRIVATE_KEY || (!MESSAGE && MESSAGE_LENGTH) || (!CONTEXT && CONTEXT_LENGTH) || !SIGNATURE)
+    if (!PRIVATE_KEY || (!MESSAGE && MESSAGE_LENGTH) ||
+        (!CONTEXT && CONTEXT_LENGTH) || !SIGNATURE)
         return CRYPTO_ERROR_INVALID_ARGUMENT;
-    if (CONTEXT_LENGTH > CRYPTO_SIGNATURE_CONTEXT_MAX_BYTES) return CRYPTO_ERROR_INVALID_ARGUMENT;
+    if (CONTEXT_LENGTH > CRYPTO_SIGNATURE_CONTEXT_MAX_BYTES)
+        return CRYPTO_ERROR_INVALID_ARGUMENT;
     sk_length = slh_sk_sz(prm);
     sig_length = slh_sig_sz(prm);
     if (PRIVATE_KEY_LENGTH != sk_length) return CRYPTO_ERROR_INVALID_KEY;
     if (SIGNATURE_LENGTH < sig_length) return CRYPTO_ERROR_BUFFER_TOO_SMALL;
     n = slh_pk_sz(prm) / 2u;
 
-    err = crypto_random_bytes_internal(addrnd, n);
-    if (err != CRYPTO_SUCCESS) {
+    err = crypto_pqc_random_bytes_internal(addrnd, n);
+    if (err == CRYPTO_SUCCESS) {
+        err = crypto_slh_dsa_sign_seeded_internal(
+            ALG, addrnd, n, PRIVATE_KEY, PRIVATE_KEY_LENGTH,
+            MESSAGE, MESSAGE_LENGTH, CONTEXT, CONTEXT_LENGTH,
+            SIGNATURE, SIGNATURE_LENGTH);
+    } else {
         crypto_zeroize(SIGNATURE, sig_length);
-        crypto_zeroize(addrnd, sizeof(addrnd));
-        return err;
     }
-
-    written = slh_sign(SIGNATURE, MESSAGE, MESSAGE_LENGTH,
-                       CONTEXT, CONTEXT_LENGTH, PRIVATE_KEY, addrnd, prm);
     crypto_zeroize(addrnd, sizeof(addrnd));
-    if (written != sig_length) {
-        crypto_zeroize(SIGNATURE, sig_length);
-        return CRYPTO_ERROR_INTERNAL;
-    }
-    return CRYPTO_SUCCESS;
+    return err;
 }
 
 CryptoError crypto_slh_dsa_verify_internal(AlgID ALG,

@@ -128,24 +128,20 @@ cleanup:
 
 CryptoError ML_KEM_KeyGen(unsigned char *public_key,
                           unsigned char *private_key) {
-    unsigned char seed[32] = { 0 };
-    unsigned char rejection_seed[32] = { 0 };
+    unsigned char randomness[64] = { 0 };
     CryptoError result;
 
-    result = RBG(seed, sizeof(seed));
-    if (result != CRYPTO_SUCCESS) goto cleanup;
-    result = RBG(rejection_seed, sizeof(rejection_seed));
-    if (result != CRYPTO_SUCCESS) goto cleanup;
-    result = ML_KEM_KeyGen_internal(seed, rejection_seed, public_key,
-                                    private_key);
+    result = RBG(randomness, sizeof(randomness));
+    if (result == CRYPTO_SUCCESS) {
+        result = ML_KEM_KeyGen_internal(
+            randomness, randomness + 32u, public_key, private_key);
+    }
 
-cleanup:
     if (result != CRYPTO_SUCCESS) {
         crypto_zeroize(public_key, 384u * (size_t)k + 32u);
         crypto_zeroize(private_key, 768u * (size_t)k + 96u);
     }
-    crypto_zeroize(seed, sizeof(seed));
-    crypto_zeroize(rejection_seed, sizeof(rejection_seed));
+    crypto_zeroize(randomness, sizeof(randomness));
     return result;
 }
 

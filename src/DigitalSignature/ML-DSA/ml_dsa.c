@@ -4,7 +4,7 @@
  */
 
 #include "ml_dsa_internal.h"
-#include "RandomNumberGeneration/Noise/random_internal.h"
+#include "RandomNumberGeneration/KAT/pqc_kat_rng_internal.h"
 #include "Util/Core/secure_zero.h"
 #include "mldsa_native_all.h"
 
@@ -68,13 +68,41 @@ size_t crypto_ml_dsa_signature_size_internal(AlgID ALG) {
     return ml_dsa_sizes(ALG, NULL, NULL, &value) == CRYPTO_SUCCESS ? value : 0u;
 }
 
+CryptoError crypto_ml_dsa_keygen_seeded_internal(
+                          AlgID ALG, const uint8_t SEED[ML_DSA_SEED_BYTES],
+                          uint8_t *PUBLIC_KEY, size_t PUBLIC_KEY_LENGTH,
+                          uint8_t *PRIVATE_KEY, size_t PRIVATE_KEY_LENGTH) {
+    size_t pk_length, sk_length;
+    CryptoError err;
+    int rc = -1;
+
+    if (!SEED || !PUBLIC_KEY || !PRIVATE_KEY)
+        return CRYPTO_ERROR_INVALID_ARGUMENT;
+    err = ml_dsa_sizes(ALG, &pk_length, &sk_length, NULL);
+    if (err != CRYPTO_SUCCESS) return err;
+    if (PUBLIC_KEY_LENGTH < pk_length || PRIVATE_KEY_LENGTH < sk_length)
+        return CRYPTO_ERROR_BUFFER_TOO_SMALL;
+
+    switch (ALG) {
+        case ALG_ML_DSA_44: rc = mldsa44_keypair_internal(PUBLIC_KEY, PRIVATE_KEY, SEED); break;
+        case ALG_ML_DSA_65: rc = mldsa65_keypair_internal(PUBLIC_KEY, PRIVATE_KEY, SEED); break;
+        case ALG_ML_DSA_87: rc = mldsa87_keypair_internal(PUBLIC_KEY, PRIVATE_KEY, SEED); break;
+        default: rc = -9; break;
+    }
+    err = ml_dsa_backend_error(rc);
+    if (err != CRYPTO_SUCCESS) {
+        crypto_zeroize(PUBLIC_KEY, pk_length);
+        crypto_zeroize(PRIVATE_KEY, sk_length);
+    }
+    return err;
+}
+
 CryptoError crypto_ml_dsa_keygen_internal(AlgID ALG,
                           uint8_t *PUBLIC_KEY, size_t PUBLIC_KEY_LENGTH,
                           uint8_t *PRIVATE_KEY, size_t PRIVATE_KEY_LENGTH) {
     uint8_t seed[ML_DSA_SEED_BYTES];
     size_t pk_length, sk_length;
     CryptoError err;
-    int rc = -1;
 
     if (!PUBLIC_KEY || !PRIVATE_KEY) return CRYPTO_ERROR_INVALID_ARGUMENT;
     err = ml_dsa_sizes(ALG, &pk_length, &sk_length, NULL);
@@ -82,26 +110,71 @@ CryptoError crypto_ml_dsa_keygen_internal(AlgID ALG,
     if (PUBLIC_KEY_LENGTH < pk_length || PRIVATE_KEY_LENGTH < sk_length)
         return CRYPTO_ERROR_BUFFER_TOO_SMALL;
 
-    err = crypto_random_bytes_internal(seed, sizeof(seed));
-    if (err != CRYPTO_SUCCESS) {
+    err = crypto_pqc_random_bytes_internal(seed, sizeof(seed));
+    if (err == CRYPTO_SUCCESS) {
+        err = crypto_ml_dsa_keygen_seeded_internal(
+            ALG, seed, PUBLIC_KEY, PUBLIC_KEY_LENGTH,
+            PRIVATE_KEY, PRIVATE_KEY_LENGTH);
+    } else {
         crypto_zeroize(PUBLIC_KEY, pk_length);
         crypto_zeroize(PRIVATE_KEY, sk_length);
-        crypto_zeroize(seed, sizeof(seed));
-        return err;
-    }
-
-    switch (ALG) {
-        case ALG_ML_DSA_44: rc = mldsa44_keypair_internal(PUBLIC_KEY, PRIVATE_KEY, seed); break;
-        case ALG_ML_DSA_65: rc = mldsa65_keypair_internal(PUBLIC_KEY, PRIVATE_KEY, seed); break;
-        case ALG_ML_DSA_87: rc = mldsa87_keypair_internal(PUBLIC_KEY, PRIVATE_KEY, seed); break;
-        default: rc = -9; break;
     }
     crypto_zeroize(seed, sizeof(seed));
-    err = ml_dsa_backend_error(rc);
-    if (err != CRYPTO_SUCCESS) {
-        crypto_zeroize(PUBLIC_KEY, pk_length);
-        crypto_zeroize(PRIVATE_KEY, sk_length);
+    return err;
+}
+
+CryptoError crypto_ml_dsa_sign_seeded_internal(
+                        AlgID ALG,
+                        const uint8_t RANDOMNESS[ML_DSA_RANDOM_BYTES],
+                        const uint8_t *PRIVATE_KEY, size_t PRIVATE_KEY_LENGTH,
+                        const uint8_t *MESSAGE, size_t MESSAGE_LENGTH,
+                        const uint8_t *CONTEXT, size_t CONTEXT_LENGTH,
+                        uint8_t *SIGNATURE, size_t SIGNATURE_LENGTH) {
+    uint8_t prefix[MLD_DOMAIN_SEPARATION_MAX_BYTES];
+    size_t sk_length, sig_length, prefix_length = 0u;
+    CryptoError err;
+    int rc = -1;
+
+    if (!RANDOMNESS || !PRIVATE_KEY || (!MESSAGE && MESSAGE_LENGTH) ||
+        (!CONTEXT && CONTEXT_LENGTH) || !SIGNATURE)
+        return CRYPTO_ERROR_INVALID_ARGUMENT;
+    if (CONTEXT_LENGTH > CRYPTO_SIGNATURE_CONTEXT_MAX_BYTES) return CRYPTO_ERROR_INVALID_ARGUMENT;
+    err = ml_dsa_sizes(ALG, NULL, &sk_length, &sig_length);
+    if (err != CRYPTO_SUCCESS) return err;
+    if (PRIVATE_KEY_LENGTH != sk_length) return CRYPTO_ERROR_INVALID_KEY;
+    if (SIGNATURE_LENGTH < sig_length) return CRYPTO_ERROR_BUFFER_TOO_SMALL;
+
+    switch (ALG) {
+        case ALG_ML_DSA_44:
+            prefix_length = mldsa44_prepare_domain_separation_prefix(
+                prefix, NULL, 0u, CONTEXT, CONTEXT_LENGTH, MLD_PREHASH_NONE);
+            if (prefix_length != 0u)
+                rc = mldsa44_signature_internal(SIGNATURE, MESSAGE, MESSAGE_LENGTH,
+                                                prefix, prefix_length, RANDOMNESS, PRIVATE_KEY, 0);
+            break;
+        case ALG_ML_DSA_65:
+            prefix_length = mldsa65_prepare_domain_separation_prefix(
+                prefix, NULL, 0u, CONTEXT, CONTEXT_LENGTH, MLD_PREHASH_NONE);
+            if (prefix_length != 0u)
+                rc = mldsa65_signature_internal(SIGNATURE, MESSAGE, MESSAGE_LENGTH,
+                                                prefix, prefix_length, RANDOMNESS, PRIVATE_KEY, 0);
+            break;
+        case ALG_ML_DSA_87:
+            prefix_length = mldsa87_prepare_domain_separation_prefix(
+                prefix, NULL, 0u, CONTEXT, CONTEXT_LENGTH, MLD_PREHASH_NONE);
+            if (prefix_length != 0u)
+                rc = mldsa87_signature_internal(SIGNATURE, MESSAGE, MESSAGE_LENGTH,
+                                                prefix, prefix_length, RANDOMNESS, PRIVATE_KEY, 0);
+            break;
+        default:
+            rc = -9;
+            break;
     }
+
+    crypto_zeroize(prefix, sizeof(prefix));
+    if (prefix_length == 0u) err = CRYPTO_ERROR_INVALID_ARGUMENT;
+    else err = ml_dsa_backend_error(rc);
+    if (err != CRYPTO_SUCCESS) crypto_zeroize(SIGNATURE, sig_length);
     return err;
 }
 
@@ -111,58 +184,29 @@ CryptoError crypto_ml_dsa_sign_internal(AlgID ALG,
                         const uint8_t *CONTEXT, size_t CONTEXT_LENGTH,
                         uint8_t *SIGNATURE, size_t SIGNATURE_LENGTH) {
     uint8_t rnd[ML_DSA_RANDOM_BYTES];
-    uint8_t prefix[MLD_DOMAIN_SEPARATION_MAX_BYTES];
-    size_t sk_length, sig_length, prefix_length = 0u;
+    size_t sk_length, sig_length;
     CryptoError err;
-    int rc = -1;
 
-    if (!PRIVATE_KEY || (!MESSAGE && MESSAGE_LENGTH) || (!CONTEXT && CONTEXT_LENGTH) || !SIGNATURE)
+    if (!PRIVATE_KEY || (!MESSAGE && MESSAGE_LENGTH) ||
+        (!CONTEXT && CONTEXT_LENGTH) || !SIGNATURE)
         return CRYPTO_ERROR_INVALID_ARGUMENT;
-    if (CONTEXT_LENGTH > CRYPTO_SIGNATURE_CONTEXT_MAX_BYTES) return CRYPTO_ERROR_INVALID_ARGUMENT;
+    if (CONTEXT_LENGTH > CRYPTO_SIGNATURE_CONTEXT_MAX_BYTES)
+        return CRYPTO_ERROR_INVALID_ARGUMENT;
     err = ml_dsa_sizes(ALG, NULL, &sk_length, &sig_length);
     if (err != CRYPTO_SUCCESS) return err;
     if (PRIVATE_KEY_LENGTH != sk_length) return CRYPTO_ERROR_INVALID_KEY;
     if (SIGNATURE_LENGTH < sig_length) return CRYPTO_ERROR_BUFFER_TOO_SMALL;
 
-    err = crypto_random_bytes_internal(rnd, sizeof(rnd));
-    if (err != CRYPTO_SUCCESS) {
+    err = crypto_pqc_random_bytes_internal(rnd, sizeof(rnd));
+    if (err == CRYPTO_SUCCESS) {
+        err = crypto_ml_dsa_sign_seeded_internal(
+            ALG, rnd, PRIVATE_KEY, PRIVATE_KEY_LENGTH,
+            MESSAGE, MESSAGE_LENGTH, CONTEXT, CONTEXT_LENGTH,
+            SIGNATURE, SIGNATURE_LENGTH);
+    } else {
         crypto_zeroize(SIGNATURE, sig_length);
-        crypto_zeroize(rnd, sizeof(rnd));
-        return err;
     }
-
-    switch (ALG) {
-        case ALG_ML_DSA_44:
-            prefix_length = mldsa44_prepare_domain_separation_prefix(
-                prefix, NULL, 0u, CONTEXT, CONTEXT_LENGTH, MLD_PREHASH_NONE);
-            if (prefix_length != 0u)
-                rc = mldsa44_signature_internal(SIGNATURE, MESSAGE, MESSAGE_LENGTH,
-                                                prefix, prefix_length, rnd, PRIVATE_KEY, 0);
-            break;
-        case ALG_ML_DSA_65:
-            prefix_length = mldsa65_prepare_domain_separation_prefix(
-                prefix, NULL, 0u, CONTEXT, CONTEXT_LENGTH, MLD_PREHASH_NONE);
-            if (prefix_length != 0u)
-                rc = mldsa65_signature_internal(SIGNATURE, MESSAGE, MESSAGE_LENGTH,
-                                                prefix, prefix_length, rnd, PRIVATE_KEY, 0);
-            break;
-        case ALG_ML_DSA_87:
-            prefix_length = mldsa87_prepare_domain_separation_prefix(
-                prefix, NULL, 0u, CONTEXT, CONTEXT_LENGTH, MLD_PREHASH_NONE);
-            if (prefix_length != 0u)
-                rc = mldsa87_signature_internal(SIGNATURE, MESSAGE, MESSAGE_LENGTH,
-                                                prefix, prefix_length, rnd, PRIVATE_KEY, 0);
-            break;
-        default:
-            rc = -9;
-            break;
-    }
-
-    crypto_zeroize(prefix, sizeof(prefix));
     crypto_zeroize(rnd, sizeof(rnd));
-    if (prefix_length == 0u) err = CRYPTO_ERROR_INVALID_ARGUMENT;
-    else err = ml_dsa_backend_error(rc);
-    if (err != CRYPTO_SUCCESS) crypto_zeroize(SIGNATURE, sig_length);
     return err;
 }
 

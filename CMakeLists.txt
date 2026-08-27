@@ -39,6 +39,7 @@ set(CRYPTO_SOURCES
     src/BlockCipher/AES/aes.c
     src/BlockCipher/AES/aes_aead.c
     src/RandomNumberGeneration/CTR_DRBG/ctr_drbg.c
+    src/RandomNumberGeneration/KAT/pqc_kat_rng.c
     src/Util/Bignum/bignum.c
     src/Util/Prime/prime.c
     src/AsymmetricCipher/RSA/rsa.c

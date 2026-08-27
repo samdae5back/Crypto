@@ -6,11 +6,11 @@
 #include <string.h>
 
 #include "hash.h"
-#include "RandomNumberGeneration/Noise/random_internal.h"
+#include "RandomNumberGeneration/KAT/pqc_kat_rng_internal.h"
 #include "Util/Core/secure_zero.h"
 
 CryptoError RBG(unsigned char *seed, size_t length) {
-    CryptoError result = crypto_random_bytes_internal(seed, length);
+    CryptoError result = crypto_pqc_random_bytes_internal(seed, length);
     if (result != CRYPTO_SUCCESS) crypto_zeroize(seed, length);
     return result;
 }
