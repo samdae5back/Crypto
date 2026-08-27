@@ -217,7 +217,7 @@ void crypto_ntru_plus_poly_ntt(crypto_ntru_plus_poly *r, const crypto_ntru_plus_
 /*************************************************
 * Name:        poly_invntt
 *
-* Description: Computes inverse number-theoretic transform (NTT)
+* Description: Computes inverse of number-theoretic transform (NTT)
 *
 * Arguments:   - crypto_ntru_plus_poly *r:                  pointer to output polynomial
 *              - const crypto_ntru_plus_poly *a:            pointer to input polynomial
