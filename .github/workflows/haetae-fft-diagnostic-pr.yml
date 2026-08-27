@@ -17,7 +17,7 @@ jobs:
         with:
           ref: fix/haetae-portable-arithmetic-final
 
-      - name: Reproduce FFT experiment and tracing
+      - name: Reproduce FFT experiment and add tracing
         shell: python
         run: |
           from pathlib import Path
@@ -34,17 +34,73 @@ jobs:
                   line[10:] if line.startswith('          ') else line
                   for line in lines)
 
+          # Reproduce the experimental FFT/range-widening patch exactly as in
+          # the original long-running experiment.
           patch = extract_run(
               '.github/workflows/haetae-portable-arithmetic.yml',
               'Apply portable codec, reduction, and FFT fixes',
               'Validate HAETAE build and tests')
           exec(compile(patch, '<fft-patch>', 'exec'), {})
 
-          trace = extract_run(
-              '.github/workflows/haetae-fft-diagnostic.yml',
-              'Add diagnostic tracing',
-              'Build diagnostic binary')
-          exec(compile(trace, '<fft-trace>', 'exec'), {})
+          # Trace which runtime parameter set enters/exits key generation.
+          unit = Path('tests/DigitalSignature/HAETAE/UnitTest.c')
+          text = unit.read_text()
+          marker = '    error = CRYPTO_HAETAE_KEYGEN(\n'
+          if text.count(marker) != 1:
+              raise RuntimeError('unexpected HAETAE unit keygen call shape')
+          text = text.replace(
+              marker,
+              '    fprintf(stderr, "HAETAE unit: keygen start alg=%d\\n", (int)alg);\n'
+              '    fflush(stderr);\n' + marker,
+              1)
+          marker = '    if (error != CRYPTO_SUCCESS) goto cleanup;\n    error = CRYPTO_HAETAE_SIGN(\n'
+          if text.count(marker) != 1:
+              raise RuntimeError('unexpected HAETAE unit post-keygen shape')
+          text = text.replace(
+              marker,
+              '    fprintf(stderr, "HAETAE unit: keygen done alg=%d err=%d\\n",\n'
+              '            (int)alg, (int)error);\n'
+              '    fflush(stderr);\n' + marker,
+              1)
+          unit.write_text(text)
+
+          # Trace the singular-value rejection result after each of the two
+          # key-generation calls, independent of surrounding whitespace.
+          source = Path('src/DigitalSignature/HAETAE/haetae.c')
+          text = source.read_text()
+          if '#include <stdio.h>' not in text:
+              include_marker = '#include <stdlib.h>\n'
+              if include_marker not in text:
+                  raise RuntimeError('stdlib include not found')
+              text = text.replace(
+                  include_marker, include_marker + '#include <stdio.h>\n', 1)
+
+          call = (
+              '        squared_singular_value = crypto_haetae_polyvecmk_sqsing_value(\n'
+              '            &workspace->s1, &workspace->s2, parameters);\n')
+          if text.count(call) != 2:
+              raise RuntimeError(
+                  f'expected two singular-value calls, found {text.count(call)}')
+          trace = (
+              '        {\n'
+              '            static unsigned int fft_diag_count = 0u;\n'
+              '            if (fft_diag_count < 64u) {\n'
+              '                const double fft_diag_limit =\n'
+              '                    parameters->gamma * parameters->gamma *\n'
+              '                    (double)CRYPTO_HAETAE_N;\n'
+              '                fprintf(stderr,\n'
+              '                        "HAETAE FFT diag alg=%d d=%u sq=%lld limit=%.3f reject=%d\\n",\n'
+              '                        (int)parameters->algorithm,\n'
+              '                        (unsigned int)parameters->d,\n'
+              '                        squared_singular_value,\n'
+              '                        fft_diag_limit,\n'
+              '                        (double)squared_singular_value > fft_diag_limit);\n'
+              '                fflush(stderr);\n'
+              '                ++fft_diag_count;\n'
+              '            }\n'
+              '        }\n')
+          text = text.replace(call, call + trace)
+          source.write_text(text)
 
       - name: Build diagnostic binary
         shell: bash
