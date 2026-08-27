@@ -1,0 +1,85 @@
+name: Apply LiberaCrypt public API rename
+
+on:
+  push:
+    branches:
+      - refactor/liberacrypt-public-api
+
+permissions:
+  contents: write
+
+jobs:
+  rename-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/liberacrypt-public-api
+          fetch-depth: 0
+
+      - name: Apply public API and package rename
+        run: |
+          python .github/liberacrypt_public_api_rename.py
+          python .github/liberacrypt_public_api_post.py
+
+      - name: Build and run focused tests
+        run: |
+          cmake -S . -B build \
+            -DBUILD_SHARED_LIBS=ON \
+            -DLIBERAC_BUILD_TESTS=ON \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j2
+          ctest --test-dir build \
+            -R 'Public|Unit|HAETAE-120.KAT|ML-KEM-512.KAT' \
+            --output-on-failure
+
+      - name: Verify installed package and library identity
+        run: |
+          cmake --install build --prefix "$PWD/install"
+          test -f install/lib/libliberacrypt.so
+          test -f install/inc/LiberaCrypt.h
+          test ! -e install/inc/Crypto.h
+          test -f install/lib/cmake/LiberaCrypt/LiberaCryptConfig.cmake
+          test -f install/lib/cmake/LiberaCrypt/LiberaCryptTargets.cmake
+          nm -D --defined-only install/lib/libliberacrypt.so | grep ' LIBERAC_HASH$'
+          if nm -D --defined-only install/lib/libliberacrypt.so | grep -q ' CRYPTO_HASH$'; then
+            echo 'old CRYPTO_HASH export remains' >&2
+            exit 1
+          fi
+
+      - name: Build installed-package consumer
+        run: |
+          mkdir consumer
+          cat > consumer/CMakeLists.txt <<'EOF'
+          cmake_minimum_required(VERSION 3.10)
+          project(LiberaCryptConsumer C)
+          find_package(LiberaCrypt CONFIG REQUIRED)
+          add_executable(consumer main.c)
+          target_link_libraries(consumer PRIVATE LiberaCrypt::LiberaCrypt)
+          EOF
+          cat > consumer/main.c <<'EOF'
+          #include <LiberaCrypt.h>
+          #include <stdint.h>
+          int main(void) {
+              uint8_t digest[LIBERAC_SHA2_256_DIGEST_BYTES];
+              const LiberaCError error = LIBERAC_HASH(
+                  digest, sizeof(digest), NULL, 0u, ALG_HASH_SHA2_256);
+              return error == LIBERAC_SUCCESS ? 0 : 1;
+          }
+          EOF
+          cmake -S consumer -B consumer-build \
+            -DCMAKE_PREFIX_PATH="$PWD/install"
+          cmake --build consumer-build -j2
+          LD_LIBRARY_PATH="$PWD/install/lib" ./consumer-build/consumer
+
+      - name: Commit rename
+        run: |
+          rm .github/liberacrypt_public_api_rename.py
+          rm .github/liberacrypt_public_api_post.py
+          rm .github/workflows/liberacrypt-public-api-rename.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "refactor(api): rename public surface to LiberaCrypt" \
+            -m "Rename the public C namespace to LIBERAC_, public types to LiberaC*, the umbrella header to LiberaCrypt.h, the CMake package and target to LiberaCrypt::LiberaCrypt, and the Unix library to libliberacrypt. Keep internal lowercase crypto_* implementation symbols private. Validate the installed package with a standalone consumer and representative tests."
+          git push origin HEAD:refactor/liberacrypt-public-api
