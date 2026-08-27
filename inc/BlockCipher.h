@@ -1,18 +1,112 @@
+/**
+ * @file BlockCipher.h
+ * @brief Runtime-selected AES encryption and decryption API.
+ *
+ * @defgroup crypto_block_cipher Block-cipher API
+ * @brief AES-128, AES-192, and AES-256 in ECB, CBC, CTR, CCM, and GCM modes.
+ *
+ * Encryption and decryption preserve the input length.  No padding scheme is
+ * applied: ECB and CBC callers must supply complete 16-byte blocks and add or
+ * remove any required padding themselves.  CCM and GCM are authenticated modes
+ * and produce or consume a separate authentication tag.
+ * @{
+ */
 #ifndef CRYPTO_BLOCK_CIPHER_H
 #define CRYPTO_BLOCK_CIPHER_H
 
 #include "Def.h"
 
+/** AES block size and required ECB/CBC input alignment, in bytes. */
 #define CRYPTO_BLOCK_CIPHER_BLOCK_BYTES 16u
+/** Largest authentication tag produced or accepted by an AES AEAD mode. */
 #define CRYPTO_BLOCK_CIPHER_MAX_TAG_BYTES 16u
+/** AES-128 master-key size, in bytes. */
 #define CRYPTO_AES_128_KEY_BYTES 16u
+/** AES-192 master-key size, in bytes. */
 #define CRYPTO_AES_192_KEY_BYTES 24u
+/** AES-256 master-key size, in bytes. */
 #define CRYPTO_AES_256_KEY_BYTES 32u
 
 CRYPTO_BEGIN_DECLS
 
+/**
+ * @brief Return the master-key size required by an AES algorithm identifier.
+ *
+ * @param[in] ALG One of the @c ALG_AES_* identifiers.
+ *
+ * @return Required key size in bytes, or zero if @p ALG is not a supported
+ *         block-cipher identifier.
+ *
+ * @par Generating an AES master key
+ * An AES master key is simply a uniformly random byte string of the size
+ * returned by this function.  Generate it with CRYPTO_RANDOM_BYTES() (declared
+ * by RandomNumberGeneration.h), store it as secret key material, and pass it
+ * directly to the encryption/decryption operation.  The internal AES round-key
+ * schedule is derived for each operation and must not be generated, stored, or
+ * exposed by callers.
+ * @code{.c}
+ * uint8_t key[CRYPTO_AES_256_KEY_BYTES];
+ * size_t key_length = CRYPTO_BLOCK_CIPHER_KEY_SIZE(ALG_AES_256_GCM);
+ * CryptoError error = CRYPTO_RANDOM_BYTES(key, key_length);
+ * @endcode
+ */
 CRYPTO_API size_t CRYPTO_BLOCK_CIPHER_KEY_SIZE(AlgID ALG);
 
+/**
+ * @brief Encrypt data with a runtime-selected AES key size and mode.
+ *
+ * The ciphertext length is exactly @p INPUT_LENGTH.  The mode-specific
+ * requirements are:
+ *
+ * - ECB: @p INPUT_LENGTH is a multiple of 16; @p IV_LENGTH,
+ *   @p AAD_LENGTH, and @p TAG_LENGTH are zero.
+ * - CBC: @p INPUT_LENGTH is a multiple of 16; the IV is exactly 16 bytes;
+ *   @p AAD_LENGTH and @p TAG_LENGTH are zero.
+ * - CTR: the initial counter is exactly 16 bytes; @p AAD_LENGTH and
+ *   @p TAG_LENGTH are zero.  Any input length is accepted.
+ * - CCM: the nonce is 7 through 13 bytes and the tag length is an even value
+ *   from 4 through 16 bytes.  The nonce length also determines the maximum
+ *   encodable message length.
+ * - GCM: the IV is non-empty (12 bytes is the usual interoperable choice) and
+ *   the tag length is 4, 8, or 12 through 16 bytes.
+ *
+ * A counter/nonce must never be reused with the same key in CTR, CCM, or GCM.
+ * CBC IVs must be unpredictable and unique for the key.  ECB provides no
+ * semantic security for repeated blocks and should only be used when a
+ * protocol explicitly requires it.
+ *
+ * @param[out] OUTPUT Ciphertext buffer.  May be NULL only when
+ *                    @p INPUT_LENGTH is zero.
+ * @param[in]  OUTPUT_CAPACITY Size of @p OUTPUT in bytes; must be at least
+ *                             @p INPUT_LENGTH.
+ * @param[out] TAG Authentication-tag buffer for CCM/GCM.  It must hold exactly
+ *                   @p TAG_LENGTH bytes.  It is ignored by non-AEAD modes when
+ *                   @p TAG_LENGTH is zero.
+ * @param[in]  TAG_LENGTH Requested authentication-tag length in bytes, or zero
+ *                        for ECB/CBC/CTR.
+ * @param[in]  INPUT Plaintext buffer.  May be NULL only when
+ *                   @p INPUT_LENGTH is zero.
+ * @param[in]  INPUT_LENGTH Plaintext length in bytes.
+ * @param[in]  KEY AES master key.
+ * @param[in]  KEY_LENGTH Size of @p KEY in bytes; it must exactly match the
+ *                        key size encoded by @p ALG.
+ * @param[in]  IV Initialization vector, initial counter, or nonce as required
+ *               by the selected mode; use NULL for ECB.
+ * @param[in]  IV_LENGTH Size of @p IV in bytes, or zero for ECB.
+ * @param[in]  AAD Additional authenticated data for CCM/GCM.  May be NULL when
+ *                 @p AAD_LENGTH is zero and is not accepted by other modes.
+ * @param[in]  AAD_LENGTH Additional authenticated-data length in bytes.
+ * @param[in]  ALG One of the @c ALG_AES_* identifiers.
+ *
+ * @retval CRYPTO_SUCCESS Encryption completed successfully.
+ * @retval CRYPTO_ERROR_INVALID_ALG_ID @p ALG is not a supported AES selector.
+ * @retval CRYPTO_ERROR_INVALID_ARGUMENT A pointer, length, or mode-specific
+ *         parameter is invalid.
+ * @retval CRYPTO_ERROR_INVALID_KEY @p KEY_LENGTH does not match @p ALG.
+ * @retval CRYPTO_ERROR_BUFFER_TOO_SMALL @p OUTPUT_CAPACITY is smaller than
+ *         @p INPUT_LENGTH.
+ * @retval CRYPTO_ERROR_MESSAGE_TOO_LARGE A CCM/GCM length limit was exceeded.
+ */
 CRYPTO_API CryptoError CRYPTO_BLOCK_CIPHER_ENCRYPT(
     uint8_t *OUTPUT, size_t OUTPUT_CAPACITY,
     uint8_t *TAG, size_t TAG_LENGTH,
@@ -22,6 +116,48 @@ CRYPTO_API CryptoError CRYPTO_BLOCK_CIPHER_ENCRYPT(
     const uint8_t *AAD, size_t AAD_LENGTH,
     AlgID ALG);
 
+/**
+ * @brief Decrypt data with a runtime-selected AES key size and mode.
+ *
+ * Parameters and mode constraints are identical to
+ * CRYPTO_BLOCK_CIPHER_ENCRYPT(), except that @p INPUT is ciphertext and
+ * @p OUTPUT receives plaintext.  For CCM/GCM, authentication is verified using
+ * @p TAG.  If authentication fails, the function returns
+ * CRYPTO_ERROR_AUTHENTICATION_FAILED and clears @p INPUT_LENGTH bytes of the
+ * plaintext output; callers must not use that output.
+ *
+ * @param[out] OUTPUT Plaintext buffer.  May be NULL only when
+ *                    @p INPUT_LENGTH is zero.
+ * @param[in]  OUTPUT_CAPACITY Size of @p OUTPUT in bytes; must be at least
+ *                             @p INPUT_LENGTH.
+ * @param[in]  TAG Authentication tag to verify for CCM/GCM.  It is ignored by
+ *                 non-AEAD modes when @p TAG_LENGTH is zero.
+ * @param[in]  TAG_LENGTH Authentication-tag length in bytes, or zero for
+ *                        ECB/CBC/CTR.
+ * @param[in]  INPUT Ciphertext buffer.  May be NULL only when
+ *                   @p INPUT_LENGTH is zero.
+ * @param[in]  INPUT_LENGTH Ciphertext length in bytes.
+ * @param[in]  KEY AES master key.
+ * @param[in]  KEY_LENGTH Size of @p KEY in bytes; it must exactly match the
+ *                        key size encoded by @p ALG.
+ * @param[in]  IV Initialization vector, initial counter, or nonce as required
+ *               by the selected mode; use NULL for ECB.
+ * @param[in]  IV_LENGTH Size of @p IV in bytes, or zero for ECB.
+ * @param[in]  AAD Additional authenticated data for CCM/GCM.  May be NULL when
+ *                 @p AAD_LENGTH is zero and is not accepted by other modes.
+ * @param[in]  AAD_LENGTH Additional authenticated-data length in bytes.
+ * @param[in]  ALG One of the @c ALG_AES_* identifiers.
+ *
+ * @retval CRYPTO_SUCCESS Decryption and, for AEAD, authentication succeeded.
+ * @retval CRYPTO_ERROR_AUTHENTICATION_FAILED The CCM/GCM tag is invalid.
+ * @retval CRYPTO_ERROR_INVALID_ALG_ID @p ALG is not a supported AES selector.
+ * @retval CRYPTO_ERROR_INVALID_ARGUMENT A pointer, length, or mode-specific
+ *         parameter is invalid.
+ * @retval CRYPTO_ERROR_INVALID_KEY @p KEY_LENGTH does not match @p ALG.
+ * @retval CRYPTO_ERROR_BUFFER_TOO_SMALL @p OUTPUT_CAPACITY is smaller than
+ *         @p INPUT_LENGTH.
+ * @retval CRYPTO_ERROR_MESSAGE_TOO_LARGE A CCM/GCM length limit was exceeded.
+ */
 CRYPTO_API CryptoError CRYPTO_BLOCK_CIPHER_DECRYPT(
     uint8_t *OUTPUT, size_t OUTPUT_CAPACITY,
     const uint8_t *TAG, size_t TAG_LENGTH,
@@ -33,3 +169,5 @@ CRYPTO_API CryptoError CRYPTO_BLOCK_CIPHER_DECRYPT(
 
 CRYPTO_END_DECLS
 #endif
+
+/** @} */
