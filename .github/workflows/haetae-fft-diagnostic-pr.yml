@@ -1,0 +1,65 @@
+name: Diagnose HAETAE FFT on PR
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/haetae-portable-arithmetic-final
+
+      - name: Reproduce FFT experiment and tracing
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def extract_run(workflow, step_name, next_step_name):
+              text = Path(workflow).read_text()
+              start_marker = f'      - name: {step_name}\n'
+              end_marker = f'      - name: {next_step_name}\n'
+              start = text.index(start_marker)
+              run_pos = text.index('        run: |\n', start) + len('        run: |\n')
+              end = text.index(end_marker, run_pos)
+              lines = text[run_pos:end].splitlines()
+              return '\n'.join(
+                  line[10:] if line.startswith('          ') else line
+                  for line in lines)
+
+          patch = extract_run(
+              '.github/workflows/haetae-portable-arithmetic.yml',
+              'Apply portable codec, reduction, and FFT fixes',
+              'Validate HAETAE build and tests')
+          exec(compile(patch, '<fft-patch>', 'exec'), {})
+
+          trace = extract_run(
+              '.github/workflows/haetae-fft-diagnostic.yml',
+              'Add diagnostic tracing',
+              'Build diagnostic binary')
+          exec(compile(trace, '<fft-trace>', 'exec'), {})
+
+      - name: Build diagnostic binary
+        shell: bash
+        run: |
+          cmake -S . -B build -DBUILD_SHARED_LIBS=ON -DCRYPTO_BUILD_TESTS=ON
+          cmake --build build -j2
+
+      - name: Run HAETAE unit with timeout
+        shell: bash
+        run: |
+          set +e
+          timeout 90s ./build/crypto_haetae_unit 2>&1 | tee haetae-fft-diagnostic.log
+          rc=${PIPESTATUS[0]}
+          echo "HAETAE diagnostic unit exit=$rc"
+          if [ "$rc" -eq 124 ]; then
+            echo "HAETAE unit timed out after 90 seconds"
+          fi
+          exit 0
