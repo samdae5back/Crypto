@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "haetae_decompose.h"
+#include "Util/Bit/bit_internal.h"
 
 /*************************************************
  * Name:        crypto_haetae_decompose_z1
@@ -17,13 +18,15 @@ void crypto_haetae_decompose_z1(int *highbits, int *lowbits, const int r) {
     const int log_alpha = 8;
 
     int lb, center;
-    uint32_t alpha_mask = alpha - 1;
+    const int alpha_mask = alpha - 1;
 
     lb = r & alpha_mask;
-    center = ((alpha >> 1) - (lb + 1)) >> 31; // if lb >= HALF_ALPHA
+    center = crypto_floor_div_pow2_i32(
+        (alpha >> 1) - (lb + 1), 31u); // if lb >= HALF_ALPHA
     lb -= alpha & center;
     *lowbits = lb;
-    *highbits = (r + (alpha >> 1)) >> log_alpha;
+    *highbits = crypto_floor_div_pow2_i32(
+        r + (alpha >> 1), (unsigned int)log_alpha);
 }
 
 /*************************************************
@@ -39,12 +42,14 @@ void crypto_haetae_decompose_z1(int *highbits, int *lowbits, const int r) {
 void crypto_haetae_decompose_hint(int *highbits, const int r, const crypto_haetae_parameters *parameters) {
     int hb, edgecase;
 
-    const int alpha_hint = parameters->alpha_hint;
-    const int log_alpha_hint = parameters->log_alpha_hint;
+    const int alpha_hint = (int)parameters->alpha_hint;
+    const unsigned int log_alpha_hint = parameters->log_alpha_hint;
 
-    hb = (r + (alpha_hint >> 1)) >> log_alpha_hint;
-    edgecase =
-        ((CRYPTO_HAETAE_DOUBLE_Q - 2) / alpha_hint - (hb + 1)) >> 31; // if hb == (DQ-2)/ALPHA
+    hb = crypto_floor_div_pow2_i32(
+        r + (alpha_hint >> 1), log_alpha_hint);
+    edgecase = crypto_floor_div_pow2_i32(
+        (CRYPTO_HAETAE_DOUBLE_Q - 2) / alpha_hint - (hb + 1),
+        31u); // if hb == (DQ-2)/ALPHA
     hb -= (CRYPTO_HAETAE_DOUBLE_Q - 2) / alpha_hint & edgecase;       // hb = 0
 
     *highbits = hb;
@@ -67,6 +72,6 @@ int crypto_haetae_decompose_vk(int *a0, const int a) {
 #error "Only implemented for D = 1"
 #endif
     *a0 = a & 1;
-    *a0 -= ((a >> 1) & *a0) << 1;
-    return (a - *a0) >> 1;
+    *a0 -= (crypto_floor_div_pow2_i32(a, 1u) & *a0) << 1;
+    return crypto_floor_div_pow2_i32(a - *a0, 1u);
 }

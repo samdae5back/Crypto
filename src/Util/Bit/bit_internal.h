@@ -44,4 +44,23 @@ static inline int32_t crypto_floor_div_pow2_i32(
            (INT32_C(1) - INT32_C(2) * (int32_t)negative);
 }
 
+/* Return floor(value / 2^count) without shifting a negative signed value. */
+static inline int64_t crypto_floor_div_pow2_i64(
+    int64_t value, unsigned int count) {
+    const uint64_t negative = (uint64_t)(value < 0);
+    const uint64_t negative_mask = UINT64_C(0) - negative;
+    const uint64_t remainder_mask =
+        (UINT64_C(1) << count) - UINT64_C(1);
+    const uint64_t magnitude =
+        ((uint64_t)value ^ negative_mask) + negative;
+    const uint64_t quotient =
+        (magnitude + (remainder_mask & negative_mask)) >> count;
+
+    if (count == 0u) {
+        return value;
+    }
+    return (int64_t)quotient *
+           (INT64_C(1) - INT64_C(2) * (int64_t)negative);
+}
+
 #endif

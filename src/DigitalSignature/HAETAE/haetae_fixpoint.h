@@ -4,6 +4,7 @@
 #define CRYPTO_HAETAE_FIXPOINT_H
 
 #include "haetae.h"
+#include "Util/Bit/bit_internal.h"
 
 #if defined(__SIZEOF_INT128__) && \
     !defined(CRYPTO_HAETAE_FORCE_NO_INT128)
@@ -34,15 +35,17 @@ static inline int64_t smulh48(int64_t a, uint64_t b) {
     !defined(CRYPTO_HAETAE_FORCE_NO_INT128)
     return (((int128)a * (int128)b) + ((int128)1 << 48) - 1) >> 48;
 #else
-    int64_t ah = a >> 24;
+    int64_t ah = crypto_floor_div_pow2_i64(a, 24u);
     int64_t al = a - ah * INT64_C(16777216);
     int64_t bl = (int64_t)(b & ((UINT64_C(1) << 24) - 1));
     int64_t bh = (int64_t)(b >> 24);
     int64_t res =
-        (al * bl + ((INT64_C(1) << 24) - 1)) >> 24;
+        crypto_floor_div_pow2_i64(
+            al * bl + ((INT64_C(1) << 24) - 1), 24u);
 
     res += al * bh + ah * bl;
-    res = (res + ((INT64_C(1) << 24) - 1)) >> 24;
+    res = crypto_floor_div_pow2_i64(
+        res + ((INT64_C(1) << 24) - 1), 24u);
     return res + (ah * bh);
 #endif
 }
