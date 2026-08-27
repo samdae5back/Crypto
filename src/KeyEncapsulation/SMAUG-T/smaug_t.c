@@ -38,7 +38,7 @@ typedef struct crypto_smaug_t_ciphertext {
 } crypto_smaug_t_ciphertext;
 
 static const crypto_smaug_t_parameters *smaug_t_parameters_for(
-    AlgID algorithm) {
+    LiberaCAlgID algorithm) {
     size_t index;
 
     for (index = 0u;
@@ -265,7 +265,7 @@ static void smaug_t_sample_cbd(
     size_t i;
     size_t j;
 
-    if (parameters->algorithm == ALG_SMAUG_T_128) {
+    if (parameters->algorithm == LIBERAC_ALG_SMAUG_T_128) {
         for (i = 0u; i < CRYPTO_SMAUG_T_N / 8u; ++i) {
             const uint32_t value = crypto_load24_le(buffer + 3u * i);
             uint32_t magnitude = value & UINT32_C(0x00249249);
@@ -281,7 +281,7 @@ static void smaug_t_sample_cbd(
                     (int16_t)(nonzero * (1 - 2 * sign));
             }
         }
-    } else if (parameters->algorithm == ALG_SMAUG_T_192) {
+    } else if (parameters->algorithm == LIBERAC_ALG_SMAUG_T_192) {
         for (i = 0u; i < CRYPTO_SMAUG_T_N / 16u; ++i) {
             const uint32_t value = crypto_load32_le(buffer + 4u * i);
             for (j = 0u; j < 16u; ++j) {
@@ -847,7 +847,7 @@ static void smaug_t_expand_matrix(
     crypto_zeroize(buffer, sizeof(buffer));
 }
 
-static CryptoError smaug_t_expand_secret(
+static LiberaCError smaug_t_expand_secret(
     crypto_smaug_t_polyvec *secret_key,
     const uint8_t seed[CRYPTO_SMAUG_T_SEED_BYTES],
     const crypto_smaug_t_parameters *parameters) {
@@ -873,11 +873,11 @@ static CryptoError smaug_t_expand_secret(
         if (attempt > UINT8_MAX) {
             crypto_zeroize(extended_seed, sizeof(extended_seed));
             crypto_zeroize(secret_key, sizeof(*secret_key));
-            return CRYPTO_ERROR_INTERNAL;
+            return LIBERAC_ERROR_INTERNAL;
         }
     }
     crypto_zeroize(extended_seed, sizeof(extended_seed));
-    return CRYPTO_SUCCESS;
+    return LIBERAC_SUCCESS;
 }
 
 static void smaug_t_expand_ephemeral(
@@ -1036,14 +1036,14 @@ static void smaug_t_compute_ciphertext_second(
     }
 }
 
-static CryptoError smaug_t_pke_keypair(
+static LiberaCError smaug_t_pke_keypair(
     uint8_t *public_key, uint8_t *private_key,
     const uint8_t seed[CRYPTO_SMAUG_T_SEED_BYTES],
     const crypto_smaug_t_parameters *parameters) {
     uint8_t expanded_seed[2u * CRYPTO_SMAUG_T_SEED_BYTES] = {0};
     crypto_smaug_t_public_key decoded_public_key;
     crypto_smaug_t_polyvec decoded_private_key;
-    CryptoError result;
+    LiberaCError result;
 
     memset(&decoded_public_key, 0, sizeof(decoded_public_key));
     memset(&decoded_private_key, 0, sizeof(decoded_private_key));
@@ -1051,7 +1051,7 @@ static CryptoError smaug_t_pke_keypair(
 
     result = smaug_t_expand_secret(
         &decoded_private_key, expanded_seed, parameters);
-    if (result != CRYPTO_SUCCESS) {
+    if (result != LIBERAC_SUCCESS) {
         goto cleanup;
     }
     memcpy(decoded_public_key.seed,
@@ -1158,15 +1158,15 @@ static void smaug_t_pke_decrypt(
     crypto_zeroize(&decoded_private_key, sizeof(decoded_private_key));
 }
 
-static CryptoError smaug_t_keypair_deterministic(
+static LiberaCError smaug_t_keypair_deterministic(
     uint8_t *public_key, uint8_t *private_key,
     const uint8_t rejection_secret[CRYPTO_SMAUG_T_SEED_BYTES],
     const uint8_t seed[CRYPTO_SMAUG_T_SEED_BYTES],
     const crypto_smaug_t_parameters *parameters) {
-    CryptoError result = smaug_t_pke_keypair(
+    LiberaCError result = smaug_t_pke_keypair(
         public_key, private_key, seed, parameters);
 
-    if (result != CRYPTO_SUCCESS) {
+    if (result != LIBERAC_SUCCESS) {
         return result;
     }
     memcpy(private_key + parameters->pke_private_key_bytes,
@@ -1174,18 +1174,18 @@ static CryptoError smaug_t_keypair_deterministic(
     memcpy(private_key + parameters->pke_private_key_bytes +
                CRYPTO_SMAUG_T_SEED_BYTES,
            public_key, parameters->public_key_bytes);
-    return CRYPTO_SUCCESS;
+    return LIBERAC_SUCCESS;
 }
 
 static void smaug_t_encapsulate_deterministic(
     uint8_t *ciphertext,
-    uint8_t shared_secret[CRYPTO_SMAUG_T_SHARED_SECRET_BYTES],
+    uint8_t shared_secret[LIBERAC_SMAUG_T_SHARED_SECRET_BYTES],
     const uint8_t *public_key,
     const uint8_t message[CRYPTO_SMAUG_T_MESSAGE_BYTES],
     const crypto_smaug_t_parameters *parameters) {
     uint8_t seed_and_secret[
         CRYPTO_SMAUG_T_SEED_BYTES +
-        CRYPTO_SMAUG_T_SHARED_SECRET_BYTES] = {0};
+        LIBERAC_SMAUG_T_SHARED_SECRET_BYTES] = {0};
     uint8_t public_key_hash[32] = {0};
 
     crypto_sha3_256(
@@ -1196,27 +1196,27 @@ static void smaug_t_encapsulate_deterministic(
         public_key_hash, sizeof(public_key_hash));
     smaug_t_pke_encrypt(
         ciphertext, public_key, message, seed_and_secret, parameters);
-    memset(shared_secret, 0, CRYPTO_SMAUG_T_SHARED_SECRET_BYTES);
+    memset(shared_secret, 0, LIBERAC_SMAUG_T_SHARED_SECRET_BYTES);
     crypto_pqc_cmov(
         shared_secret,
         seed_and_secret + CRYPTO_SMAUG_T_SEED_BYTES,
-        CRYPTO_SMAUG_T_SHARED_SECRET_BYTES, 1u);
+        LIBERAC_SMAUG_T_SHARED_SECRET_BYTES, 1u);
 
     crypto_zeroize(public_key_hash, sizeof(public_key_hash));
     crypto_zeroize(seed_and_secret, sizeof(seed_and_secret));
 }
 
 static void smaug_t_decapsulate_deterministic(
-    uint8_t shared_secret[CRYPTO_SMAUG_T_SHARED_SECRET_BYTES],
+    uint8_t shared_secret[LIBERAC_SMAUG_T_SHARED_SECRET_BYTES],
     const uint8_t *ciphertext, const uint8_t *private_key,
     const crypto_smaug_t_parameters *parameters) {
     uint8_t message[CRYPTO_SMAUG_T_MESSAGE_BYTES] = {0};
     uint8_t selected[
         CRYPTO_SMAUG_T_SEED_BYTES +
-        CRYPTO_SMAUG_T_SHARED_SECRET_BYTES] = {0};
+        LIBERAC_SMAUG_T_SHARED_SECRET_BYTES] = {0};
     uint8_t rejected[
         CRYPTO_SMAUG_T_SEED_BYTES +
-        CRYPTO_SMAUG_T_SHARED_SECRET_BYTES] = {0};
+        LIBERAC_SMAUG_T_SHARED_SECRET_BYTES] = {0};
     uint8_t hash_result[32] = {0};
     uint8_t comparison[CRYPTO_SMAUG_T_MAX_CIPHERTEXT_BYTES] = {0};
     const uint8_t *public_key =
@@ -1244,14 +1244,14 @@ static void smaug_t_decapsulate_deterministic(
         CRYPTO_SMAUG_T_SEED_BYTES,
         hash_result, sizeof(hash_result));
 
-    memset(shared_secret, 0, CRYPTO_SMAUG_T_SHARED_SECRET_BYTES);
+    memset(shared_secret, 0, LIBERAC_SMAUG_T_SHARED_SECRET_BYTES);
     crypto_pqc_cmov(
         selected + CRYPTO_SMAUG_T_SEED_BYTES,
         rejected + CRYPTO_SMAUG_T_SEED_BYTES,
-        CRYPTO_SMAUG_T_SHARED_SECRET_BYTES, (uint8_t)failed);
+        LIBERAC_SMAUG_T_SHARED_SECRET_BYTES, (uint8_t)failed);
     crypto_pqc_cmov(
         shared_secret, selected + CRYPTO_SMAUG_T_SEED_BYTES,
-        CRYPTO_SMAUG_T_SHARED_SECRET_BYTES, 1u);
+        LIBERAC_SMAUG_T_SHARED_SECRET_BYTES, 1u);
 
     crypto_zeroize(comparison, sizeof(comparison));
     crypto_zeroize(hash_result, sizeof(hash_result));
@@ -1260,60 +1260,60 @@ static void smaug_t_decapsulate_deterministic(
     crypto_zeroize(message, sizeof(message));
 }
 
-size_t crypto_smaug_t_public_key_size_internal(AlgID algorithm) {
+size_t crypto_smaug_t_public_key_size_internal(LiberaCAlgID algorithm) {
     const crypto_smaug_t_parameters *parameters =
         smaug_t_parameters_for(algorithm);
     return parameters != NULL ? parameters->public_key_bytes : 0u;
 }
 
-size_t crypto_smaug_t_private_key_size_internal(AlgID algorithm) {
+size_t crypto_smaug_t_private_key_size_internal(LiberaCAlgID algorithm) {
     const crypto_smaug_t_parameters *parameters =
         smaug_t_parameters_for(algorithm);
     return parameters != NULL ? parameters->private_key_bytes : 0u;
 }
 
-size_t crypto_smaug_t_ciphertext_size_internal(AlgID algorithm) {
+size_t crypto_smaug_t_ciphertext_size_internal(LiberaCAlgID algorithm) {
     const crypto_smaug_t_parameters *parameters =
         smaug_t_parameters_for(algorithm);
     return parameters != NULL ? parameters->ciphertext_bytes : 0u;
 }
 
-CryptoError crypto_smaug_t_keygen_internal(
-    AlgID algorithm,
+LiberaCError crypto_smaug_t_keygen_internal(
+    LiberaCAlgID algorithm,
     uint8_t *public_key, size_t public_key_length,
     uint8_t *private_key, size_t private_key_length) {
     const crypto_smaug_t_parameters *parameters =
         smaug_t_parameters_for(algorithm);
     uint8_t rejection_secret[CRYPTO_SMAUG_T_SEED_BYTES] = {0};
     uint8_t seed[CRYPTO_SMAUG_T_SEED_BYTES] = {0};
-    CryptoError result;
+    LiberaCError result;
 
     if (parameters == NULL) {
-        return CRYPTO_ERROR_INVALID_ALG_ID;
+        return LIBERAC_ERROR_INVALID_ALG_ID;
     }
     if (public_key == NULL || private_key == NULL) {
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
     if (public_key_length < parameters->public_key_bytes ||
         private_key_length < parameters->private_key_bytes) {
-        return CRYPTO_ERROR_BUFFER_TOO_SMALL;
+        return LIBERAC_ERROR_BUFFER_TOO_SMALL;
     }
     if (crypto_ranges_overlap(
             public_key, parameters->public_key_bytes,
             private_key, parameters->private_key_bytes)) {
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
 
     result = crypto_pqc_random_bytes_internal(
         rejection_secret, sizeof(rejection_secret));
-    if (result == CRYPTO_SUCCESS) {
+    if (result == LIBERAC_SUCCESS) {
         result = crypto_pqc_random_bytes_internal(seed, sizeof(seed));
     }
-    if (result == CRYPTO_SUCCESS) {
+    if (result == LIBERAC_SUCCESS) {
         result = smaug_t_keypair_deterministic(
             public_key, private_key, rejection_secret, seed, parameters);
     }
-    if (result != CRYPTO_SUCCESS) {
+    if (result != LIBERAC_SUCCESS) {
         crypto_zeroize(public_key, parameters->public_key_bytes);
         crypto_zeroize(private_key, parameters->private_key_bytes);
     }
@@ -1323,82 +1323,82 @@ CryptoError crypto_smaug_t_keygen_internal(
     return result;
 }
 
-CryptoError crypto_smaug_t_encaps_internal(
-    AlgID algorithm,
+LiberaCError crypto_smaug_t_encaps_internal(
+    LiberaCAlgID algorithm,
     const uint8_t *public_key, size_t public_key_length,
-    uint8_t shared_secret[CRYPTO_SMAUG_T_SHARED_SECRET_BYTES],
+    uint8_t shared_secret[LIBERAC_SMAUG_T_SHARED_SECRET_BYTES],
     uint8_t *ciphertext, size_t ciphertext_length) {
     const crypto_smaug_t_parameters *parameters =
         smaug_t_parameters_for(algorithm);
     uint8_t message[CRYPTO_SMAUG_T_MESSAGE_BYTES] = {0};
-    CryptoError result;
+    LiberaCError result;
 
     if (parameters == NULL) {
-        return CRYPTO_ERROR_INVALID_ALG_ID;
+        return LIBERAC_ERROR_INVALID_ALG_ID;
     }
     if (public_key == NULL || shared_secret == NULL || ciphertext == NULL) {
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
     if (public_key_length < parameters->public_key_bytes ||
         ciphertext_length < parameters->ciphertext_bytes) {
-        return CRYPTO_ERROR_BUFFER_TOO_SMALL;
+        return LIBERAC_ERROR_BUFFER_TOO_SMALL;
     }
     if (crypto_ranges_overlap(
             public_key, parameters->public_key_bytes,
-            shared_secret, CRYPTO_SMAUG_T_SHARED_SECRET_BYTES) ||
+            shared_secret, LIBERAC_SMAUG_T_SHARED_SECRET_BYTES) ||
         crypto_ranges_overlap(
             public_key, parameters->public_key_bytes,
             ciphertext, parameters->ciphertext_bytes) ||
         crypto_ranges_overlap(
-            shared_secret, CRYPTO_SMAUG_T_SHARED_SECRET_BYTES,
+            shared_secret, LIBERAC_SMAUG_T_SHARED_SECRET_BYTES,
             ciphertext, parameters->ciphertext_bytes)) {
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
 
     result = crypto_pqc_random_bytes_internal(message, sizeof(message));
-    if (result == CRYPTO_SUCCESS) {
+    if (result == LIBERAC_SUCCESS) {
         smaug_t_encapsulate_deterministic(
             ciphertext, shared_secret, public_key, message, parameters);
     } else {
-        crypto_zeroize(shared_secret, CRYPTO_SMAUG_T_SHARED_SECRET_BYTES);
+        crypto_zeroize(shared_secret, LIBERAC_SMAUG_T_SHARED_SECRET_BYTES);
         crypto_zeroize(ciphertext, parameters->ciphertext_bytes);
     }
     crypto_zeroize(message, sizeof(message));
     return result;
 }
 
-CryptoError crypto_smaug_t_decaps_internal(
-    AlgID algorithm,
+LiberaCError crypto_smaug_t_decaps_internal(
+    LiberaCAlgID algorithm,
     const uint8_t *private_key, size_t private_key_length,
     const uint8_t *ciphertext, size_t ciphertext_length,
-    uint8_t shared_secret[CRYPTO_SMAUG_T_SHARED_SECRET_BYTES]) {
+    uint8_t shared_secret[LIBERAC_SMAUG_T_SHARED_SECRET_BYTES]) {
     const crypto_smaug_t_parameters *parameters =
         smaug_t_parameters_for(algorithm);
 
     if (parameters == NULL) {
-        return CRYPTO_ERROR_INVALID_ALG_ID;
+        return LIBERAC_ERROR_INVALID_ALG_ID;
     }
     if (private_key == NULL || ciphertext == NULL || shared_secret == NULL) {
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
     if (private_key_length < parameters->private_key_bytes ||
         ciphertext_length < parameters->ciphertext_bytes) {
-        return CRYPTO_ERROR_BUFFER_TOO_SMALL;
+        return LIBERAC_ERROR_BUFFER_TOO_SMALL;
     }
     if (crypto_ranges_overlap(
             private_key, parameters->private_key_bytes,
-            shared_secret, CRYPTO_SMAUG_T_SHARED_SECRET_BYTES) ||
+            shared_secret, LIBERAC_SMAUG_T_SHARED_SECRET_BYTES) ||
         crypto_ranges_overlap(
             ciphertext, parameters->ciphertext_bytes,
-            shared_secret, CRYPTO_SMAUG_T_SHARED_SECRET_BYTES)) {
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+            shared_secret, LIBERAC_SMAUG_T_SHARED_SECRET_BYTES)) {
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
     if (!smaug_t_encoded_secret_key_is_valid(private_key, parameters)) {
-        crypto_zeroize(shared_secret, CRYPTO_SMAUG_T_SHARED_SECRET_BYTES);
-        return CRYPTO_ERROR_INVALID_KEY;
+        crypto_zeroize(shared_secret, LIBERAC_SMAUG_T_SHARED_SECRET_BYTES);
+        return LIBERAC_ERROR_INVALID_KEY;
     }
 
     smaug_t_decapsulate_deterministic(
         shared_secret, ciphertext, private_key, parameters);
-    return CRYPTO_SUCCESS;
+    return LIBERAC_SUCCESS;
 }

@@ -19,10 +19,10 @@ static int all_zero(const void *ptr, size_t length) {
 }
 
 static int test_df_variants(void) {
-    const AlgID algorithms[] = {
-        ALG_CTR_DRBG_AES_128_DF,
-        ALG_CTR_DRBG_AES_192_DF,
-        ALG_CTR_DRBG_AES_256_DF
+    const LiberaCAlgID algorithms[] = {
+        LIBERAC_ALG_CTR_DRBG_AES_128_DF,
+        LIBERAC_ALG_CTR_DRBG_AES_192_DF,
+        LIBERAC_ALG_CTR_DRBG_AES_256_DF
     };
     uint8_t entropy[32], nonce[16], additional[13];
     uint8_t first[64], second[64];
@@ -34,38 +34,38 @@ static int test_df_variants(void) {
         additional[i] = (uint8_t)(0x40u + i);
 
     for (j = 0u; j < sizeof(algorithms) / sizeof(algorithms[0]); ++j) {
-        CRYPTO_CTR_DRBG_CONTEXT first_context, second_context;
+        LiberaCCtrDrbgContext first_context, second_context;
         key_length = (j == 0u) ? 16u : (j == 1u ? 24u : 32u);
         security_length = key_length;
         nonce_length = (security_length + 1u) / 2u;
-        if (CRYPTO_CTR_DRBG_SEED_SIZE(algorithms[j]) != key_length + 16u)
+        if (LIBERAC_CTR_DRBG_SEED_SIZE(algorithms[j]) != key_length + 16u)
             return 1;
-        if (CRYPTO_CTR_DRBG_INSTANTIATE(
+        if (LIBERAC_CTR_DRBG_INSTANTIATE(
                 &first_context, entropy, security_length,
                 nonce, nonce_length, (const uint8_t *)"crypto-test", 11u,
-                algorithms[j]) != CRYPTO_SUCCESS) {
+                algorithms[j]) != LIBERAC_SUCCESS) {
             return 1;
         }
-        if (CRYPTO_CTR_DRBG_INSTANTIATE(
+        if (LIBERAC_CTR_DRBG_INSTANTIATE(
                 &second_context, entropy, security_length,
                 nonce, nonce_length, (const uint8_t *)"crypto-test", 11u,
-                algorithms[j]) != CRYPTO_SUCCESS) {
-            CRYPTO_CTR_DRBG_CLEAR(&first_context);
+                algorithms[j]) != LIBERAC_SUCCESS) {
+            LIBERAC_CTR_DRBG_CLEAR(&first_context);
             return 1;
         }
-        if (CRYPTO_CTR_DRBG_GENERATE(
+        if (LIBERAC_CTR_DRBG_GENERATE(
                 &first_context, first, sizeof(first), additional,
-                sizeof(additional), 0) != CRYPTO_SUCCESS ||
-            CRYPTO_CTR_DRBG_GENERATE(
+                sizeof(additional), 0) != LIBERAC_SUCCESS ||
+            LIBERAC_CTR_DRBG_GENERATE(
                 &second_context, second, sizeof(second), additional,
-                sizeof(additional), 0) != CRYPTO_SUCCESS ||
+                sizeof(additional), 0) != LIBERAC_SUCCESS ||
             memcmp(first, second, sizeof(first)) != 0) {
-            CRYPTO_CTR_DRBG_CLEAR(&first_context);
-            CRYPTO_CTR_DRBG_CLEAR(&second_context);
+            LIBERAC_CTR_DRBG_CLEAR(&first_context);
+            LIBERAC_CTR_DRBG_CLEAR(&second_context);
             return 1;
         }
-        CRYPTO_CTR_DRBG_CLEAR(&first_context);
-        CRYPTO_CTR_DRBG_CLEAR(&second_context);
+        LIBERAC_CTR_DRBG_CLEAR(&first_context);
+        LIBERAC_CTR_DRBG_CLEAR(&second_context);
     }
     return 0;
 }
@@ -73,21 +73,21 @@ static int test_df_variants(void) {
 static int test_reseed_limit_and_clear(void) {
     uint8_t entropy[48] = {0};
     uint8_t output[16];
-    CRYPTO_CTR_DRBG_CONTEXT context;
+    LiberaCCtrDrbgContext context;
 
-    if (CRYPTO_CTR_DRBG_INSTANTIATE(
+    if (LIBERAC_CTR_DRBG_INSTANTIATE(
             &context, entropy, sizeof(entropy), NULL, 0u, NULL, 0u,
-            ALG_CTR_DRBG_AES_256_NO_DF) != CRYPTO_SUCCESS) {
+            LIBERAC_ALG_CTR_DRBG_AES_256_NO_DF) != LIBERAC_SUCCESS) {
         return 1;
     }
     context.RESEED_COUNTER = ((uint64_t)1u << 48) + 1u;
-    if (CRYPTO_CTR_DRBG_GENERATE(
+    if (LIBERAC_CTR_DRBG_GENERATE(
             &context, output, sizeof(output), NULL, 0u, 0) !=
-        CRYPTO_ERROR_RESEED_REQUIRED) {
-        CRYPTO_CTR_DRBG_CLEAR(&context);
+        LIBERAC_ERROR_RESEED_REQUIRED) {
+        LIBERAC_CTR_DRBG_CLEAR(&context);
         return 1;
     }
-    CRYPTO_CTR_DRBG_CLEAR(&context);
+    LIBERAC_CTR_DRBG_CLEAR(&context);
     return !all_zero(&context, sizeof(context));
 }
 

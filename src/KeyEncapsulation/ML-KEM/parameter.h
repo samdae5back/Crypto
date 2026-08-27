@@ -9,7 +9,7 @@
 #include "Def.h"
 
 typedef struct {
-    AlgID alg;
+    LiberaCAlgID alg;
     int q, n, k, eta1, eta2, du, dv;
 } mlkem_parameters;
 
@@ -18,9 +18,9 @@ enum { MLKEM_Q = 3329, MLKEM_N = 256, MLKEM_MAX_K = 4,
        MLKEM_MAX_CIPHERTEXT_BYTES = 1568 };
 
 static const mlkem_parameters MLKEM_PARAMETER_SETS[] = {
-    { ALG_ML_KEM_512,  3329, 256, 2, 3, 2, 10, 4 },
-    { ALG_ML_KEM_768,  3329, 256, 3, 2, 2, 10, 4 },
-    { ALG_ML_KEM_1024, 3329, 256, 4, 2, 2, 11, 5 }
+    { LIBERAC_ALG_ML_KEM_512,  3329, 256, 2, 3, 2, 10, 4 },
+    { LIBERAC_ALG_ML_KEM_768,  3329, 256, 3, 2, 2, 10, 4 },
+    { LIBERAC_ALG_ML_KEM_1024, 3329, 256, 4, 2, 2, 11, 5 }
 };
 
 #if defined(_MSC_VER)
@@ -30,7 +30,7 @@ static const mlkem_parameters MLKEM_PARAMETER_SETS[] = {
 #endif
 
 extern MLKEM_THREAD_LOCAL const mlkem_parameters *mlkem_active_parameters;
-const mlkem_parameters *mlkem_parameters_for(AlgID alg);
+const mlkem_parameters *mlkem_parameters_for(LiberaCAlgID alg);
 
 #define q MLKEM_Q
 #define k (mlkem_active_parameters->k)

@@ -45,7 +45,7 @@ void crypto_ntru_plus_hash_h(
     const crypto_ntru_plus_parameters *parameters)
 {
     crypto_ntru_plus_hash_with_domain(
-        output, CRYPTO_NTRU_PLUS_SHARED_SECRET_BYTES + parameters->n / 4u,
+        output, LIBERAC_NTRU_PLUS_SHARED_SECRET_BYTES + parameters->n / 4u,
         0x02u, input,
         parameters->n / 8u + CRYPTO_NTRU_PLUS_SEED_BYTES);
 }

@@ -10,24 +10,24 @@
 
 typedef struct crypto_test_smaug_t_case {
     const char *name;
-    AlgID alg;
+    LiberaCAlgID alg;
 } CRYPTO_TEST_SMAUG_T_CASE;
 
 static const CRYPTO_TEST_SMAUG_T_CASE smaug_t_cases[] = {
-    { "SMAUG-T-128", ALG_SMAUG_T_128 },
-    { "SMAUG-T-192", ALG_SMAUG_T_192 },
-    { "SMAUG-T-256", ALG_SMAUG_T_256 }
+    { "SMAUG-T-128", LIBERAC_ALG_SMAUG_T_128 },
+    { "SMAUG-T-192", LIBERAC_ALG_SMAUG_T_192 },
+    { "SMAUG-T-256", LIBERAC_ALG_SMAUG_T_256 }
 };
 
 int main(int argc, char **argv) {
     static const CRYPTO_TEST_KEM_API api = {
-        CRYPTO_SMAUG_T_SHARED_SECRET_BYTES,
-        CRYPTO_SMAUG_T_PUBLIC_KEY_SIZE,
-        CRYPTO_SMAUG_T_PRIVATE_KEY_SIZE,
-        CRYPTO_SMAUG_T_CIPHERTEXT_SIZE,
-        CRYPTO_SMAUG_T_KEYGEN,
-        CRYPTO_SMAUG_T_ENCAPS,
-        CRYPTO_SMAUG_T_DECAPS
+        LIBERAC_SMAUG_T_SHARED_SECRET_BYTES,
+        LIBERAC_SMAUG_T_PUBLIC_KEY_SIZE,
+        LIBERAC_SMAUG_T_PRIVATE_KEY_SIZE,
+        LIBERAC_SMAUG_T_CIPHERTEXT_SIZE,
+        LIBERAC_SMAUG_T_KEYGEN,
+        LIBERAC_SMAUG_T_ENCAPS,
+        LIBERAC_SMAUG_T_DECAPS
     };
     size_t index;
 

@@ -9,7 +9,7 @@
 #include "Def.h"
 #include "HashFunction/SHA3/sha3_internal.h"
 typedef crypto_sha3_context crypto_sha3_ctx;
-CryptoError RBG(unsigned char *seed, size_t length);
+LiberaCError RBG(unsigned char *seed, size_t length);
 int PRF(size_t eta, const unsigned char *seed, unsigned char nonce,
         unsigned char *output);
 void H(const unsigned char *input,size_t input_length,unsigned char *output);

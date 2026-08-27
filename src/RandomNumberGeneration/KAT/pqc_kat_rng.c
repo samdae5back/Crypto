@@ -15,22 +15,22 @@
 #define CRYPTO_KAT_THREAD_LOCAL _Thread_local
 #endif
 
-static CRYPTO_KAT_THREAD_LOCAL CRYPTO_CTR_DRBG_CONTEXT pqc_kat_drbg;
+static CRYPTO_KAT_THREAD_LOCAL LiberaCCtrDrbgContext pqc_kat_drbg;
 static CRYPTO_KAT_THREAD_LOCAL int pqc_kat_active;
 
-CryptoError crypto_pqc_kat_initialize_internal(
+LiberaCError crypto_pqc_kat_initialize_internal(
     const uint8_t seed[CRYPTO_PQC_KAT_SEED_BYTES]) {
-    CryptoError error;
+    LiberaCError error;
 
-    if (seed == NULL) return CRYPTO_ERROR_INVALID_ARGUMENT;
+    if (seed == NULL) return LIBERAC_ERROR_INVALID_ARGUMENT;
 
     crypto_ctr_drbg_clear_internal(&pqc_kat_drbg);
     pqc_kat_active = 0;
     error = crypto_ctr_drbg_instantiate_internal(
-        &pqc_kat_drbg, ALG_CTR_DRBG_AES_256_NO_DF,
+        &pqc_kat_drbg, LIBERAC_ALG_CTR_DRBG_AES_256_NO_DF,
         seed, CRYPTO_PQC_KAT_SEED_BYTES,
         NULL, 0u, NULL, 0u);
-    if (error == CRYPTO_SUCCESS) {
+    if (error == LIBERAC_SUCCESS) {
         pqc_kat_active = 1;
     } else {
         crypto_ctr_drbg_clear_internal(&pqc_kat_drbg);
@@ -44,7 +44,7 @@ void crypto_pqc_kat_finalize_internal(void) {
 }
 #endif
 
-CryptoError crypto_pqc_random_bytes_internal(
+LiberaCError crypto_pqc_random_bytes_internal(
     uint8_t *output, size_t output_length) {
 #if defined(CRYPTO_ENABLE_PQC_KAT)
     if (pqc_kat_active != 0) {

@@ -10,14 +10,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-void crypto_bignum_init(CRYPTO_BIGNUM *VALUE) {
+void crypto_bignum_init(LiberaCBignum *VALUE) {
     if (!VALUE) return;
     VALUE->LIMBS = NULL;
     VALUE->LENGTH = 0;
     VALUE->CAPACITY = 0;
 }
 
-void crypto_bignum_free(CRYPTO_BIGNUM *VALUE) {
+void crypto_bignum_free(LiberaCBignum *VALUE) {
     if (!VALUE) return;
     if (VALUE->LIMBS) {
         crypto_zeroize(VALUE->LIMBS, VALUE->CAPACITY * sizeof(uint32_t));
@@ -26,7 +26,7 @@ void crypto_bignum_free(CRYPTO_BIGNUM *VALUE) {
     crypto_bignum_init(VALUE);
 }
 
-int bignum_reserve(CRYPTO_BIGNUM *a, size_t capacity) {
+int bignum_reserve(LiberaCBignum *a, size_t capacity) {
     uint32_t *p;
     size_t old;
     if (!a) return -1;
@@ -45,12 +45,12 @@ int bignum_reserve(CRYPTO_BIGNUM *a, size_t capacity) {
     return 0;
 }
 
-void bignum_normalize(CRYPTO_BIGNUM *a) {
+void bignum_normalize(LiberaCBignum *a) {
     if (!a) return;
     while (a->LENGTH && a->LIMBS[a->LENGTH - 1] == 0) --a->LENGTH;
 }
 
-int crypto_bignum_copy(CRYPTO_BIGNUM *OUT, const CRYPTO_BIGNUM *IN) {
+int crypto_bignum_copy(LiberaCBignum *OUT, const LiberaCBignum *IN) {
     if (!OUT || !IN) return -1;
     if (OUT == IN) return 0;
     if (bignum_reserve(OUT, IN->LENGTH) != 0) return -1;
@@ -60,7 +60,7 @@ int crypto_bignum_copy(CRYPTO_BIGNUM *OUT, const CRYPTO_BIGNUM *IN) {
     return 0;
 }
 
-int crypto_bignum_set_u64(CRYPTO_BIGNUM *OUT, uint64_t VALUE) {
+int crypto_bignum_set_u64(LiberaCBignum *OUT, uint64_t VALUE) {
     if (!OUT) return -1;
     if (VALUE == 0) {
         OUT->LENGTH = 0;
@@ -77,34 +77,34 @@ int crypto_bignum_set_u64(CRYPTO_BIGNUM *OUT, uint64_t VALUE) {
     return 0;
 }
 
-CryptoError crypto_bignum_from_bytes_le(CRYPTO_BIGNUM *OUT,
+LiberaCError crypto_bignum_from_bytes_le(LiberaCBignum *OUT,
                                          const uint8_t *BYTES,
                                          size_t LENGTH) {
     size_t limbs, i;
-    if (!OUT || (!BYTES && LENGTH)) return CRYPTO_ERROR_INVALID_ARGUMENT;
+    if (!OUT || (!BYTES && LENGTH)) return LIBERAC_ERROR_INVALID_ARGUMENT;
     if (LENGTH > (size_t)-1 / 8u)
-        return CRYPTO_ERROR_MESSAGE_TOO_LARGE;
+        return LIBERAC_ERROR_MESSAGE_TOO_LARGE;
     limbs = (LENGTH + 3u) / 4u;
     if (bignum_reserve(OUT, limbs) != 0)
-        return CRYPTO_ERROR_ALLOCATION_FAILED;
+        return LIBERAC_ERROR_ALLOCATION_FAILED;
     if (OUT->CAPACITY)
         crypto_zeroize(OUT->LIMBS, OUT->CAPACITY * sizeof(uint32_t));
     for (i = 0; i < LENGTH; ++i) OUT->LIMBS[i / 4u] |= (uint32_t)BYTES[i] << (8u * (i % 4u));
     OUT->LENGTH = limbs;
     bignum_normalize(OUT);
-    return CRYPTO_SUCCESS;
+    return LIBERAC_SUCCESS;
 }
 
-CryptoError crypto_bignum_from_bytes_be(CRYPTO_BIGNUM *OUT,
+LiberaCError crypto_bignum_from_bytes_be(LiberaCBignum *OUT,
                                          const uint8_t *BYTES,
                                          size_t LENGTH) {
     size_t limbs, i;
-    if (!OUT || (!BYTES && LENGTH)) return CRYPTO_ERROR_INVALID_ARGUMENT;
+    if (!OUT || (!BYTES && LENGTH)) return LIBERAC_ERROR_INVALID_ARGUMENT;
     if (LENGTH > (size_t)-1 / 8u)
-        return CRYPTO_ERROR_MESSAGE_TOO_LARGE;
+        return LIBERAC_ERROR_MESSAGE_TOO_LARGE;
     limbs = (LENGTH + 3u) / 4u;
     if (bignum_reserve(OUT, limbs) != 0)
-        return CRYPTO_ERROR_ALLOCATION_FAILED;
+        return LIBERAC_ERROR_ALLOCATION_FAILED;
     if (OUT->CAPACITY)
         crypto_zeroize(OUT->LIMBS, OUT->CAPACITY * sizeof(uint32_t));
     for (i = 0; i < LENGTH; ++i) {
@@ -113,10 +113,10 @@ CryptoError crypto_bignum_from_bytes_be(CRYPTO_BIGNUM *OUT,
     }
     OUT->LENGTH = limbs;
     bignum_normalize(OUT);
-    return CRYPTO_SUCCESS;
+    return LIBERAC_SUCCESS;
 }
 
-size_t crypto_bignum_bit_length(const CRYPTO_BIGNUM *VALUE) {
+size_t crypto_bignum_bit_length(const LiberaCBignum *VALUE) {
     uint32_t top;
     size_t bits;
     if (!VALUE || VALUE->LENGTH == 0) return 0;
@@ -126,34 +126,34 @@ size_t crypto_bignum_bit_length(const CRYPTO_BIGNUM *VALUE) {
     return bits;
 }
 
-size_t crypto_bignum_byte_length(const CRYPTO_BIGNUM *VALUE) {
+size_t crypto_bignum_byte_length(const LiberaCBignum *VALUE) {
     size_t bits = crypto_bignum_bit_length(VALUE);
     return (bits + 7u) / 8u;
 }
 
-CryptoError crypto_bignum_to_bytes_le(const CRYPTO_BIGNUM *IN, uint8_t *OUT,
+LiberaCError crypto_bignum_to_bytes_le(const LiberaCBignum *IN, uint8_t *OUT,
                                        size_t OUT_LENGTH) {
     size_t need, i;
-    if (!IN || (!OUT && OUT_LENGTH)) return CRYPTO_ERROR_INVALID_ARGUMENT;
+    if (!IN || (!OUT && OUT_LENGTH)) return LIBERAC_ERROR_INVALID_ARGUMENT;
     need = crypto_bignum_byte_length(IN);
-    if (OUT_LENGTH < need) return CRYPTO_ERROR_BUFFER_TOO_SMALL;
+    if (OUT_LENGTH < need) return LIBERAC_ERROR_BUFFER_TOO_SMALL;
     if (OUT_LENGTH) memset(OUT, 0, OUT_LENGTH);
     for (i = 0; i < need; ++i) OUT[i] = (uint8_t)(IN->LIMBS[i / 4u] >> (8u * (i % 4u)));
-    return CRYPTO_SUCCESS;
+    return LIBERAC_SUCCESS;
 }
 
-CryptoError crypto_bignum_to_bytes_be(const CRYPTO_BIGNUM *IN, uint8_t *OUT,
+LiberaCError crypto_bignum_to_bytes_be(const LiberaCBignum *IN, uint8_t *OUT,
                                        size_t OUT_LENGTH) {
     size_t need, i;
-    if (!IN || (!OUT && OUT_LENGTH)) return CRYPTO_ERROR_INVALID_ARGUMENT;
+    if (!IN || (!OUT && OUT_LENGTH)) return LIBERAC_ERROR_INVALID_ARGUMENT;
     need = crypto_bignum_byte_length(IN);
-    if (OUT_LENGTH < need) return CRYPTO_ERROR_BUFFER_TOO_SMALL;
+    if (OUT_LENGTH < need) return LIBERAC_ERROR_BUFFER_TOO_SMALL;
     if (OUT_LENGTH) memset(OUT, 0, OUT_LENGTH);
     for (i = 0; i < need; ++i) OUT[OUT_LENGTH - 1u - i] = (uint8_t)(IN->LIMBS[i / 4u] >> (8u * (i % 4u)));
-    return CRYPTO_SUCCESS;
+    return LIBERAC_SUCCESS;
 }
 
-int crypto_bignum_compare(const CRYPTO_BIGNUM *A, const CRYPTO_BIGNUM *B) {
+int crypto_bignum_compare(const LiberaCBignum *A, const LiberaCBignum *B) {
     size_t i;
     if (!A || !B) return 0;
     if (A->LENGTH < B->LENGTH) return -1;
@@ -166,12 +166,12 @@ int crypto_bignum_compare(const CRYPTO_BIGNUM *A, const CRYPTO_BIGNUM *B) {
     return 0;
 }
 
-int crypto_bignum_is_zero(const CRYPTO_BIGNUM *VALUE) {
+int crypto_bignum_is_zero(const LiberaCBignum *VALUE) {
     return !VALUE || VALUE->LENGTH == 0;
 }
 
-int crypto_bignum_add(CRYPTO_BIGNUM *OUT, const CRYPTO_BIGNUM *A, const CRYPTO_BIGNUM *B) {
-    CRYPTO_BIGNUM t;
+int crypto_bignum_add(LiberaCBignum *OUT, const LiberaCBignum *A, const LiberaCBignum *B) {
+    LiberaCBignum t;
     size_t n, i;
     uint64_t carry = 0;
     if (!OUT || !A || !B) return -1;
@@ -195,8 +195,8 @@ fail:
     return -1;
 }
 
-int crypto_bignum_sub(CRYPTO_BIGNUM *OUT, const CRYPTO_BIGNUM *A, const CRYPTO_BIGNUM *B) {
-    CRYPTO_BIGNUM t;
+int crypto_bignum_sub(LiberaCBignum *OUT, const LiberaCBignum *A, const LiberaCBignum *B) {
+    LiberaCBignum t;
     size_t i;
     uint64_t borrow = 0;
     if (!OUT || !A || !B || crypto_bignum_compare(A, B) < 0) return -1;
@@ -218,8 +218,8 @@ fail:
     return -1;
 }
 
-int crypto_bignum_mul(CRYPTO_BIGNUM *OUT, const CRYPTO_BIGNUM *A, const CRYPTO_BIGNUM *B) {
-    CRYPTO_BIGNUM t;
+int crypto_bignum_mul(LiberaCBignum *OUT, const LiberaCBignum *A, const LiberaCBignum *B) {
+    LiberaCBignum t;
     size_t i, j, n;
     if (!OUT || !A || !B) return -1;
     crypto_bignum_init(&t);
@@ -257,13 +257,13 @@ fail:
     return -1;
 }
 
-int bignum_get_bit(const CRYPTO_BIGNUM *a, size_t bit) {
+int bignum_get_bit(const LiberaCBignum *a, size_t bit) {
     size_t limb = bit / 32u;
     if (!a || limb >= a->LENGTH) return 0;
     return (int)((a->LIMBS[limb] >> (bit % 32u)) & 1u);
 }
 
-int bignum_shift_left_one(CRYPTO_BIGNUM *a) {
+int bignum_shift_left_one(LiberaCBignum *a) {
     size_t i;
     uint64_t carry = 0;
     if (!a) return -1;
@@ -278,7 +278,7 @@ int bignum_shift_left_one(CRYPTO_BIGNUM *a) {
     return 0;
 }
 
-int bignum_add_u32(CRYPTO_BIGNUM *a, uint32_t v) {
+int bignum_add_u32(LiberaCBignum *a, uint32_t v) {
     size_t i = 0;
     uint64_t carry = v;
     if (!a) return -1;
@@ -302,8 +302,8 @@ int bignum_add_u32(CRYPTO_BIGNUM *a, uint32_t v) {
     return 0;
 }
 
-int crypto_bignum_mod(CRYPTO_BIGNUM *OUT, const CRYPTO_BIGNUM *A, const CRYPTO_BIGNUM *MODULUS) {
-    CRYPTO_BIGNUM r, tmp;
+int crypto_bignum_mod(LiberaCBignum *OUT, const LiberaCBignum *A, const LiberaCBignum *MODULUS) {
+    LiberaCBignum r, tmp;
     size_t bits, i;
     if (!OUT || !A || !MODULUS || MODULUS->LENGTH == 0) return -1;
     if (crypto_bignum_compare(A, MODULUS) < 0) return crypto_bignum_copy(OUT, A);
@@ -330,8 +330,8 @@ fail:
     return -1;
 }
 
-int bignum_mul_u32(CRYPTO_BIGNUM *out, const CRYPTO_BIGNUM *a, uint32_t v) {
-    CRYPTO_BIGNUM t;
+int bignum_mul_u32(LiberaCBignum *out, const LiberaCBignum *a, uint32_t v) {
+    LiberaCBignum t;
     size_t i;
     uint64_t carry = 0;
     if (!out || !a) return -1;
@@ -357,7 +357,7 @@ fail:
     return -1;
 }
 
-uint32_t bignum_mod_u32(const CRYPTO_BIGNUM *a, uint32_t v) {
+uint32_t bignum_mod_u32(const LiberaCBignum *a, uint32_t v) {
     uint64_t r = 0;
     size_t i;
     if (!a || v == 0) return 0;
@@ -365,8 +365,8 @@ uint32_t bignum_mod_u32(const CRYPTO_BIGNUM *a, uint32_t v) {
     return (uint32_t)r;
 }
 
-int bignum_div_u32(CRYPTO_BIGNUM *out, const CRYPTO_BIGNUM *a, uint32_t v, uint32_t *remainder) {
-    CRYPTO_BIGNUM t;
+int bignum_div_u32(LiberaCBignum *out, const LiberaCBignum *a, uint32_t v, uint32_t *remainder) {
+    LiberaCBignum t;
     uint64_t rem = 0;
     size_t i;
     if (!out || !a || v == 0) return -1;
@@ -388,8 +388,8 @@ fail:
     return -1;
 }
 
-int bignum_sub_u32(CRYPTO_BIGNUM *out, const CRYPTO_BIGNUM *a, uint32_t v) {
-    CRYPTO_BIGNUM b;
+int bignum_sub_u32(LiberaCBignum *out, const LiberaCBignum *a, uint32_t v) {
+    LiberaCBignum b;
     int rc;
     crypto_bignum_init(&b);
     if (crypto_bignum_set_u64(&b, v) != 0) return -1;
@@ -398,7 +398,7 @@ int bignum_sub_u32(CRYPTO_BIGNUM *out, const CRYPTO_BIGNUM *a, uint32_t v) {
     return rc;
 }
 
-int bignum_add_u32_copy(CRYPTO_BIGNUM *out, const CRYPTO_BIGNUM *a, uint32_t v) {
+int bignum_add_u32_copy(LiberaCBignum *out, const LiberaCBignum *a, uint32_t v) {
     if (crypto_bignum_copy(out, a) != 0) return -1;
     return bignum_add_u32(out, v);
 }
@@ -406,8 +406,8 @@ int bignum_add_u32_copy(CRYPTO_BIGNUM *out, const CRYPTO_BIGNUM *a, uint32_t v) 
 typedef struct {
     size_t n;
     uint32_t n0inv;
-    CRYPTO_BIGNUM mod;
-    CRYPTO_BIGNUM r2;
+    LiberaCBignum mod;
+    LiberaCBignum r2;
 } MONT_CTX;
 
 static uint32_t mont_n0inv(uint32_t n0) {
@@ -425,8 +425,8 @@ static void mont_clear(MONT_CTX *ctx) {
     ctx->n0inv = 0;
 }
 
-static int mont_init(MONT_CTX *ctx, const CRYPTO_BIGNUM *mod) {
-    CRYPTO_BIGNUM x, tmp;
+static int mont_init(MONT_CTX *ctx, const LiberaCBignum *mod) {
+    LiberaCBignum x, tmp;
     size_t i, rounds;
     if (!ctx || !mod || mod->LENGTH == 0 || !(mod->LIMBS[0] & 1u)) return -1;
     ctx->n = mod->LENGTH;
@@ -457,10 +457,10 @@ fail:
     return -1;
 }
 
-static int mont_mul(CRYPTO_BIGNUM *out, const CRYPTO_BIGNUM *a, const CRYPTO_BIGNUM *b, const MONT_CTX *ctx) {
+static int mont_mul(LiberaCBignum *out, const LiberaCBignum *a, const LiberaCBignum *b, const MONT_CTX *ctx) {
     uint32_t *t;
     size_t n, i, j;
-    CRYPTO_BIGNUM r, tmp;
+    LiberaCBignum r, tmp;
     if (!out || !a || !b || !ctx) return -1;
     n = ctx->n;
     t = (uint32_t *)calloc(n + 2u, sizeof(uint32_t));
@@ -529,8 +529,8 @@ fail2:
     return -1;
 }
 
-int crypto_bignum_mod_mul(CRYPTO_BIGNUM *OUT, const CRYPTO_BIGNUM *A, const CRYPTO_BIGNUM *B, const CRYPTO_BIGNUM *MODULUS) {
-    CRYPTO_BIGNUM product;
+int crypto_bignum_mod_mul(LiberaCBignum *OUT, const LiberaCBignum *A, const LiberaCBignum *B, const LiberaCBignum *MODULUS) {
+    LiberaCBignum product;
     int rc;
     if (!OUT || !A || !B || !MODULUS || MODULUS->LENGTH == 0) return -1;
     crypto_bignum_init(&product);
@@ -540,14 +540,14 @@ int crypto_bignum_mod_mul(CRYPTO_BIGNUM *OUT, const CRYPTO_BIGNUM *A, const CRYP
     return rc;
 }
 
-int crypto_bignum_mod_exp(CRYPTO_BIGNUM *OUT, const CRYPTO_BIGNUM *BASE, const CRYPTO_BIGNUM *EXPONENT, const CRYPTO_BIGNUM *MODULUS) {
+int crypto_bignum_mod_exp(LiberaCBignum *OUT, const LiberaCBignum *BASE, const LiberaCBignum *EXPONENT, const LiberaCBignum *MODULUS) {
     MONT_CTX ctx;
-    CRYPTO_BIGNUM base, base_m, acc, one, tmp;
+    LiberaCBignum base, base_m, acc, one, tmp;
     size_t bits, i;
     int rc = -1;
     if (!OUT || !BASE || !EXPONENT || !MODULUS || MODULUS->LENGTH == 0) return -1;
     if (!(MODULUS->LIMBS[0] & 1u)) {
-        CRYPTO_BIGNUM result, b, prod;
+        LiberaCBignum result, b, prod;
         crypto_bignum_init(&result); crypto_bignum_init(&b); crypto_bignum_init(&prod);
         if (crypto_bignum_set_u64(&result, 1) != 0 || crypto_bignum_mod(&b, BASE, MODULUS) != 0) goto even_fail;
         bits = crypto_bignum_bit_length(EXPONENT);
@@ -592,19 +592,19 @@ done:
     return rc;
 }
 
-CryptoError crypto_bignum_random_bits(CRYPTO_BIGNUM *OUT, size_t BITS,
+LiberaCError crypto_bignum_random_bits(LiberaCBignum *OUT, size_t BITS,
                                        int SET_TOP_BIT, int SET_ODD) {
     uint8_t *buf;
     size_t bytes;
     unsigned unused;
-    CryptoError err;
-    if (!OUT || BITS == 0) return CRYPTO_ERROR_INVALID_ARGUMENT;
-    if (BITS > (size_t)-1 - 7u) return CRYPTO_ERROR_MESSAGE_TOO_LARGE;
+    LiberaCError err;
+    if (!OUT || BITS == 0) return LIBERAC_ERROR_INVALID_ARGUMENT;
+    if (BITS > (size_t)-1 - 7u) return LIBERAC_ERROR_MESSAGE_TOO_LARGE;
     bytes = (BITS + 7u) / 8u;
     buf = (uint8_t *)malloc(bytes);
-    if (!buf) return CRYPTO_ERROR_ALLOCATION_FAILED;
+    if (!buf) return LIBERAC_ERROR_ALLOCATION_FAILED;
     err = crypto_random_bytes_internal(buf, bytes);
-    if (err != CRYPTO_SUCCESS) {
+    if (err != LIBERAC_SUCCESS) {
         crypto_zeroize(buf, bytes);
         free(buf);
         return err;
@@ -619,27 +619,27 @@ CryptoError crypto_bignum_random_bits(CRYPTO_BIGNUM *OUT, size_t BITS,
     return err;
 }
 
-CryptoError crypto_bignum_random_range(
-    CRYPTO_BIGNUM *OUT, const CRYPTO_BIGNUM *UPPER_EXCLUSIVE) {
-    CRYPTO_BIGNUM x;
+LiberaCError crypto_bignum_random_range(
+    LiberaCBignum *OUT, const LiberaCBignum *UPPER_EXCLUSIVE) {
+    LiberaCBignum x;
     size_t bits;
     int tries;
-    CryptoError err;
+    LiberaCError err;
     if (!OUT || !UPPER_EXCLUSIVE || UPPER_EXCLUSIVE->LENGTH == 0)
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     bits = crypto_bignum_bit_length(UPPER_EXCLUSIVE);
     crypto_bignum_init(&x);
     for (tries = 0; tries < 128; ++tries) {
         err = crypto_bignum_random_bits(&x, bits, 0, 0);
-        if (err != CRYPTO_SUCCESS) goto fail;
+        if (err != LIBERAC_SUCCESS) goto fail;
         if (crypto_bignum_compare(&x, UPPER_EXCLUSIVE) < 0) {
             crypto_bignum_free(OUT);
             *OUT = x;
-            return CRYPTO_SUCCESS;
+            return LIBERAC_SUCCESS;
         }
         crypto_bignum_free(&x); crypto_bignum_init(&x);
     }
-    err = CRYPTO_ERROR_INTERNAL;
+    err = LIBERAC_ERROR_INTERNAL;
 fail:
     crypto_bignum_free(&x);
     return err;

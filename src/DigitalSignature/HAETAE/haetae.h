@@ -47,7 +47,7 @@ typedef struct crypto_haetae_polyvecm {
 } crypto_haetae_polyvecm;
 
 typedef struct crypto_haetae_parameters {
-    AlgID algorithm;
+    LiberaCAlgID algorithm;
     size_t public_key_bytes;
     size_t private_key_bytes;
     size_t signature_bytes;
@@ -70,6 +70,6 @@ typedef struct crypto_haetae_parameters {
 } crypto_haetae_parameters;
 
 const crypto_haetae_parameters *crypto_haetae_parameters_from_algorithm(
-    AlgID algorithm);
+    LiberaCAlgID algorithm);
 
 #endif

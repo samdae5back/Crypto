@@ -9,12 +9,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-static int test_variant(AlgID algorithm) {
+static int test_variant(LiberaCAlgID algorithm) {
     static const uint8_t message[] = {'p','q','-','s','i','g'};
     static const uint8_t context[] = {'t','e','s','t'};
-    size_t public_key_length = CRYPTO_ML_DSA_PUBLIC_KEY_SIZE(algorithm);
-    size_t private_key_length = CRYPTO_ML_DSA_PRIVATE_KEY_SIZE(algorithm);
-    size_t signature_length = CRYPTO_ML_DSA_SIGNATURE_SIZE(algorithm);
+    size_t public_key_length = LIBERAC_ML_DSA_PUBLIC_KEY_SIZE(algorithm);
+    size_t private_key_length = LIBERAC_ML_DSA_PRIVATE_KEY_SIZE(algorithm);
+    size_t signature_length = LIBERAC_ML_DSA_SIGNATURE_SIZE(algorithm);
     uint8_t *public_key = NULL;
     uint8_t *private_key = NULL;
     uint8_t *signature = NULL;
@@ -27,26 +27,26 @@ static int test_variant(AlgID algorithm) {
     signature = (uint8_t *)malloc(signature_length);
     if (!public_key || !private_key || !signature) goto done;
 
-    if (CRYPTO_ML_DSA_KEYGEN(
+    if (LIBERAC_ML_DSA_KEYGEN(
             public_key, public_key_length, private_key, private_key_length,
-            algorithm) != CRYPTO_SUCCESS)
+            algorithm) != LIBERAC_SUCCESS)
         goto done;
-    if (CRYPTO_ML_DSA_SIGN(
+    if (LIBERAC_ML_DSA_SIGN(
             private_key, private_key_length, message, sizeof(message),
             context, sizeof(context), signature, signature_length,
-            algorithm) != CRYPTO_SUCCESS)
+            algorithm) != LIBERAC_SUCCESS)
         goto done;
-    if (CRYPTO_ML_DSA_VERIFY(
+    if (LIBERAC_ML_DSA_VERIFY(
             public_key, public_key_length, message, sizeof(message),
             context, sizeof(context), signature, signature_length,
-            algorithm) != CRYPTO_SUCCESS)
+            algorithm) != LIBERAC_SUCCESS)
         goto done;
 
     signature[0] ^= 1u;
-    if (CRYPTO_ML_DSA_VERIFY(
+    if (LIBERAC_ML_DSA_VERIFY(
             public_key, public_key_length, message, sizeof(message),
             context, sizeof(context), signature, signature_length,
-            algorithm) != CRYPTO_ERROR_SIGNATURE_INVALID)
+            algorithm) != LIBERAC_ERROR_SIGNATURE_INVALID)
         goto done;
     signature[0] ^= 1u;
     failed = 0;
@@ -61,33 +61,33 @@ done:
 }
 
 static int test_sizes(void) {
-    if (CRYPTO_ML_DSA_PUBLIC_KEY_SIZE(ALG_ML_DSA_44) !=
-            CRYPTO_ML_DSA_44_PUBLIC_KEY_BYTES ||
-        CRYPTO_ML_DSA_PRIVATE_KEY_SIZE(ALG_ML_DSA_44) !=
-            CRYPTO_ML_DSA_44_PRIVATE_KEY_BYTES ||
-        CRYPTO_ML_DSA_SIGNATURE_SIZE(ALG_ML_DSA_44) !=
-            CRYPTO_ML_DSA_44_SIGNATURE_BYTES)
+    if (LIBERAC_ML_DSA_PUBLIC_KEY_SIZE(LIBERAC_ALG_ML_DSA_44) !=
+            LIBERAC_ML_DSA_44_PUBLIC_KEY_BYTES ||
+        LIBERAC_ML_DSA_PRIVATE_KEY_SIZE(LIBERAC_ALG_ML_DSA_44) !=
+            LIBERAC_ML_DSA_44_PRIVATE_KEY_BYTES ||
+        LIBERAC_ML_DSA_SIGNATURE_SIZE(LIBERAC_ALG_ML_DSA_44) !=
+            LIBERAC_ML_DSA_44_SIGNATURE_BYTES)
         return 1;
-    if (CRYPTO_ML_DSA_PUBLIC_KEY_SIZE(ALG_ML_DSA_65) !=
-            CRYPTO_ML_DSA_65_PUBLIC_KEY_BYTES ||
-        CRYPTO_ML_DSA_PRIVATE_KEY_SIZE(ALG_ML_DSA_65) !=
-            CRYPTO_ML_DSA_65_PRIVATE_KEY_BYTES ||
-        CRYPTO_ML_DSA_SIGNATURE_SIZE(ALG_ML_DSA_65) !=
-            CRYPTO_ML_DSA_65_SIGNATURE_BYTES)
+    if (LIBERAC_ML_DSA_PUBLIC_KEY_SIZE(LIBERAC_ALG_ML_DSA_65) !=
+            LIBERAC_ML_DSA_65_PUBLIC_KEY_BYTES ||
+        LIBERAC_ML_DSA_PRIVATE_KEY_SIZE(LIBERAC_ALG_ML_DSA_65) !=
+            LIBERAC_ML_DSA_65_PRIVATE_KEY_BYTES ||
+        LIBERAC_ML_DSA_SIGNATURE_SIZE(LIBERAC_ALG_ML_DSA_65) !=
+            LIBERAC_ML_DSA_65_SIGNATURE_BYTES)
         return 1;
-    if (CRYPTO_ML_DSA_PUBLIC_KEY_SIZE(ALG_ML_DSA_87) !=
-            CRYPTO_ML_DSA_87_PUBLIC_KEY_BYTES ||
-        CRYPTO_ML_DSA_PRIVATE_KEY_SIZE(ALG_ML_DSA_87) !=
-            CRYPTO_ML_DSA_87_PRIVATE_KEY_BYTES ||
-        CRYPTO_ML_DSA_SIGNATURE_SIZE(ALG_ML_DSA_87) !=
-            CRYPTO_ML_DSA_87_SIGNATURE_BYTES)
+    if (LIBERAC_ML_DSA_PUBLIC_KEY_SIZE(LIBERAC_ALG_ML_DSA_87) !=
+            LIBERAC_ML_DSA_87_PUBLIC_KEY_BYTES ||
+        LIBERAC_ML_DSA_PRIVATE_KEY_SIZE(LIBERAC_ALG_ML_DSA_87) !=
+            LIBERAC_ML_DSA_87_PRIVATE_KEY_BYTES ||
+        LIBERAC_ML_DSA_SIGNATURE_SIZE(LIBERAC_ALG_ML_DSA_87) !=
+            LIBERAC_ML_DSA_87_SIGNATURE_BYTES)
         return 1;
-    return CRYPTO_ML_DSA_PUBLIC_KEY_SIZE(ALG_RSA_RAW) != 0u;
+    return LIBERAC_ML_DSA_PUBLIC_KEY_SIZE(LIBERAC_ALG_RSA_RAW) != 0u;
 }
 
 int main(void) {
-    static const AlgID algorithms[] = {
-        ALG_ML_DSA_44, ALG_ML_DSA_65, ALG_ML_DSA_87
+    static const LiberaCAlgID algorithms[] = {
+        LIBERAC_ALG_ML_DSA_44, LIBERAC_ALG_ML_DSA_65, LIBERAC_ALG_ML_DSA_87
     };
     size_t i;
 

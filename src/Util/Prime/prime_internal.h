@@ -8,10 +8,10 @@
 
 #include "Util.h"
 
-int prime_small_division(const CRYPTO_BIGNUM *n);
-int crypto_prime_is_probable_internal(const CRYPTO_BIGNUM *value, uint32_t rounds);
-CryptoError crypto_prime_generate_internal(CRYPTO_BIGNUM *out, size_t bits, uint32_t rounds);
-CryptoError crypto_prime_generate_safe_internal(CRYPTO_BIGNUM *p, CRYPTO_BIGNUM *q,
+int prime_small_division(const LiberaCBignum *n);
+int crypto_prime_is_probable_internal(const LiberaCBignum *value, uint32_t rounds);
+LiberaCError crypto_prime_generate_internal(LiberaCBignum *out, size_t bits, uint32_t rounds);
+LiberaCError crypto_prime_generate_safe_internal(LiberaCBignum *p, LiberaCBignum *q,
                                                  size_t p_bits, uint32_t rounds);
 
 #endif

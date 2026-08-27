@@ -11,19 +11,19 @@
 
 #define RSA_DEFAULT_E 65537u
 
-void crypto_rsa_public_key_init_internal(CRYPTO_RSA_PUBLIC_KEY *KEY) {
+void crypto_rsa_public_key_init_internal(LiberaCRsaPublicKey *KEY) {
     if (!KEY) return;
     crypto_bignum_init(&KEY->N); crypto_bignum_init(&KEY->E);
 }
-void crypto_rsa_public_key_free_internal(CRYPTO_RSA_PUBLIC_KEY *KEY) {
+void crypto_rsa_public_key_free_internal(LiberaCRsaPublicKey *KEY) {
     if (!KEY) return;
     crypto_bignum_free(&KEY->N); crypto_bignum_free(&KEY->E);
 }
-void crypto_rsa_private_key_init_internal(CRYPTO_RSA_PRIVATE_KEY *KEY) {
+void crypto_rsa_private_key_init_internal(LiberaCRsaPrivateKey *KEY) {
     if (!KEY) return;
     crypto_bignum_init(&KEY->N); crypto_bignum_init(&KEY->D); crypto_bignum_init(&KEY->P); crypto_bignum_init(&KEY->Q);
 }
-void crypto_rsa_private_key_free_internal(CRYPTO_RSA_PRIVATE_KEY *KEY) {
+void crypto_rsa_private_key_free_internal(LiberaCRsaPrivateKey *KEY) {
     if (!KEY) return;
     crypto_bignum_free(&KEY->N); crypto_bignum_free(&KEY->D); crypto_bignum_free(&KEY->P); crypto_bignum_free(&KEY->Q);
 }
@@ -42,10 +42,10 @@ uint32_t rsa_inverse_u32(uint32_t a, uint32_t m) {
     return (uint32_t)t;
 }
 
-static int make_private_exponent(CRYPTO_BIGNUM *d, const CRYPTO_BIGNUM *phi) {
+static int make_private_exponent(LiberaCBignum *d, const LiberaCBignum *phi) {
     uint32_t r = bignum_mod_u32(phi, RSA_DEFAULT_E);
     uint32_t inv, k, rem;
-    CRYPTO_BIGNUM tmp, numerator;
+    LiberaCBignum tmp, numerator;
     int rc = -1;
     if (r == 0) return -1;
     inv = rsa_inverse_u32(r, RSA_DEFAULT_E);
@@ -61,13 +61,13 @@ done:
     return rc;
 }
 
-CryptoError crypto_rsa_keygen_internal(AlgID ALG, CRYPTO_RSA_PUBLIC_KEY *PUBLIC_KEY, CRYPTO_RSA_PRIVATE_KEY *PRIVATE_KEY, size_t MODULUS_BITS, unsigned PRIME_ROUNDS) {
-    CRYPTO_BIGNUM p, q, n, p1, q1, phi, d;
+LiberaCError crypto_rsa_keygen_internal(LiberaCAlgID ALG, LiberaCRsaPublicKey *PUBLIC_KEY, LiberaCRsaPrivateKey *PRIVATE_KEY, size_t MODULUS_BITS, unsigned PRIME_ROUNDS) {
+    LiberaCBignum p, q, n, p1, q1, phi, d;
     size_t p_bits, q_bits;
     int attempts;
-    CryptoError err;
-    if (ALG != ALG_RSA_RAW) return CRYPTO_ERROR_INVALID_ALG_ID;
-    if (!PUBLIC_KEY || !PRIVATE_KEY || MODULUS_BITS < 32) return CRYPTO_ERROR_INVALID_ARGUMENT;
+    LiberaCError err;
+    if (ALG != LIBERAC_ALG_RSA_RAW) return LIBERAC_ERROR_INVALID_ALG_ID;
+    if (!PUBLIC_KEY || !PRIVATE_KEY || MODULUS_BITS < 32) return LIBERAC_ERROR_INVALID_ARGUMENT;
     if (PRIME_ROUNDS == 0) PRIME_ROUNDS = 32;
     p_bits = MODULUS_BITS / 2u;
     q_bits = MODULUS_BITS - p_bits;
@@ -77,9 +77,9 @@ CryptoError crypto_rsa_keygen_internal(AlgID ALG, CRYPTO_RSA_PUBLIC_KEY *PUBLIC_
         crypto_bignum_free(&p); crypto_bignum_init(&p); crypto_bignum_free(&q); crypto_bignum_init(&q);
         crypto_bignum_free(&n); crypto_bignum_init(&n); crypto_bignum_free(&p1); crypto_bignum_init(&p1); crypto_bignum_free(&q1); crypto_bignum_init(&q1); crypto_bignum_free(&phi); crypto_bignum_init(&phi); crypto_bignum_free(&d); crypto_bignum_init(&d);
         err = crypto_prime_generate_internal(&p, p_bits, PRIME_ROUNDS);
-        if (err != CRYPTO_SUCCESS) goto prime_fail;
+        if (err != LIBERAC_SUCCESS) goto prime_fail;
         err = crypto_prime_generate_internal(&q, q_bits, PRIME_ROUNDS);
-        if (err != CRYPTO_SUCCESS) goto prime_fail;
+        if (err != LIBERAC_SUCCESS) goto prime_fail;
         if (crypto_bignum_compare(&p, &q) == 0) continue;
         if (crypto_bignum_mul(&n, &p, &q) != 0) goto arithmetic_fail;
         if (crypto_bignum_bit_length(&n) != MODULUS_BITS) continue;
@@ -93,30 +93,30 @@ CryptoError crypto_rsa_keygen_internal(AlgID ALG, CRYPTO_RSA_PUBLIC_KEY *PUBLIC_
             crypto_bignum_copy(&PRIVATE_KEY->N, &n) != 0 || crypto_bignum_copy(&PRIVATE_KEY->D, &d) != 0 ||
             crypto_bignum_copy(&PRIVATE_KEY->P, &p) != 0 || crypto_bignum_copy(&PRIVATE_KEY->Q, &q) != 0) goto alloc_fail;
         crypto_bignum_free(&p); crypto_bignum_free(&q); crypto_bignum_free(&n); crypto_bignum_free(&p1); crypto_bignum_free(&q1); crypto_bignum_free(&phi); crypto_bignum_free(&d);
-        return CRYPTO_SUCCESS;
+        return LIBERAC_SUCCESS;
     }
-    err = CRYPTO_ERROR_PRIME_GENERATION_FAILED;
+    err = LIBERAC_ERROR_PRIME_GENERATION_FAILED;
 prime_fail:
     crypto_bignum_free(&p); crypto_bignum_free(&q); crypto_bignum_free(&n); crypto_bignum_free(&p1); crypto_bignum_free(&q1); crypto_bignum_free(&phi); crypto_bignum_free(&d);
     return err;
 arithmetic_fail:
     crypto_bignum_free(&p); crypto_bignum_free(&q); crypto_bignum_free(&n); crypto_bignum_free(&p1); crypto_bignum_free(&q1); crypto_bignum_free(&phi); crypto_bignum_free(&d);
-    return CRYPTO_ERROR_ARITHMETIC;
+    return LIBERAC_ERROR_ARITHMETIC;
 alloc_fail:
     crypto_bignum_free(&p); crypto_bignum_free(&q); crypto_bignum_free(&n); crypto_bignum_free(&p1); crypto_bignum_free(&q1); crypto_bignum_free(&phi); crypto_bignum_free(&d);
-    return CRYPTO_ERROR_ALLOCATION_FAILED;
+    return LIBERAC_ERROR_ALLOCATION_FAILED;
 }
 
-CryptoError crypto_rsa_encrypt_internal(AlgID ALG, CRYPTO_BIGNUM *CIPHERTEXT, const CRYPTO_BIGNUM *MESSAGE, const CRYPTO_RSA_PUBLIC_KEY *PUBLIC_KEY) {
-    if (ALG != ALG_RSA_RAW) return CRYPTO_ERROR_INVALID_ALG_ID;
-    if (!CIPHERTEXT || !MESSAGE || !PUBLIC_KEY) return CRYPTO_ERROR_INVALID_ARGUMENT;
-    if (crypto_bignum_compare(MESSAGE, &PUBLIC_KEY->N) >= 0) return CRYPTO_ERROR_MESSAGE_TOO_LARGE;
-    return crypto_bignum_mod_exp(CIPHERTEXT, MESSAGE, &PUBLIC_KEY->E, &PUBLIC_KEY->N) == 0 ? CRYPTO_SUCCESS : CRYPTO_ERROR_ARITHMETIC;
+LiberaCError crypto_rsa_encrypt_internal(LiberaCAlgID ALG, LiberaCBignum *CIPHERTEXT, const LiberaCBignum *MESSAGE, const LiberaCRsaPublicKey *PUBLIC_KEY) {
+    if (ALG != LIBERAC_ALG_RSA_RAW) return LIBERAC_ERROR_INVALID_ALG_ID;
+    if (!CIPHERTEXT || !MESSAGE || !PUBLIC_KEY) return LIBERAC_ERROR_INVALID_ARGUMENT;
+    if (crypto_bignum_compare(MESSAGE, &PUBLIC_KEY->N) >= 0) return LIBERAC_ERROR_MESSAGE_TOO_LARGE;
+    return crypto_bignum_mod_exp(CIPHERTEXT, MESSAGE, &PUBLIC_KEY->E, &PUBLIC_KEY->N) == 0 ? LIBERAC_SUCCESS : LIBERAC_ERROR_ARITHMETIC;
 }
 
-CryptoError crypto_rsa_decrypt_internal(AlgID ALG, CRYPTO_BIGNUM *MESSAGE, const CRYPTO_BIGNUM *CIPHERTEXT, const CRYPTO_RSA_PRIVATE_KEY *PRIVATE_KEY) {
-    if (ALG != ALG_RSA_RAW) return CRYPTO_ERROR_INVALID_ALG_ID;
-    if (!MESSAGE || !CIPHERTEXT || !PRIVATE_KEY) return CRYPTO_ERROR_INVALID_ARGUMENT;
-    if (crypto_bignum_compare(CIPHERTEXT, &PRIVATE_KEY->N) >= 0) return CRYPTO_ERROR_INVALID_ARGUMENT;
-    return crypto_bignum_mod_exp(MESSAGE, CIPHERTEXT, &PRIVATE_KEY->D, &PRIVATE_KEY->N) == 0 ? CRYPTO_SUCCESS : CRYPTO_ERROR_ARITHMETIC;
+LiberaCError crypto_rsa_decrypt_internal(LiberaCAlgID ALG, LiberaCBignum *MESSAGE, const LiberaCBignum *CIPHERTEXT, const LiberaCRsaPrivateKey *PRIVATE_KEY) {
+    if (ALG != LIBERAC_ALG_RSA_RAW) return LIBERAC_ERROR_INVALID_ALG_ID;
+    if (!MESSAGE || !CIPHERTEXT || !PRIVATE_KEY) return LIBERAC_ERROR_INVALID_ARGUMENT;
+    if (crypto_bignum_compare(CIPHERTEXT, &PRIVATE_KEY->N) >= 0) return LIBERAC_ERROR_INVALID_ARGUMENT;
+    return crypto_bignum_mod_exp(MESSAGE, CIPHERTEXT, &PRIVATE_KEY->D, &PRIVATE_KEY->N) == 0 ? LIBERAC_SUCCESS : LIBERAC_ERROR_ARITHMETIC;
 }

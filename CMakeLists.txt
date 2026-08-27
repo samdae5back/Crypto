@@ -1,24 +1,24 @@
 cmake_minimum_required(VERSION 3.10)
-project(Crypto VERSION 0.6.0 LANGUAGES C)
+project(LiberaCrypt VERSION 0.6.0 LANGUAGES C)
 
 if(POLICY CMP0077)
     cmake_policy(SET CMP0077 NEW)
 endif()
 
 if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
-    set(CRYPTO_IS_TOP_LEVEL ON)
+    set(LIBERAC_IS_TOP_LEVEL ON)
 else()
-    set(CRYPTO_IS_TOP_LEVEL OFF)
+    set(LIBERAC_IS_TOP_LEVEL OFF)
 endif()
 
-option(BUILD_SHARED_LIBS "Build Crypto as a shared library" ON)
-option(CRYPTO_BUILD_TESTS "Build Crypto tests" ${CRYPTO_IS_TOP_LEVEL})
-option(CRYPTO_BUILD_DOCS "Generate the public API reference with Doxygen" OFF)
+option(BUILD_SHARED_LIBS "Build LiberaCrypt as a shared library" ON)
+option(LIBERAC_BUILD_TESTS "Build LiberaCrypt tests" ${LIBERAC_IS_TOP_LEVEL})
+option(LIBERAC_BUILD_DOCS "Generate the public API reference with Doxygen" OFF)
 
-set(CRYPTO_PUBLIC_HEADER_NAMES
+set(LIBERAC_PUBLIC_HEADER_NAMES
     AsymmetricCipher.h
     BlockCipher.h
-    Crypto.h
+    LiberaCrypt.h
     Def.h
     DigitalSignature.h
     HashFunction.h
@@ -26,10 +26,10 @@ set(CRYPTO_PUBLIC_HEADER_NAMES
     RandomNumberGeneration.h
     Util.h
 )
-set(CRYPTO_PUBLIC_HEADERS "")
-foreach(CRYPTO_PUBLIC_HEADER IN LISTS CRYPTO_PUBLIC_HEADER_NAMES)
-    list(APPEND CRYPTO_PUBLIC_HEADERS
-        "${CMAKE_CURRENT_SOURCE_DIR}/inc/${CRYPTO_PUBLIC_HEADER}")
+set(LIBERAC_PUBLIC_HEADERS "")
+foreach(LIBERAC_PUBLIC_HEADER IN LISTS LIBERAC_PUBLIC_HEADER_NAMES)
+    list(APPEND LIBERAC_PUBLIC_HEADERS
+        "${CMAKE_CURRENT_SOURCE_DIR}/inc/${LIBERAC_PUBLIC_HEADER}")
 endforeach()
 
 set(CMAKE_C_STANDARD 11)
@@ -55,7 +55,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "AIX")
     set(CMAKE_AIX_EXPORT_ALL_SYMBOLS OFF)
 endif()
 
-set(CRYPTO_SOURCES
+set(LIBERAC_SOURCES
     # Public ABI entry points: one translation unit per operational category.
     src/AsymmetricCipher.c
     src/BlockCipher.c
@@ -115,7 +115,7 @@ set(CRYPTO_SOURCES
     src/DigitalSignature/SLH-DSA/slh_dsa.c
 )
 
-list(APPEND CRYPTO_SOURCES
+list(APPEND LIBERAC_SOURCES
     src/KeyEncapsulation/ML-KEM/K-PKE.c
     src/KeyEncapsulation/ML-KEM/ML-KEM.c
     src/KeyEncapsulation/ML-KEM/NTT_.c
@@ -150,26 +150,26 @@ add_library(crypto_slhdsa OBJECT ${SLHDSA_VENDOR_SOURCES})
 set_target_properties(crypto_slhdsa PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(crypto_slhdsa PRIVATE ${SLHDSA_BACKEND_DIR})
 
-add_library(Crypto ${CRYPTO_SOURCES}
+add_library(LiberaCrypt ${LIBERAC_SOURCES}
     $<TARGET_OBJECTS:crypto_mldsa>
     $<TARGET_OBJECTS:crypto_slhdsa>
 )
-add_library(Crypto::Crypto ALIAS Crypto)
+add_library(LiberaCrypt::LiberaCrypt ALIAS LiberaCrypt)
 
-set_target_properties(Crypto PROPERTIES
-    OUTPUT_NAME crypto
+set_target_properties(LiberaCrypt PROPERTIES
+    OUTPUT_NAME liberacrypt
     POSITION_INDEPENDENT_CODE ON
     WINDOWS_EXPORT_ALL_SYMBOLS OFF
 )
 
 if(WIN32 AND BUILD_SHARED_LIBS)
-    # MinGW otherwise emits libcrypto.dll, which collides with the common
+    # MinGW otherwise emits libliberacrypt.dll, which collides with the common
     # LibreSSL/OpenSSL runtime name in the Windows system search path.  Match
-    # MSVC's prefix-free crypto.dll name for every Windows toolchain.
-    set_target_properties(Crypto PROPERTIES PREFIX "")
+    # MSVC's prefix-free liberacrypt.dll name for every Windows toolchain.
+    set_target_properties(LiberaCrypt PROPERTIES PREFIX "")
 endif()
 
-target_include_directories(Crypto
+target_include_directories(LiberaCrypt
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/inc>
         $<INSTALL_INTERFACE:inc>
@@ -179,20 +179,20 @@ target_include_directories(Crypto
         ${MLDSA_BACKEND_DIR}
         ${SLHDSA_BACKEND_DIR}
 )
-target_compile_definitions(Crypto PRIVATE
+target_compile_definitions(LiberaCrypt PRIVATE
     MLD_CONFIG_NO_RANDOMIZED_API
     MLD_CONFIG_MULTILEVEL_BUILD
     MLD_CONFIG_NAMESPACE_PREFIX=mldsa
 )
 
 if(WIN32)
-    target_link_libraries(Crypto PRIVATE bcrypt)
+    target_link_libraries(LiberaCrypt PRIVATE bcrypt)
 endif()
 
-include(cmake/CryptoExports.cmake)
-crypto_configure_exports(Crypto)
-crypto_configure_portable_warnings(Crypto crypto_mldsa crypto_slhdsa)
-crypto_configure_vendor_endianness(
+include(cmake/LiberaCryptExports.cmake)
+liberac_configure_exports(LiberaCrypt)
+liberac_configure_portable_warnings(LiberaCrypt crypto_mldsa crypto_slhdsa)
+liberac_configure_vendor_endianness(
     SLHDSA_TARGET crypto_slhdsa
     MLDSA_TARGET crypto_mldsa
 )
@@ -200,115 +200,115 @@ crypto_configure_vendor_endianness(
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
-set(CRYPTO_CMAKE_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/Crypto)
+set(LIBERAC_CMAKE_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/LiberaCrypt)
 configure_package_config_file(
-    cmake/CryptoConfig.cmake.in
-    ${CMAKE_CURRENT_BINARY_DIR}/CryptoConfig.cmake
-    INSTALL_DESTINATION ${CRYPTO_CMAKE_INSTALL_DIR}
+    cmake/LiberaCryptConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/LiberaCryptConfig.cmake
+    INSTALL_DESTINATION ${LIBERAC_CMAKE_INSTALL_DIR}
     NO_SET_AND_CHECK_MACRO
     NO_CHECK_REQUIRED_COMPONENTS_MACRO
 )
 write_basic_package_version_file(
-    ${CMAKE_CURRENT_BINARY_DIR}/CryptoConfigVersion.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/LiberaCryptConfigVersion.cmake
     VERSION ${PROJECT_VERSION}
     COMPATIBILITY SameMajorVersion
 )
 
-install(TARGETS Crypto
-    EXPORT CryptoTargets
+install(TARGETS LiberaCrypt
+    EXPORT LiberaCryptTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
-install(FILES ${CRYPTO_PUBLIC_HEADERS} DESTINATION inc)
-install(EXPORT CryptoTargets NAMESPACE Crypto:: DESTINATION ${CRYPTO_CMAKE_INSTALL_DIR})
+install(FILES ${LIBERAC_PUBLIC_HEADERS} DESTINATION inc)
+install(EXPORT LiberaCryptTargets NAMESPACE LiberaCrypt:: DESTINATION ${LIBERAC_CMAKE_INSTALL_DIR})
 install(FILES
-    ${CMAKE_CURRENT_BINARY_DIR}/CryptoConfig.cmake
-    ${CMAKE_CURRENT_BINARY_DIR}/CryptoConfigVersion.cmake
-    DESTINATION ${CRYPTO_CMAKE_INSTALL_DIR}
+    ${CMAKE_CURRENT_BINARY_DIR}/LiberaCryptConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/LiberaCryptConfigVersion.cmake
+    DESTINATION ${LIBERAC_CMAKE_INSTALL_DIR}
 )
-set(CRYPTO_LICENSE_INSTALL_DIR ${CMAKE_INSTALL_DATADIR}/licenses/Crypto)
+set(LIBERAC_LICENSE_INSTALL_DIR ${CMAKE_INSTALL_DATADIR}/licenses/LiberaCrypt)
 install(FILES LICENSE
-    DESTINATION ${CRYPTO_LICENSE_INSTALL_DIR}
+    DESTINATION ${LIBERAC_LICENSE_INSTALL_DIR}
     RENAME AGPL-3.0-only.txt
 )
 install(FILES THIRD_PARTY_NOTICES.md
-    DESTINATION ${CRYPTO_LICENSE_INSTALL_DIR}
+    DESTINATION ${LIBERAC_LICENSE_INSTALL_DIR}
 )
 install(FILES ${MLDSA_BACKEND_DIR}/LICENSE
-    DESTINATION ${CRYPTO_LICENSE_INSTALL_DIR}
+    DESTINATION ${LIBERAC_LICENSE_INSTALL_DIR}
     RENAME mldsa-native-LICENSE.txt
 )
 install(FILES ${SLHDSA_BACKEND_DIR}/LICENSE
-    DESTINATION ${CRYPTO_LICENSE_INSTALL_DIR}
+    DESTINATION ${LIBERAC_LICENSE_INSTALL_DIR}
     RENAME slhdsa-c-LICENSE.txt
 )
 install(FILES src/KeyEncapsulation/NTRU-Plus/LICENSE
-    DESTINATION ${CRYPTO_LICENSE_INSTALL_DIR}
+    DESTINATION ${LIBERAC_LICENSE_INSTALL_DIR}
     RENAME ntru-plus-LICENSE.txt
 )
 install(FILES src/KeyEncapsulation/NTRU-Plus/UPSTREAM.md
-    DESTINATION ${CRYPTO_LICENSE_INSTALL_DIR}
+    DESTINATION ${LIBERAC_LICENSE_INSTALL_DIR}
     RENAME ntru-plus-UPSTREAM.md
 )
 install(FILES src/KeyEncapsulation/SMAUG-T/LICENSE
-    DESTINATION ${CRYPTO_LICENSE_INSTALL_DIR}
+    DESTINATION ${LIBERAC_LICENSE_INSTALL_DIR}
     RENAME smaug-t-LICENSE.txt
 )
 install(FILES src/KeyEncapsulation/SMAUG-T/UPSTREAM.md
-    DESTINATION ${CRYPTO_LICENSE_INSTALL_DIR}
+    DESTINATION ${LIBERAC_LICENSE_INSTALL_DIR}
     RENAME smaug-t-UPSTREAM.md
 )
 install(FILES ${AIMER_BACKEND_DIR}/LICENSE
-    DESTINATION ${CRYPTO_LICENSE_INSTALL_DIR}
+    DESTINATION ${LIBERAC_LICENSE_INSTALL_DIR}
     RENAME aimer-LICENSE.txt
 )
 install(FILES ${AIMER_BACKEND_DIR}/NOTICE
-    DESTINATION ${CRYPTO_LICENSE_INSTALL_DIR}
+    DESTINATION ${LIBERAC_LICENSE_INSTALL_DIR}
     RENAME aimer-NOTICE.txt
 )
 install(FILES ${AIMER_BACKEND_DIR}/README.md
-    DESTINATION ${CRYPTO_LICENSE_INSTALL_DIR}
+    DESTINATION ${LIBERAC_LICENSE_INSTALL_DIR}
     RENAME aimer-UPSTREAM.md
 )
 install(FILES ${HAETAE_SOURCE_DIR}/LICENSE
-    DESTINATION ${CRYPTO_LICENSE_INSTALL_DIR}
+    DESTINATION ${LIBERAC_LICENSE_INSTALL_DIR}
     RENAME haetae-LICENSE.txt
 )
 install(FILES ${HAETAE_SOURCE_DIR}/NOTICE
-    DESTINATION ${CRYPTO_LICENSE_INSTALL_DIR}
+    DESTINATION ${LIBERAC_LICENSE_INSTALL_DIR}
     RENAME haetae-NOTICE.txt
 )
 install(FILES ${HAETAE_SOURCE_DIR}/UPSTREAM.md
-    DESTINATION ${CRYPTO_LICENSE_INSTALL_DIR}
+    DESTINATION ${LIBERAC_LICENSE_INSTALL_DIR}
     RENAME haetae-UPSTREAM.md
 )
 
-if(CRYPTO_BUILD_DOCS)
+if(LIBERAC_BUILD_DOCS)
     find_package(Doxygen 1.12 REQUIRED)
-    set(CRYPTO_DOXYGEN_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/docs")
-    set(CRYPTO_DOXYGEN_INDEX
-        "${CRYPTO_DOXYGEN_OUTPUT_DIR}/html/index.html")
-    set(CRYPTO_DOXYGEN_WARNINGS
-        "${CRYPTO_DOXYGEN_OUTPUT_DIR}/warnings.log")
+    set(LIBERAC_DOXYGEN_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/docs")
+    set(LIBERAC_DOXYGEN_INDEX
+        "${LIBERAC_DOXYGEN_OUTPUT_DIR}/html/index.html")
+    set(LIBERAC_DOXYGEN_WARNINGS
+        "${LIBERAC_DOXYGEN_OUTPUT_DIR}/warnings.log")
     configure_file(
         cmake/Doxyfile.in
         ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
         @ONLY
     )
-    add_custom_target(crypto_docs
+    add_custom_target(liberacrypt_docs
         COMMAND ${CMAKE_COMMAND} -E make_directory
-                ${CRYPTO_DOXYGEN_OUTPUT_DIR}
+                ${LIBERAC_DOXYGEN_OUTPUT_DIR}
         COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
-        DEPENDS ${CRYPTO_PUBLIC_HEADERS} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
-        BYPRODUCTS ${CRYPTO_DOXYGEN_INDEX} ${CRYPTO_DOXYGEN_WARNINGS}
+        DEPENDS ${LIBERAC_PUBLIC_HEADERS} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
+        BYPRODUCTS ${LIBERAC_DOXYGEN_INDEX} ${LIBERAC_DOXYGEN_WARNINGS}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        COMMENT "Generating Crypto public API documentation"
+        COMMENT "Generating LiberaCrypt public API documentation"
         VERBATIM
     )
 endif()
 
-if(CRYPTO_BUILD_TESTS)
+if(LIBERAC_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()

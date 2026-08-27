@@ -11,14 +11,14 @@
 #include "AsymmetricCipher.h"
 #include "KeyEncapsulation.h"
 #include "DigitalSignature.h"
-#include "Crypto.h"
+#include "LiberaCrypt.h"
 
 int main(void) {
-    CRYPTO_BIGNUM value;
-    CRYPTO_CTR_DRBG_CONTEXT drbg;
-    CRYPTO_HASH_CONTEXT hash;
-    AlgID alg = ALG_HASH_SHA2_256;
-    CryptoError error = CRYPTO_SUCCESS;
+    LiberaCBignum value;
+    LiberaCCtrDrbgContext drbg;
+    LiberaCHashContext hash;
+    LiberaCAlgID alg = LIBERAC_ALG_HASH_SHA2_256;
+    LiberaCError error = LIBERAC_SUCCESS;
 
     (void)value;
     (void)drbg;

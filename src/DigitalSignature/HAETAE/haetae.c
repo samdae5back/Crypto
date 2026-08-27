@@ -17,13 +17,13 @@
 #include "haetae_symmetric.h"
 
 static const crypto_haetae_parameters crypto_haetae_parameter_table[] = {
-    {ALG_HAETAE_120, 992u, 1408u, 1474u, 2u, 2u, 4u, 58u,
+    {LIBERAC_ALG_HAETAE_120, 992u, 1408u, 1474u, 2u, 2u, 4u, 58u,
      9846.02, 9838.98, 12777.52, 48.858, 39.191835884530846,
      1u, 132u, 7u, 512u, 9u, 480u, 576u},
-    {ALG_HAETAE_180, 1472u, 2112u, 2349u, 3u, 3u, 6u, 80u,
+    {LIBERAC_ALG_HAETAE_180, 1472u, 2112u, 2349u, 3u, 3u, 6u, 80u,
      18314.98, 18307.70, 21906.65, 57.707, 48.0,
      1u, 376u, 127u, 512u, 9u, 480u, 864u},
-    {ALG_HAETAE_260, 2080u, 2752u, 2948u, 5u, 4u, 7u, 128u,
+    {LIBERAC_ALG_HAETAE_260, 2080u, 2752u, 2948u, 5u, 4u, 7u, 128u,
      22343.66, 22334.95, 24441.49, 55.13, 53.0659966456864,
      0u, 501u, 358u, 256u, 8u, 512u, 1152u}
 };
@@ -40,7 +40,7 @@ typedef struct crypto_haetae_keygen_workspace {
 } crypto_haetae_keygen_workspace;
 
 const crypto_haetae_parameters *crypto_haetae_parameters_from_algorithm(
-    AlgID algorithm) {
+    LiberaCAlgID algorithm) {
     size_t index;
 
     for (index = 0u;
@@ -54,7 +54,7 @@ const crypto_haetae_parameters *crypto_haetae_parameters_from_algorithm(
     return NULL;
 }
 
-static CryptoError crypto_haetae_keygen_core(
+static LiberaCError crypto_haetae_keygen_core(
     uint8_t *public_key,
     uint8_t *private_key,
     const crypto_haetae_parameters *parameters) {
@@ -67,16 +67,16 @@ static CryptoError crypto_haetae_keygen_core(
     const uint8_t *key;
     uint16_t nonce = 0u;
     uint64_t squared_singular_value;
-    CryptoError result;
+    LiberaCError result;
 
     workspace = calloc(1u, sizeof(*workspace));
     if (workspace == NULL) {
-        return CRYPTO_ERROR_ALLOCATION_FAILED;
+        return LIBERAC_ERROR_ALLOCATION_FAILED;
     }
 
     result = crypto_pqc_random_bytes_internal(
         seed_buffer, CRYPTO_HAETAE_SEED_BYTES);
-    if (result != CRYPTO_SUCCESS) {
+    if (result != LIBERAC_SUCCESS) {
         goto cleanup;
     }
 
@@ -157,7 +157,7 @@ reject_without_rounding:
     crypto_haetae_pack_sk(
         private_key, public_key, &workspace->s1, &workspace->s2, key,
         parameters);
-    result = CRYPTO_SUCCESS;
+    result = LIBERAC_SUCCESS;
 
 cleanup:
     crypto_sha3_clear(&hash_context);
@@ -191,7 +191,7 @@ typedef struct crypto_haetae_sign_workspace {
     crypto_haetae_polyveck hint_temporary;
 } crypto_haetae_sign_workspace;
 
-CryptoError crypto_haetae_sign_core(
+LiberaCError crypto_haetae_sign_core(
     uint8_t *sig,
     const uint8_t *m,
     size_t mlen,
@@ -245,7 +245,7 @@ CryptoError crypto_haetae_sign_core(
 
 	workspace = calloc(1u, sizeof(*workspace));
 	if (workspace == NULL) {
-		return CRYPTO_ERROR_ALLOCATION_FAILED;
+		return LIBERAC_ERROR_ALLOCATION_FAILED;
 	}
 	buf = workspace->buffer;
 	s1 = &workspace->s1;
@@ -406,7 +406,7 @@ reject:
 	crypto_zeroize(&lsb, sizeof(lsb));
 	crypto_zeroize(workspace, sizeof(*workspace));
 	free(workspace);
-	return CRYPTO_SUCCESS;
+	return LIBERAC_SUCCESS;
 }
 
 typedef struct crypto_haetae_verify_workspace {
@@ -425,7 +425,7 @@ typedef struct crypto_haetae_verify_workspace {
     crypto_haetae_poly w_prime;
 } crypto_haetae_verify_workspace;
 
-CryptoError crypto_haetae_verify_core(
+LiberaCError crypto_haetae_verify_core(
     const uint8_t *signature,
     size_t signature_length,
     const uint8_t *message,
@@ -442,15 +442,15 @@ CryptoError crypto_haetae_verify_core(
     uint64_t b2_squared = (uint64_t)(parameters->b2 * parameters->b2);
     size_t high_bits_bytes = parameters->polyveck_high_bits_packed_bytes;
     uint32_t index;
-    CryptoError result = CRYPTO_ERROR_SIGNATURE_INVALID;
+    LiberaCError result = LIBERAC_ERROR_SIGNATURE_INVALID;
 
     if (signature_length != parameters->signature_bytes) {
-        return CRYPTO_ERROR_SIGNATURE_INVALID;
+        return LIBERAC_ERROR_SIGNATURE_INVALID;
     }
 
     workspace = calloc(1u, sizeof(*workspace));
     if (workspace == NULL) {
-        return CRYPTO_ERROR_ALLOCATION_FAILED;
+        return LIBERAC_ERROR_ALLOCATION_FAILED;
     }
 
     crypto_haetae_unpack_pk(
@@ -545,7 +545,7 @@ CryptoError crypto_haetae_verify_core(
             (const uint8_t *)workspace->challenge.coeffs,
             (const uint8_t *)workspace->challenge_prime.coeffs,
             sizeof(workspace->challenge.coeffs)) == 0) {
-        result = CRYPTO_SUCCESS;
+        result = LIBERAC_SUCCESS;
     }
 
 cleanup:
@@ -557,61 +557,61 @@ cleanup:
     return result;
 }
 
-size_t crypto_haetae_public_key_size_internal(AlgID alg) {
+size_t crypto_haetae_public_key_size_internal(LiberaCAlgID alg) {
     const crypto_haetae_parameters *parameters =
         crypto_haetae_parameters_from_algorithm(alg);
     return parameters != NULL ? parameters->public_key_bytes : 0u;
 }
 
-size_t crypto_haetae_private_key_size_internal(AlgID alg) {
+size_t crypto_haetae_private_key_size_internal(LiberaCAlgID alg) {
     const crypto_haetae_parameters *parameters =
         crypto_haetae_parameters_from_algorithm(alg);
     return parameters != NULL ? parameters->private_key_bytes : 0u;
 }
 
-size_t crypto_haetae_signature_size_internal(AlgID alg) {
+size_t crypto_haetae_signature_size_internal(LiberaCAlgID alg) {
     const crypto_haetae_parameters *parameters =
         crypto_haetae_parameters_from_algorithm(alg);
     return parameters != NULL ? parameters->signature_bytes : 0u;
 }
 
-CryptoError crypto_haetae_keygen_internal(
-    AlgID alg,
+LiberaCError crypto_haetae_keygen_internal(
+    LiberaCAlgID alg,
     uint8_t *public_key,
     size_t public_key_length,
     uint8_t *private_key,
     size_t private_key_length) {
     const crypto_haetae_parameters *parameters =
         crypto_haetae_parameters_from_algorithm(alg);
-    CryptoError result;
+    LiberaCError result;
 
     if (parameters == NULL) {
-        return CRYPTO_ERROR_INVALID_ALG_ID;
+        return LIBERAC_ERROR_INVALID_ALG_ID;
     }
     if (public_key == NULL || private_key == NULL) {
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
     if (public_key_length < parameters->public_key_bytes ||
         private_key_length < parameters->private_key_bytes) {
-        return CRYPTO_ERROR_BUFFER_TOO_SMALL;
+        return LIBERAC_ERROR_BUFFER_TOO_SMALL;
     }
     if (crypto_ranges_overlap(
             public_key, parameters->public_key_bytes,
             private_key, parameters->private_key_bytes) != 0) {
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
 
     result = crypto_haetae_keygen_core(
         public_key, private_key, parameters);
-    if (result != CRYPTO_SUCCESS) {
+    if (result != LIBERAC_SUCCESS) {
         crypto_zeroize(public_key, parameters->public_key_bytes);
         crypto_zeroize(private_key, parameters->private_key_bytes);
     }
     return result;
 }
 
-CryptoError crypto_haetae_sign_internal(
-    AlgID alg,
+LiberaCError crypto_haetae_sign_internal(
+    LiberaCAlgID alg,
     const uint8_t *private_key,
     size_t private_key_length,
     const uint8_t *message,
@@ -624,24 +624,24 @@ CryptoError crypto_haetae_sign_internal(
         crypto_haetae_parameters_from_algorithm(alg);
     uint8_t prefix[256] = {0};
     uint8_t randomness[CRYPTO_HAETAE_SEED_BYTES] = {0};
-    CryptoError result;
+    LiberaCError result;
 
     if (parameters == NULL) {
-        return CRYPTO_ERROR_INVALID_ALG_ID;
+        return LIBERAC_ERROR_INVALID_ALG_ID;
     }
     if (private_key == NULL || signature == NULL ||
         (message == NULL && message_length != 0u) ||
         (context == NULL && context_length != 0u)) {
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
     if (context_length > 255u) {
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
     if (private_key_length != parameters->private_key_bytes) {
-        return CRYPTO_ERROR_INVALID_KEY;
+        return LIBERAC_ERROR_INVALID_KEY;
     }
     if (signature_length < parameters->signature_bytes) {
-        return CRYPTO_ERROR_BUFFER_TOO_SMALL;
+        return LIBERAC_ERROR_BUFFER_TOO_SMALL;
     }
     if (crypto_ranges_overlap(
             signature, parameters->signature_bytes,
@@ -652,7 +652,7 @@ CryptoError crypto_haetae_sign_internal(
         crypto_ranges_overlap(
             signature, parameters->signature_bytes,
             context, context_length) != 0) {
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
 
     prefix[0] = (uint8_t)context_length;
@@ -662,12 +662,12 @@ CryptoError crypto_haetae_sign_internal(
 
     result = crypto_pqc_random_bytes_internal(
         randomness, CRYPTO_HAETAE_SEED_BYTES);
-    if (result == CRYPTO_SUCCESS) {
+    if (result == LIBERAC_SUCCESS) {
         result = crypto_haetae_sign_core(
             signature, message, message_length, prefix, context_length + 1u,
             randomness, private_key, parameters);
     }
-    if (result != CRYPTO_SUCCESS) {
+    if (result != LIBERAC_SUCCESS) {
         crypto_zeroize(signature, parameters->signature_bytes);
     }
     crypto_zeroize(prefix, sizeof(prefix));
@@ -675,8 +675,8 @@ CryptoError crypto_haetae_sign_internal(
     return result;
 }
 
-CryptoError crypto_haetae_verify_internal(
-    AlgID alg,
+LiberaCError crypto_haetae_verify_internal(
+    LiberaCAlgID alg,
     const uint8_t *public_key,
     size_t public_key_length,
     const uint8_t *message,
@@ -688,24 +688,24 @@ CryptoError crypto_haetae_verify_internal(
     const crypto_haetae_parameters *parameters =
         crypto_haetae_parameters_from_algorithm(alg);
     uint8_t prefix[256] = {0};
-    CryptoError result;
+    LiberaCError result;
 
     if (parameters == NULL) {
-        return CRYPTO_ERROR_INVALID_ALG_ID;
+        return LIBERAC_ERROR_INVALID_ALG_ID;
     }
     if (public_key == NULL || signature == NULL ||
         (message == NULL && message_length != 0u) ||
         (context == NULL && context_length != 0u)) {
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
     if (context_length > 255u) {
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
     if (public_key_length != parameters->public_key_bytes) {
-        return CRYPTO_ERROR_INVALID_KEY;
+        return LIBERAC_ERROR_INVALID_KEY;
     }
     if (signature_length != parameters->signature_bytes) {
-        return CRYPTO_ERROR_SIGNATURE_INVALID;
+        return LIBERAC_ERROR_SIGNATURE_INVALID;
     }
 
     prefix[0] = (uint8_t)context_length;

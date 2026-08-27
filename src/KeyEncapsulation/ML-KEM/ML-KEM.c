@@ -12,15 +12,15 @@
 #include "parameter.h"
 #include "Util/Core/secure_zero.h"
 
-CryptoError ML_KEM_KeyGen_internal(const unsigned char seed[32],
+LiberaCError ML_KEM_KeyGen_internal(const unsigned char seed[32],
                                    const unsigned char rejection_seed[32],
                                    unsigned char *public_key,
                                    unsigned char *private_key) {
     unsigned char public_key_hash[32] = { 0 };
-    CryptoError result;
+    LiberaCError result;
 
     result = K_PKE_KeyGen(seed, public_key, private_key);
-    if (result != CRYPTO_SUCCESS) goto cleanup;
+    if (result != LIBERAC_SUCCESS) goto cleanup;
 
     memcpy(private_key + 384u * (size_t)k, public_key,
            384u * (size_t)k + 32u);
@@ -29,7 +29,7 @@ CryptoError ML_KEM_KeyGen_internal(const unsigned char seed[32],
     memcpy(private_key + 768u * (size_t)k + 64u, rejection_seed, 32u);
 
 cleanup:
-    if (result != CRYPTO_SUCCESS) {
+    if (result != LIBERAC_SUCCESS) {
         crypto_zeroize(public_key, 384u * (size_t)k + 32u);
         crypto_zeroize(private_key, 768u * (size_t)k + 96u);
     }
@@ -37,20 +37,20 @@ cleanup:
     return result;
 }
 
-CryptoError ML_KEM_Encaps_internal(const unsigned char *public_key,
+LiberaCError ML_KEM_Encaps_internal(const unsigned char *public_key,
                                    const unsigned char message[32],
                                    unsigned char shared_secret[32],
                                    unsigned char *ciphertext) {
     unsigned char hash_input[64] = { 0 };
     unsigned char randomness[32] = { 0 };
-    CryptoError result;
+    LiberaCError result;
 
     memcpy(hash_input, message, 32u);
     H(public_key, 384u * (size_t)k + 32u, hash_input + 32u);
     G(hash_input, sizeof(hash_input), shared_secret, randomness);
     result = K_PKE_Enc(public_key, message, randomness, ciphertext);
 
-    if (result != CRYPTO_SUCCESS) {
+    if (result != LIBERAC_SUCCESS) {
         crypto_zeroize(shared_secret, 32u);
         crypto_zeroize(ciphertext, 32u * (size_t)(d_u * k + d_v));
     }
@@ -59,7 +59,7 @@ CryptoError ML_KEM_Encaps_internal(const unsigned char *public_key,
     return result;
 }
 
-CryptoError ML_KEM_Decaps_internal(const unsigned char *private_key,
+LiberaCError ML_KEM_Decaps_internal(const unsigned char *private_key,
                                    const unsigned char *ciphertext,
                                    unsigned char shared_secret[32]) {
     unsigned char public_key[MLKEM_MAX_PUBLIC_KEY_BYTES] = { 0 };
@@ -72,7 +72,7 @@ CryptoError ML_KEM_Decaps_internal(const unsigned char *private_key,
     unsigned char rejected_secret[32] = { 0 };
     unsigned char expected_ciphertext[MLKEM_MAX_CIPHERTEXT_BYTES] = { 0 };
     size_t ciphertext_length = 32u * (size_t)(d_u * k + d_v);
-    CryptoError result;
+    LiberaCError result;
 
     memcpy(pke_private_key, private_key, 384u * (size_t)k);
     memcpy(public_key, private_key + 384u * (size_t)k,
@@ -81,7 +81,7 @@ CryptoError ML_KEM_Decaps_internal(const unsigned char *private_key,
     memcpy(rejection_seed, private_key + 768u * (size_t)k + 64u, 32u);
 
     result = K_PKE_Dec(pke_private_key, ciphertext, message);
-    if (result != CRYPTO_SUCCESS) goto cleanup;
+    if (result != LIBERAC_SUCCESS) goto cleanup;
 
     memcpy(hash_input, message, 32u);
     memcpy(hash_input + 32u, public_key_hash, 32u);
@@ -93,7 +93,7 @@ CryptoError ML_KEM_Decaps_internal(const unsigned char *private_key,
 
     result = K_PKE_Enc(public_key, message, randomness,
                        expected_ciphertext);
-    if (result != CRYPTO_SUCCESS) goto cleanup;
+    if (result != LIBERAC_SUCCESS) goto cleanup;
 
     {
         uint32_t mismatch = 0u;
@@ -110,10 +110,10 @@ CryptoError ML_KEM_Decaps_internal(const unsigned char *private_key,
                           (rejected_secret[i] & rejection_mask));
         }
     }
-    result = CRYPTO_SUCCESS;
+    result = LIBERAC_SUCCESS;
 
 cleanup:
-    if (result != CRYPTO_SUCCESS) crypto_zeroize(shared_secret, 32u);
+    if (result != LIBERAC_SUCCESS) crypto_zeroize(shared_secret, 32u);
     crypto_zeroize(public_key, sizeof(public_key));
     crypto_zeroize(pke_private_key, sizeof(pke_private_key));
     crypto_zeroize(public_key_hash, sizeof(public_key_hash));
@@ -126,18 +126,18 @@ cleanup:
     return result;
 }
 
-CryptoError ML_KEM_KeyGen(unsigned char *public_key,
+LiberaCError ML_KEM_KeyGen(unsigned char *public_key,
                           unsigned char *private_key) {
     unsigned char randomness[64] = { 0 };
-    CryptoError result;
+    LiberaCError result;
 
     result = RBG(randomness, sizeof(randomness));
-    if (result == CRYPTO_SUCCESS) {
+    if (result == LIBERAC_SUCCESS) {
         result = ML_KEM_KeyGen_internal(
             randomness, randomness + 32u, public_key, private_key);
     }
 
-    if (result != CRYPTO_SUCCESS) {
+    if (result != LIBERAC_SUCCESS) {
         crypto_zeroize(public_key, 384u * (size_t)k + 32u);
         crypto_zeroize(private_key, 768u * (size_t)k + 96u);
     }
@@ -145,17 +145,17 @@ CryptoError ML_KEM_KeyGen(unsigned char *public_key,
     return result;
 }
 
-CryptoError ML_KEM_Encaps(const unsigned char *public_key,
+LiberaCError ML_KEM_Encaps(const unsigned char *public_key,
                           unsigned char shared_secret[32],
                           unsigned char *ciphertext) {
     unsigned char message[32] = { 0 };
-    CryptoError result;
+    LiberaCError result;
 
     result = RBG(message, sizeof(message));
-    if (result == CRYPTO_SUCCESS)
+    if (result == LIBERAC_SUCCESS)
         result = ML_KEM_Encaps_internal(public_key, message, shared_secret,
                                         ciphertext);
-    if (result != CRYPTO_SUCCESS) {
+    if (result != LIBERAC_SUCCESS) {
         crypto_zeroize(shared_secret, 32u);
         crypto_zeroize(ciphertext, 32u * (size_t)(d_u * k + d_v));
     }
@@ -163,7 +163,7 @@ CryptoError ML_KEM_Encaps(const unsigned char *public_key,
     return result;
 }
 
-CryptoError ML_KEM_Decaps(const unsigned char *private_key,
+LiberaCError ML_KEM_Decaps(const unsigned char *private_key,
                           const unsigned char *ciphertext,
                           unsigned char shared_secret[32]) {
     return ML_KEM_Decaps_internal(private_key, ciphertext, shared_secret);

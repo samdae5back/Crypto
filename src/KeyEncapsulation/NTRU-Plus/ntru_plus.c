@@ -20,35 +20,35 @@
 
 static const crypto_ntru_plus_parameters crypto_ntru_plus_parameter_sets[] = {
     {
-        ALG_NTRU_PLUS_768,
+        LIBERAC_ALG_NTRU_PLUS_768,
         CRYPTO_NTRU_PLUS_768_N,
         CRYPTO_NTRU_PLUS_768_BASE_DEGREE,
         CRYPTO_NTRU_PLUS_768_POLYNOMIAL_BYTES,
-        CRYPTO_NTRU_PLUS_768_PUBLIC_KEY_BYTES,
-        CRYPTO_NTRU_PLUS_768_PRIVATE_KEY_BYTES,
-        CRYPTO_NTRU_PLUS_768_CIPHERTEXT_BYTES
+        LIBERAC_NTRU_PLUS_768_PUBLIC_KEY_BYTES,
+        LIBERAC_NTRU_PLUS_768_PRIVATE_KEY_BYTES,
+        LIBERAC_NTRU_PLUS_768_CIPHERTEXT_BYTES
     },
     {
-        ALG_NTRU_PLUS_864,
+        LIBERAC_ALG_NTRU_PLUS_864,
         CRYPTO_NTRU_PLUS_864_N,
         CRYPTO_NTRU_PLUS_864_BASE_DEGREE,
         CRYPTO_NTRU_PLUS_864_POLYNOMIAL_BYTES,
-        CRYPTO_NTRU_PLUS_864_PUBLIC_KEY_BYTES,
-        CRYPTO_NTRU_PLUS_864_PRIVATE_KEY_BYTES,
-        CRYPTO_NTRU_PLUS_864_CIPHERTEXT_BYTES
+        LIBERAC_NTRU_PLUS_864_PUBLIC_KEY_BYTES,
+        LIBERAC_NTRU_PLUS_864_PRIVATE_KEY_BYTES,
+        LIBERAC_NTRU_PLUS_864_CIPHERTEXT_BYTES
     },
     {
-        ALG_NTRU_PLUS_1152,
+        LIBERAC_ALG_NTRU_PLUS_1152,
         CRYPTO_NTRU_PLUS_1152_N,
         CRYPTO_NTRU_PLUS_1152_BASE_DEGREE,
         CRYPTO_NTRU_PLUS_1152_POLYNOMIAL_BYTES,
-        CRYPTO_NTRU_PLUS_1152_PUBLIC_KEY_BYTES,
-        CRYPTO_NTRU_PLUS_1152_PRIVATE_KEY_BYTES,
-        CRYPTO_NTRU_PLUS_1152_CIPHERTEXT_BYTES
+        LIBERAC_NTRU_PLUS_1152_PUBLIC_KEY_BYTES,
+        LIBERAC_NTRU_PLUS_1152_PRIVATE_KEY_BYTES,
+        LIBERAC_NTRU_PLUS_1152_CIPHERTEXT_BYTES
     }
 };
 
-const crypto_ntru_plus_parameters *crypto_ntru_plus_parameters_for(AlgID alg)
+const crypto_ntru_plus_parameters *crypto_ntru_plus_parameters_for(LiberaCAlgID alg)
 {
     size_t i;
 
@@ -118,26 +118,26 @@ static void crypto_ntru_plus_encode_keypair(
     crypto_zeroize(&h_inverse, sizeof(h_inverse));
 }
 
-static CryptoError crypto_ntru_plus_encaps_derandomized(
+static LiberaCError crypto_ntru_plus_encaps_derandomized(
     uint8_t *ciphertext,
-    uint8_t shared_secret[CRYPTO_NTRU_PLUS_SHARED_SECRET_BYTES],
+    uint8_t shared_secret[LIBERAC_NTRU_PLUS_SHARED_SECRET_BYTES],
     const uint8_t *public_key, const uint8_t *coins,
     const crypto_ntru_plus_parameters *parameters)
 {
     uint8_t message[CRYPTO_NTRU_PLUS_MAX_N / 8u +
                     CRYPTO_NTRU_PLUS_SEED_BYTES];
-    uint8_t hash_output[CRYPTO_NTRU_PLUS_SHARED_SECRET_BYTES +
+    uint8_t hash_output[LIBERAC_NTRU_PLUS_SHARED_SECRET_BYTES +
                         CRYPTO_NTRU_PLUS_MAX_N / 4u];
     uint8_t encoded_r[CRYPTO_NTRU_PLUS_MAX_POLYNOMIAL_BYTES];
     crypto_ntru_plus_poly ciphertext_poly;
     crypto_ntru_plus_poly public_key_poly;
     crypto_ntru_plus_poly r;
     crypto_ntru_plus_poly encoded_message;
-    CryptoError result = CRYPTO_SUCCESS;
+    LiberaCError result = LIBERAC_SUCCESS;
 
     if (crypto_ntru_plus_poly_frombytes(
             &public_key_poly, public_key, parameters) != 0) {
-        result = CRYPTO_ERROR_INVALID_KEY;
+        result = LIBERAC_ERROR_INVALID_KEY;
         goto cleanup;
     }
 
@@ -147,7 +147,7 @@ static CryptoError crypto_ntru_plus_encaps_derandomized(
     crypto_ntru_plus_hash_h(hash_output, message, parameters);
 
     crypto_ntru_plus_poly_cbd1(
-        &r, hash_output + CRYPTO_NTRU_PLUS_SHARED_SECRET_BYTES, parameters);
+        &r, hash_output + LIBERAC_NTRU_PLUS_SHARED_SECRET_BYTES, parameters);
     crypto_ntru_plus_poly_ntt(&r, &r, parameters);
     crypto_ntru_plus_poly_tobytes(encoded_r, &r, parameters);
     crypto_ntru_plus_hash_g(encoded_r, encoded_r, parameters);
@@ -161,13 +161,13 @@ static CryptoError crypto_ntru_plus_encaps_derandomized(
         ciphertext, &ciphertext_poly, parameters);
     memcpy(
         shared_secret, hash_output,
-        CRYPTO_NTRU_PLUS_SHARED_SECRET_BYTES);
+        LIBERAC_NTRU_PLUS_SHARED_SECRET_BYTES);
 
 cleanup:
-    if (result != CRYPTO_SUCCESS) {
+    if (result != LIBERAC_SUCCESS) {
         crypto_zeroize(ciphertext, parameters->ciphertext_bytes);
         crypto_zeroize(
-            shared_secret, CRYPTO_NTRU_PLUS_SHARED_SECRET_BYTES);
+            shared_secret, LIBERAC_NTRU_PLUS_SHARED_SECRET_BYTES);
     }
     crypto_zeroize(message, sizeof(message));
     crypto_zeroize(hash_output, sizeof(hash_output));
@@ -179,29 +179,29 @@ cleanup:
     return result;
 }
 
-size_t crypto_ntru_plus_public_key_size_internal(AlgID alg)
+size_t crypto_ntru_plus_public_key_size_internal(LiberaCAlgID alg)
 {
     const crypto_ntru_plus_parameters *parameters =
         crypto_ntru_plus_parameters_for(alg);
     return parameters != NULL ? parameters->public_key_bytes : 0u;
 }
 
-size_t crypto_ntru_plus_private_key_size_internal(AlgID alg)
+size_t crypto_ntru_plus_private_key_size_internal(LiberaCAlgID alg)
 {
     const crypto_ntru_plus_parameters *parameters =
         crypto_ntru_plus_parameters_for(alg);
     return parameters != NULL ? parameters->private_key_bytes : 0u;
 }
 
-size_t crypto_ntru_plus_ciphertext_size_internal(AlgID alg)
+size_t crypto_ntru_plus_ciphertext_size_internal(LiberaCAlgID alg)
 {
     const crypto_ntru_plus_parameters *parameters =
         crypto_ntru_plus_parameters_for(alg);
     return parameters != NULL ? parameters->ciphertext_bytes : 0u;
 }
 
-CryptoError crypto_ntru_plus_keygen_internal(
-    AlgID alg,
+LiberaCError crypto_ntru_plus_keygen_internal(
+    LiberaCAlgID alg,
     uint8_t *public_key, size_t public_key_length,
     uint8_t *private_key, size_t private_key_length)
 {
@@ -213,30 +213,30 @@ CryptoError crypto_ntru_plus_keygen_internal(
     crypto_ntru_plus_poly f_inverse;
     crypto_ntru_plus_poly g;
     crypto_ntru_plus_poly g_inverse;
-    CryptoError result = CRYPTO_SUCCESS;
+    LiberaCError result = LIBERAC_SUCCESS;
 
     if (parameters == NULL)
-        return CRYPTO_ERROR_INVALID_ALG_ID;
+        return LIBERAC_ERROR_INVALID_ALG_ID;
     if (public_key == NULL || private_key == NULL)
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     if (public_key_length < parameters->public_key_bytes ||
         private_key_length < parameters->private_key_bytes)
-        return CRYPTO_ERROR_BUFFER_TOO_SMALL;
+        return LIBERAC_ERROR_BUFFER_TOO_SMALL;
     if (crypto_ranges_overlap(
             public_key, parameters->public_key_bytes,
             private_key, parameters->private_key_bytes))
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
 
     do {
         result = crypto_pqc_random_bytes_internal(coins, sizeof(coins));
-        if (result != CRYPTO_SUCCESS)
+        if (result != LIBERAC_SUCCESS)
             goto cleanup;
     } while (crypto_ntru_plus_generate_f(
         &f, &f_inverse, workspace, coins, parameters) != 0);
 
     do {
         result = crypto_pqc_random_bytes_internal(coins, sizeof(coins));
-        if (result != CRYPTO_SUCCESS)
+        if (result != LIBERAC_SUCCESS)
             goto cleanup;
     } while (crypto_ntru_plus_generate_g(
         &g, &g_inverse, workspace, coins, parameters) != 0);
@@ -246,7 +246,7 @@ CryptoError crypto_ntru_plus_keygen_internal(
         &f, &f_inverse, &g, &g_inverse, parameters);
 
 cleanup:
-    if (result != CRYPTO_SUCCESS) {
+    if (result != LIBERAC_SUCCESS) {
         crypto_zeroize(public_key, parameters->public_key_bytes);
         crypto_zeroize(private_key, parameters->private_key_bytes);
     }
@@ -259,54 +259,54 @@ cleanup:
     return result;
 }
 
-CryptoError crypto_ntru_plus_encaps_internal(
-    AlgID alg,
+LiberaCError crypto_ntru_plus_encaps_internal(
+    LiberaCAlgID alg,
     const uint8_t *public_key, size_t public_key_length,
-    uint8_t shared_secret[CRYPTO_NTRU_PLUS_SHARED_SECRET_BYTES],
+    uint8_t shared_secret[LIBERAC_NTRU_PLUS_SHARED_SECRET_BYTES],
     uint8_t *ciphertext, size_t ciphertext_length)
 {
     const crypto_ntru_plus_parameters *parameters =
         crypto_ntru_plus_parameters_for(alg);
     uint8_t coins[CRYPTO_NTRU_PLUS_MAX_N / 8u];
-    CryptoError result;
+    LiberaCError result;
 
     if (parameters == NULL)
-        return CRYPTO_ERROR_INVALID_ALG_ID;
+        return LIBERAC_ERROR_INVALID_ALG_ID;
     if (public_key == NULL || shared_secret == NULL || ciphertext == NULL)
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     if (public_key_length < parameters->public_key_bytes ||
         ciphertext_length < parameters->ciphertext_bytes)
-        return CRYPTO_ERROR_BUFFER_TOO_SMALL;
+        return LIBERAC_ERROR_BUFFER_TOO_SMALL;
     if (crypto_ranges_overlap(
             public_key, parameters->public_key_bytes,
-            shared_secret, CRYPTO_NTRU_PLUS_SHARED_SECRET_BYTES) ||
+            shared_secret, LIBERAC_NTRU_PLUS_SHARED_SECRET_BYTES) ||
         crypto_ranges_overlap(
             public_key, parameters->public_key_bytes,
             ciphertext, parameters->ciphertext_bytes) ||
         crypto_ranges_overlap(
-            shared_secret, CRYPTO_NTRU_PLUS_SHARED_SECRET_BYTES,
+            shared_secret, LIBERAC_NTRU_PLUS_SHARED_SECRET_BYTES,
             ciphertext, parameters->ciphertext_bytes))
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
 
     result = crypto_pqc_random_bytes_internal(coins, parameters->n / 8u);
-    if (result == CRYPTO_SUCCESS) {
+    if (result == LIBERAC_SUCCESS) {
         result = crypto_ntru_plus_encaps_derandomized(
             ciphertext, shared_secret, public_key, coins, parameters);
     } else {
         crypto_zeroize(ciphertext, parameters->ciphertext_bytes);
         crypto_zeroize(
-            shared_secret, CRYPTO_NTRU_PLUS_SHARED_SECRET_BYTES);
+            shared_secret, LIBERAC_NTRU_PLUS_SHARED_SECRET_BYTES);
     }
 
     crypto_zeroize(coins, sizeof(coins));
     return result;
 }
 
-CryptoError crypto_ntru_plus_decaps_internal(
-    AlgID alg,
+LiberaCError crypto_ntru_plus_decaps_internal(
+    LiberaCAlgID alg,
     const uint8_t *private_key, size_t private_key_length,
     const uint8_t *ciphertext, size_t ciphertext_length,
-    uint8_t shared_secret[CRYPTO_NTRU_PLUS_SHARED_SECRET_BYTES])
+    uint8_t shared_secret[LIBERAC_NTRU_PLUS_SHARED_SECRET_BYTES])
 {
     const crypto_ntru_plus_parameters *parameters =
         crypto_ntru_plus_parameters_for(alg);
@@ -314,7 +314,7 @@ CryptoError crypto_ntru_plus_decaps_internal(
                     CRYPTO_NTRU_PLUS_SEED_BYTES];
     uint8_t encoded_r[CRYPTO_NTRU_PLUS_MAX_POLYNOMIAL_BYTES];
     uint8_t regenerated_r[CRYPTO_NTRU_PLUS_MAX_POLYNOMIAL_BYTES];
-    uint8_t hash_output[CRYPTO_NTRU_PLUS_SHARED_SECRET_BYTES +
+    uint8_t hash_output[LIBERAC_NTRU_PLUS_SHARED_SECRET_BYTES +
                         CRYPTO_NTRU_PLUS_MAX_N / 4u];
     crypto_ntru_plus_poly ciphertext_poly;
     crypto_ntru_plus_poly f;
@@ -323,23 +323,23 @@ CryptoError crypto_ntru_plus_decaps_internal(
     crypto_ntru_plus_poly recovered_r;
     crypto_ntru_plus_poly message_poly;
     crypto_ntru_plus_poly transformed_message;
-    CryptoError result = CRYPTO_SUCCESS;
+    LiberaCError result = LIBERAC_SUCCESS;
     int fail;
 
     if (parameters == NULL)
-        return CRYPTO_ERROR_INVALID_ALG_ID;
+        return LIBERAC_ERROR_INVALID_ALG_ID;
     if (private_key == NULL || ciphertext == NULL || shared_secret == NULL)
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     if (private_key_length < parameters->private_key_bytes ||
         ciphertext_length < parameters->ciphertext_bytes)
-        return CRYPTO_ERROR_BUFFER_TOO_SMALL;
+        return LIBERAC_ERROR_BUFFER_TOO_SMALL;
     if (crypto_ranges_overlap(
             private_key, parameters->private_key_bytes,
-            shared_secret, CRYPTO_NTRU_PLUS_SHARED_SECRET_BYTES) ||
+            shared_secret, LIBERAC_NTRU_PLUS_SHARED_SECRET_BYTES) ||
         crypto_ranges_overlap(
             ciphertext, parameters->ciphertext_bytes,
-            shared_secret, CRYPTO_NTRU_PLUS_SHARED_SECRET_BYTES))
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+            shared_secret, LIBERAC_NTRU_PLUS_SHARED_SECRET_BYTES))
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
 
     if (crypto_ntru_plus_poly_frombytes(
             &f, private_key, parameters) != 0 ||
@@ -347,12 +347,12 @@ CryptoError crypto_ntru_plus_decaps_internal(
             &h_inverse,
             private_key + parameters->polynomial_bytes,
             parameters) != 0) {
-        result = CRYPTO_ERROR_INVALID_KEY;
+        result = LIBERAC_ERROR_INVALID_KEY;
         goto cleanup;
     }
     if (crypto_ntru_plus_poly_frombytes(
             &ciphertext_poly, ciphertext, parameters) != 0) {
-        result = CRYPTO_ERROR_AUTHENTICATION_FAILED;
+        result = LIBERAC_ERROR_AUTHENTICATION_FAILED;
         goto cleanup;
     }
 
@@ -383,24 +383,24 @@ CryptoError crypto_ntru_plus_decaps_internal(
     crypto_ntru_plus_hash_h(hash_output, message, parameters);
 
     crypto_ntru_plus_poly_cbd1(
-        &r, hash_output + CRYPTO_NTRU_PLUS_SHARED_SECRET_BYTES, parameters);
+        &r, hash_output + LIBERAC_NTRU_PLUS_SHARED_SECRET_BYTES, parameters);
     crypto_ntru_plus_poly_ntt(&r, &r, parameters);
     crypto_ntru_plus_poly_tobytes(regenerated_r, &r, parameters);
     fail |= crypto_pqc_verify(
         encoded_r, regenerated_r, parameters->polynomial_bytes);
 
     if (fail != 0) {
-        result = CRYPTO_ERROR_AUTHENTICATION_FAILED;
+        result = LIBERAC_ERROR_AUTHENTICATION_FAILED;
         goto cleanup;
     }
     memcpy(
         shared_secret, hash_output,
-        CRYPTO_NTRU_PLUS_SHARED_SECRET_BYTES);
+        LIBERAC_NTRU_PLUS_SHARED_SECRET_BYTES);
 
 cleanup:
-    if (result != CRYPTO_SUCCESS)
+    if (result != LIBERAC_SUCCESS)
         crypto_zeroize(
-            shared_secret, CRYPTO_NTRU_PLUS_SHARED_SECRET_BYTES);
+            shared_secret, LIBERAC_NTRU_PLUS_SHARED_SECRET_BYTES);
     crypto_zeroize(message, sizeof(message));
     crypto_zeroize(encoded_r, sizeof(encoded_r));
     crypto_zeroize(regenerated_r, sizeof(regenerated_r));

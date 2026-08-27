@@ -8,13 +8,13 @@
 
 #include "Def.h"
 
-CryptoError K_PKE_KeyGen(const unsigned char *seed, unsigned char *public_key,
+LiberaCError K_PKE_KeyGen(const unsigned char *seed, unsigned char *public_key,
                          unsigned char *private_key);
-CryptoError K_PKE_Enc(const unsigned char *public_key,
+LiberaCError K_PKE_Enc(const unsigned char *public_key,
                       const unsigned char *message,
                       const unsigned char *randomness,
                       unsigned char *ciphertext);
-CryptoError K_PKE_Dec(const unsigned char *private_key,
+LiberaCError K_PKE_Dec(const unsigned char *private_key,
                       const unsigned char *ciphertext,
                       unsigned char *message);
 

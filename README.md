@@ -10,7 +10,7 @@ system, compiler, architecture, or external cryptographic runtime.
 
 The library keeps one runtime-selected API per primitive family. Every supported
 parameter set is compiled into one library; callers select the algorithm and
-parameter set with the final `AlgID` argument. Algorithm implementations use ISO
+parameter set with the final `LiberaCAlgID` argument. Algorithm implementations use ISO
 C and project-local headers rather than an external cryptographic library.
 Platform-specific code is kept at narrow system boundaries where it is actually
 required, such as entropy acquisition (`BCryptGenRandom`, `getrandom`, or
@@ -32,9 +32,9 @@ required, such as entropy acquisition (`BCryptGenRandom`, `getrandom`, or
   project's original source is released under `AGPL-3.0-only`; separately
   identified bundled components retain their upstream licenses.
 
-The public C API and CMake package identifiers currently retain the existing
-`CRYPTO_`, `Crypto.h`, and `Crypto::Crypto` names for compatibility; LiberaCrypt
-is the project name.
+LiberaCrypt uses `LIBERAC_` for public C functions, macros, constants, and
+algorithm selectors, `LiberaC` for public type names, `LiberaCrypt.h` as its
+umbrella header, and the `LiberaCrypt::LiberaCrypt` CMake target.
 
 > Security note: the RSA interface currently exposes the raw textbook
 > operation. It is useful for implementation tests, but applications must not
@@ -69,7 +69,7 @@ No submodule checkout or external crypto package is required.
 cmake -E make_directory build
 cmake -E chdir build cmake .. \
   -DBUILD_SHARED_LIBS=ON \
-  -DCRYPTO_BUILD_TESTS=ON \
+  -DLIBERAC_BUILD_TESTS=ON \
   -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release
 cmake -E chdir build ctest -C Release --output-on-failure
@@ -86,21 +86,21 @@ cmake --build build --target install --config Release
 CMake consumers can discover the installed package and link its imported target:
 
 ```cmake
-find_package(Crypto CONFIG REQUIRED)
-target_link_libraries(your_target PRIVATE Crypto::Crypto)
+find_package(LiberaCrypt CONFIG REQUIRED)
+target_link_libraries(your_target PRIVATE LiberaCrypt::LiberaCrypt)
 ```
 
 Tests default to enabled for a standalone checkout and disabled when the library
 is included by another project with `add_subdirectory()`. An embedding project
 can enable them through the CMake cache (for example,
-`-DCRYPTO_BUILD_TESTS=ON`); its top-level CMake file must also call
+`-DLIBERAC_BUILD_TESTS=ON`); its top-level CMake file must also call
 `enable_testing()` for root-level CTest discovery.
 
 The target exposes the installed `inc` directory, so source files include the
 umbrella header as follows:
 
 ```c
-#include <Crypto.h>
+#include <LiberaCrypt.h>
 ```
 
 To generate the public API reference, install Doxygen 1.12 or newer and enable
@@ -108,8 +108,8 @@ the optional documentation target:
 
 ```sh
 cmake -E make_directory build-docs
-cmake -E chdir build-docs cmake .. -DCRYPTO_BUILD_DOCS=ON
-cmake --build build-docs --target crypto_docs
+cmake -E chdir build-docs cmake .. -DLIBERAC_BUILD_DOCS=ON
+cmake --build build-docs --target liberacrypt_docs
 ```
 
 The generated entry page is `build-docs/docs/html/index.html`. Only the public
@@ -117,9 +117,9 @@ headers in `inc/` are included in this reference.
 
 ## Runtime algorithm dispatch
 
-Public operation names start with `CRYPTO_`. For APIs that accept an algorithm
-identifier, `AlgID` is the last argument. The complete identifier set is in
-`inc/Def.h` and is available from `Crypto.h`.
+Public operation names start with `LIBERAC_`. For APIs that accept an algorithm
+identifier, `LiberaCAlgID` is the last argument. The complete identifier set is in
+`inc/Def.h` and is available from `LiberaCrypt.h`.
 
 AES encryption and decryption use one API pair for all key sizes and modes:
 
@@ -128,10 +128,10 @@ uniform random key with the size required by the selected identifier; round-key
 expansion remains an internal implementation detail:
 
 ```c
-uint8_t key[CRYPTO_AES_256_KEY_BYTES];
-size_t key_length = CRYPTO_BLOCK_CIPHER_KEY_SIZE(ALG_AES_256_GCM);
+uint8_t key[LIBERAC_AES_256_KEY_BYTES];
+size_t key_length = LIBERAC_BLOCK_CIPHER_KEY_SIZE(LIBERAC_ALG_AES_256_GCM);
 
-CryptoError error = CRYPTO_RANDOM_BYTES(key, key_length);
+LiberaCError error = LIBERAC_RANDOM_BYTES(key, key_length);
 ```
 
 Applications deriving keys from passwords or shared secrets must use an
@@ -141,14 +141,14 @@ appropriate key-derivation protocol instead of copying or truncating that input.
 uint8_t ciphertext[32];
 uint8_t tag[16];
 
-CryptoError error = CRYPTO_BLOCK_CIPHER_ENCRYPT(
+LiberaCError error = LIBERAC_BLOCK_CIPHER_ENCRYPT(
     ciphertext, sizeof(ciphertext),
     tag, sizeof(tag),
     plaintext, sizeof(plaintext),
     key, sizeof(key),
     nonce, sizeof(nonce),
     aad, sizeof(aad),
-    ALG_AES_256_GCM);
+    LIBERAC_ALG_AES_256_GCM);
 ```
 
 The AES dispatcher supports AES-128, AES-192, and AES-256 with ECB, CBC, CTR,
@@ -159,12 +159,12 @@ authentication fails.
 All fixed-output hashes and XOFs use the same hash API:
 
 ```c
-uint8_t digest[CRYPTO_SHA2_256_DIGEST_BYTES];
+uint8_t digest[LIBERAC_SHA2_256_DIGEST_BYTES];
 
-CryptoError error = CRYPTO_HASH(
+LiberaCError error = LIBERAC_HASH(
     digest, sizeof(digest),
     message, message_length,
-    ALG_HASH_SHA2_256);
+    LIBERAC_ALG_HASH_SHA2_256);
 ```
 
 Supported hash identifiers are:
@@ -182,19 +182,19 @@ interface. Finalization finishes input absorption; output is then retrieved by
 the squeeze operation:
 
 ```c
-CRYPTO_HASH_CONTEXT context;
-uint8_t digest[CRYPTO_SHA2_256_DIGEST_BYTES];
+LiberaCHashContext context;
+uint8_t digest[LIBERAC_SHA2_256_DIGEST_BYTES];
 
-CryptoError error = CRYPTO_HASH_INIT(&context, ALG_HASH_SHA2_256);
-if (error == CRYPTO_SUCCESS)
-    error = CRYPTO_HASH_UPDATE(&context, first_part, first_part_length);
-if (error == CRYPTO_SUCCESS)
-    error = CRYPTO_HASH_UPDATE(&context, second_part, second_part_length);
-if (error == CRYPTO_SUCCESS)
-    error = CRYPTO_HASH_FINALIZE(&context);
-if (error == CRYPTO_SUCCESS)
-    error = CRYPTO_HASH_SQUEEZE(&context, digest, sizeof(digest));
-CRYPTO_HASH_CLEAR(&context);
+LiberaCError error = LIBERAC_HASH_INIT(&context, LIBERAC_ALG_HASH_SHA2_256);
+if (error == LIBERAC_SUCCESS)
+    error = LIBERAC_HASH_UPDATE(&context, first_part, first_part_length);
+if (error == LIBERAC_SUCCESS)
+    error = LIBERAC_HASH_UPDATE(&context, second_part, second_part_length);
+if (error == LIBERAC_SUCCESS)
+    error = LIBERAC_HASH_FINALIZE(&context);
+if (error == LIBERAC_SUCCESS)
+    error = LIBERAC_HASH_SQUEEZE(&context, digest, sizeof(digest));
+LIBERAC_HASH_CLEAR(&context);
 ```
 
 Fixed-output algorithms permit one squeeze and write exactly their standard
@@ -216,7 +216,7 @@ the same byte stream as one request for the combined length.
 - Probable-prime, prime, and safe-prime generation
 - Random bytes obtained directly from the operating system entropy source
 
-Key, ciphertext, and signature size-query APIs also take the runtime `AlgID`, so
+Key, ciphertext, and signature size-query APIs also take the runtime `LiberaCAlgID`, so
 applications do not need parameter-specific builds or headers.
 
 ## Portability considerations
@@ -280,14 +280,14 @@ The shared-library build applies the allowlist with the native platform model:
 - AIX: an `.exp` file passed with `-bE`
 - HP-UX: explicit `+e` linker entries
 
-This keeps the exported ABI limited to the documented `CRYPTO_` functions while
+This keeps the exported ABI limited to the documented `LIBERAC_` functions while
 allowing static builds to retain normal archive behavior.
 Restricted AIX exports require CMake 3.17 or newer because that release added
 the supported switch for disabling CMake's automatic all-symbol export list.
 
 ## Tests
 
-When `CRYPTO_BUILD_TESTS` is enabled, CMake generates:
+When `LIBERAC_BUILD_TESTS` is enabled, CMake generates:
 
 - public-header isolation checks
 - operation-level unit tests for key generation, encryption/decryption,

@@ -10,23 +10,23 @@
 
 typedef struct {
     const char *name;
-    AlgID alg;
+    LiberaCAlgID alg;
 } ML_DSA_KAT_CASE;
 
 static const ML_DSA_KAT_CASE ml_dsa_cases[] = {
-    { "ML-DSA-44", ALG_ML_DSA_44 },
-    { "ML-DSA-65", ALG_ML_DSA_65 },
-    { "ML-DSA-87", ALG_ML_DSA_87 }
+    { "ML-DSA-44", LIBERAC_ALG_ML_DSA_44 },
+    { "ML-DSA-65", LIBERAC_ALG_ML_DSA_65 },
+    { "ML-DSA-87", LIBERAC_ALG_ML_DSA_87 }
 };
 
 int main(int argc, char **argv) {
     static const CRYPTO_TEST_SIGNATURE_API api = {
-        CRYPTO_ML_DSA_PUBLIC_KEY_SIZE,
-        CRYPTO_ML_DSA_PRIVATE_KEY_SIZE,
-        CRYPTO_ML_DSA_SIGNATURE_SIZE,
-        CRYPTO_ML_DSA_KEYGEN,
-        CRYPTO_ML_DSA_SIGN,
-        CRYPTO_ML_DSA_VERIFY
+        LIBERAC_ML_DSA_PUBLIC_KEY_SIZE,
+        LIBERAC_ML_DSA_PRIVATE_KEY_SIZE,
+        LIBERAC_ML_DSA_SIGNATURE_SIZE,
+        LIBERAC_ML_DSA_KEYGEN,
+        LIBERAC_ML_DSA_SIGN,
+        LIBERAC_ML_DSA_VERIFY
     };
     size_t index;
 

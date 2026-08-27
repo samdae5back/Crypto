@@ -27,21 +27,21 @@ typedef enum {
 } CryptoAesMode;
 
 /* Private raw-block API used by the modes and by CTR_DRBG. */
-CryptoError crypto_aes_context_init(
+LiberaCError crypto_aes_context_init(
     AES_CONTEXT *CONTEXT,
     const uint8_t *KEY, size_t KEY_LENGTH);
 void crypto_aes_context_clear(AES_CONTEXT *CONTEXT);
-CryptoError crypto_aes_encrypt_block(
+LiberaCError crypto_aes_encrypt_block(
     const AES_CONTEXT *CONTEXT,
     const uint8_t INPUT[AES_BLOCK_SIZE],
     uint8_t OUTPUT[AES_BLOCK_SIZE]);
-CryptoError crypto_aes_decrypt_block(
+LiberaCError crypto_aes_decrypt_block(
     const AES_CONTEXT *CONTEXT,
     const uint8_t INPUT[AES_BLOCK_SIZE],
     uint8_t OUTPUT[AES_BLOCK_SIZE]);
 
 /* Private mode-independent entrypoints used only by src/BlockCipher.c. */
-CryptoError crypto_aes_encrypt(
+LiberaCError crypto_aes_encrypt(
     uint8_t *OUTPUT, size_t OUTPUT_CAPACITY,
     uint8_t *TAG, size_t TAG_LENGTH,
     const uint8_t *INPUT, size_t INPUT_LENGTH,
@@ -50,7 +50,7 @@ CryptoError crypto_aes_encrypt(
     const uint8_t *AAD, size_t AAD_LENGTH,
     size_t EXPECTED_KEY_LENGTH, CryptoAesMode MODE);
 
-CryptoError crypto_aes_decrypt(
+LiberaCError crypto_aes_decrypt(
     uint8_t *OUTPUT, size_t OUTPUT_CAPACITY,
     const uint8_t *TAG, size_t TAG_LENGTH,
     const uint8_t *INPUT, size_t INPUT_LENGTH,
@@ -60,25 +60,25 @@ CryptoError crypto_aes_decrypt(
     size_t EXPECTED_KEY_LENGTH, CryptoAesMode MODE);
 
 /* Cross-translation-unit AEAD helpers. All are private library symbols. */
-CryptoError crypto_aes_gcm_encrypt(
+LiberaCError crypto_aes_gcm_encrypt(
     const AES_CONTEXT *CONTEXT,
     uint8_t *OUTPUT, uint8_t *TAG, size_t TAG_LENGTH,
     const uint8_t *INPUT, size_t INPUT_LENGTH,
     const uint8_t *IV, size_t IV_LENGTH,
     const uint8_t *AAD, size_t AAD_LENGTH);
-CryptoError crypto_aes_gcm_decrypt(
+LiberaCError crypto_aes_gcm_decrypt(
     const AES_CONTEXT *CONTEXT,
     uint8_t *OUTPUT, const uint8_t *TAG, size_t TAG_LENGTH,
     const uint8_t *INPUT, size_t INPUT_LENGTH,
     const uint8_t *IV, size_t IV_LENGTH,
     const uint8_t *AAD, size_t AAD_LENGTH);
-CryptoError crypto_aes_ccm_encrypt(
+LiberaCError crypto_aes_ccm_encrypt(
     const AES_CONTEXT *CONTEXT,
     uint8_t *OUTPUT, uint8_t *TAG, size_t TAG_LENGTH,
     const uint8_t *INPUT, size_t INPUT_LENGTH,
     const uint8_t *NONCE, size_t NONCE_LENGTH,
     const uint8_t *AAD, size_t AAD_LENGTH);
-CryptoError crypto_aes_ccm_decrypt(
+LiberaCError crypto_aes_ccm_decrypt(
     const AES_CONTEXT *CONTEXT,
     uint8_t *OUTPUT, const uint8_t *TAG, size_t TAG_LENGTH,
     const uint8_t *INPUT, size_t INPUT_LENGTH,
