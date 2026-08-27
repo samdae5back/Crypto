@@ -72,7 +72,7 @@ void crypto_aimer_reconstruct_tree(uint8_t *nodes, const uint8_t *salt,
            reveal_path + ((alg->log_parties - depth) * alg->seed_bytes),
            alg->seed_bytes);
 
-    for (index = (1U << depth); index < (2U << depth); index++)
+    for (index = ((size_t)1 << depth); index < ((size_t)2 << depth); index++)
     {
       uint8_t index_byte = (uint8_t)index;
 
