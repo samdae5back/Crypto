@@ -10,11 +10,11 @@ system, compiler, architecture, or external cryptographic runtime.
 
 The library keeps one runtime-selected API per primitive family. Every supported
 parameter set is compiled into one library; callers select the algorithm and
-parameter set with the final `LiberaCAlgID` argument. Algorithm implementations use ISO
-C and project-local headers rather than an external cryptographic library.
-Platform-specific code is kept at narrow system boundaries where it is actually
-required, such as entropy acquisition (`BCryptGenRandom`, `getrandom`, or
-`/dev/urandom`).
+parameter set with the final `LiberaCAlgID` argument. Algorithm implementations
+use ISO C and project-local headers rather than an external cryptographic
+library. Platform-specific code is kept at narrow system boundaries where it is
+actually required, such as entropy acquisition (`BCryptGenRandom`, `getrandom`,
+or `/dev/urandom`).
 
 ## Project principles
 
@@ -118,8 +118,8 @@ headers in `inc/` are included in this reference.
 ## Runtime algorithm dispatch
 
 Public operation names start with `LIBERAC_`. For APIs that accept an algorithm
-identifier, `LiberaCAlgID` is the last argument. The complete identifier set is in
-`inc/Def.h` and is available from `LiberaCrypt.h`.
+identifier, `LiberaCAlgID` is the last argument. The complete identifier set is
+in `inc/Def.h` and is available from `LiberaCrypt.h`.
 
 AES encryption and decryption use one API pair for all key sizes and modes:
 
@@ -216,8 +216,9 @@ the same byte stream as one request for the combined length.
 - Probable-prime, prime, and safe-prime generation
 - Random bytes obtained directly from the operating system entropy source
 
-Key, ciphertext, and signature size-query APIs also take the runtime `LiberaCAlgID`, so
-applications do not need parameter-specific builds or headers.
+Key, ciphertext, and signature size-query APIs also take the runtime
+`LiberaCAlgID`, so applications do not need parameter-specific builds or
+headers.
 
 ## Portability considerations
 
@@ -269,9 +270,10 @@ makes integer width, representation, range, or platform behavior unambiguous.
 
 ## Public ABI and Unix exports
 
-`cmake/crypto_exports.txt` is the canonical public-symbol allowlist. Internal
-arithmetic, NTT, endian, hash-state, block-cipher, and backend symbols are hidden.
-The shared-library build applies the allowlist with the native platform model:
+`cmake/liberacrypt_exports.txt` is the canonical public-symbol allowlist.
+Internal arithmetic, NTT, endian, hash-state, block-cipher, and backend symbols
+are hidden. The shared-library build applies the allowlist with the native
+platform model:
 
 - Windows: explicit `__declspec(dllexport)` declarations
 - ELF systems: a linker version script
@@ -281,9 +283,9 @@ The shared-library build applies the allowlist with the native platform model:
 - HP-UX: explicit `+e` linker entries
 
 This keeps the exported ABI limited to the documented `LIBERAC_` functions while
-allowing static builds to retain normal archive behavior.
-Restricted AIX exports require CMake 3.17 or newer because that release added
-the supported switch for disabling CMake's automatic all-symbol export list.
+allowing static builds to retain normal archive behavior. Restricted AIX exports
+require CMake 3.17 or newer because that release added the supported switch for
+disabling CMake's automatic all-symbol export list.
 
 ## Tests
 
@@ -302,12 +304,12 @@ When `LIBERAC_BUILD_TESTS` is enabled, CMake generates:
 - verification of 300 context-explicit HAETAE 1.1.2 signatures as a
   compatibility regression alongside the exact HAETAE 1.2.0 KATs
 
-The PQC KAT executables link a test-exclusive static module. Calling its
-private KAT initializer routes subsequent PQC randomness through AES-256
-CTR-DRBG without a derivation function, initialized from each vector's 48-byte
-seed. The normal shared/static `Crypto` target has no KAT control API and
-continues to obtain PQC randomness from the operating system. Each parameter
-set is a separate CTest so the slower SLH-DSA cases can run in parallel.
+The PQC KAT executables link a test-exclusive static module. Calling its private
+KAT initializer routes subsequent PQC randomness through AES-256 CTR-DRBG without
+a derivation function, initialized from each vector's 48-byte seed. The normal
+shared/static `LiberaCrypt` target has no KAT control API and continues to obtain
+PQC randomness from the operating system. Each parameter set is a separate CTest
+so the slower SLH-DSA cases can run in parallel.
 
 ## Bundled implementation notices
 
