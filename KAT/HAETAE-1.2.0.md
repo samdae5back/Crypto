@@ -24,8 +24,10 @@ a 32-byte signature randomizer, one context-length byte, and the context bytes.
 It then compares the public key, private key, and signature exactly.
 
 The unsuffixed `haetae120.kat`, `haetae180.kat`, and `haetae260.kat` files are
-the context-explicit vectors supplied with this repository. They use HAETAE
-1.1.2 signatures and are not byte-for-byte official 1.2.0 response files.
+project-generated context-explicit regression vectors for HAETAE 1.1.2. The
+generating implementation had been cross-checked against other reference
+vectors, but these files are not authoritative or byte-for-byte official 1.2.0
+response files and a generator or integration error cannot be ruled out.
 HAETAE 1.2.0 changed the hyperball sampler while retaining verification
 compatibility, so these files remain unchanged and are exercised as legacy
 signature-verification regressions. Their hashes are:
