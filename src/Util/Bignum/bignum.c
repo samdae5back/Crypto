@@ -408,6 +408,7 @@ typedef struct {
     uint32_t n0inv;
     LiberaCBignum mod;
     LiberaCBignum r2;
+    uint32_t *work;
 } MONT_CTX;
 
 static uint32_t mont_n0inv(uint32_t n0) {
@@ -419,6 +420,11 @@ static uint32_t mont_n0inv(uint32_t n0) {
 
 static void mont_clear(MONT_CTX *ctx) {
     if (!ctx) return;
+    if (ctx->work) {
+        crypto_zeroize(ctx->work, (ctx->n + 2u) * sizeof(uint32_t));
+        free(ctx->work);
+        ctx->work = NULL;
+    }
     crypto_bignum_free(&ctx->mod);
     crypto_bignum_free(&ctx->r2);
     ctx->n = 0;
@@ -435,6 +441,8 @@ static int mont_init(MONT_CTX *ctx, const LiberaCBignum *mod) {
     crypto_bignum_init(&ctx->r2);
     crypto_bignum_init(&x);
     crypto_bignum_init(&tmp);
+    ctx->work = (uint32_t *)calloc(ctx->n + 2u, sizeof(uint32_t));
+    if (!ctx->work) goto fail;
     if (crypto_bignum_copy(&ctx->mod, mod) != 0 || crypto_bignum_set_u64(&x, 1) != 0) goto fail;
     rounds = 64u * ctx->n;
     for (i = 0; i < rounds; ++i) {
@@ -461,10 +469,10 @@ static int mont_mul(LiberaCBignum *out, const LiberaCBignum *a, const LiberaCBig
     uint32_t *t;
     size_t n, i, j;
     LiberaCBignum r, tmp;
-    if (!out || !a || !b || !ctx) return -1;
+    if (!out || !a || !b || !ctx || !ctx->work) return -1;
     n = ctx->n;
-    t = (uint32_t *)calloc(n + 2u, sizeof(uint32_t));
-    if (!t) return -1;
+    t = ctx->work;
+    memset(t, 0, (n + 2u) * sizeof(uint32_t));
 
     for (i = 0; i < n; ++i) {
         uint64_t carry = 0;
@@ -512,7 +520,6 @@ static int mont_mul(LiberaCBignum *out, const LiberaCBignum *a, const LiberaCBig
         r = tmp;
         crypto_bignum_init(&tmp);
     }
-    free(t);
     crypto_bignum_free(out);
     *out = r;
     crypto_bignum_free(&tmp);
@@ -520,12 +527,10 @@ static int mont_mul(LiberaCBignum *out, const LiberaCBignum *a, const LiberaCBig
 fail:
     crypto_bignum_free(&r);
     crypto_bignum_free(&tmp);
-    free(t);
     return -1;
 fail2:
     crypto_bignum_free(&r);
     crypto_bignum_free(&tmp);
-    free(t);
     return -1;
 }
 
