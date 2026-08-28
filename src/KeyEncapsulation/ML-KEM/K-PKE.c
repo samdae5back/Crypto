@@ -310,21 +310,27 @@ LiberaCError K_PKE_Dec(const unsigned char *private_key,
         NTT(workspace->ciphertext_vector[i],
             workspace->ciphertext_vector_ntt[i], zetas);
 
+    /*
+     * Inverse NTT is linear over R_q.  Accumulate the k pointwise products in
+     * the NTT domain, then transform their sum once instead of transforming
+     * every product separately.  This removes k-1 inverse transforms from the
+     * PKE decryption path without changing the resulting polynomial.
+     */
     for (i = 0; i < k; ++i) {
         Multiply_NTT(workspace->private_ntt[i],
                      workspace->ciphertext_vector_ntt[i],
                      workspace->polynomial_ntt, zetas);
-        NTT_inv(workspace->polynomial_ntt, workspace->polynomial, zetas);
         for (coefficient = 0; coefficient < MLKEM_N; ++coefficient) {
             workspace->message_polynomial[coefficient] =
                 (workspace->message_polynomial[coefficient] +
-                 workspace->polynomial[coefficient]) % MLKEM_Q;
+                 workspace->polynomial_ntt[coefficient]) % MLKEM_Q;
         }
     }
+    NTT_inv(workspace->message_polynomial, workspace->polynomial, zetas);
     for (coefficient = 0; coefficient < MLKEM_N; ++coefficient) {
         workspace->message_polynomial[coefficient] =
             (workspace->ciphertext_scalar[coefficient] -
-             workspace->message_polynomial[coefficient] + MLKEM_Q) % MLKEM_Q;
+             workspace->polynomial[coefficient] + MLKEM_Q) % MLKEM_Q;
     }
 
     if (Comp(workspace->message_polynomial, 1, workspace->polynomial,

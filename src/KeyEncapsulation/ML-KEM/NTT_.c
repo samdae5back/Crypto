@@ -37,6 +37,19 @@ static const int ZETA_TABLE[256] = {
     735, 2508, 2688, 2419, 1175
 };
 
+static unsigned int mlkem_bit_reverse_7(unsigned int value) {
+    value &= 0x7fu;
+    value = ((value & 0x55u) << 1u) | ((value >> 1u) & 0x55u);
+    value = ((value & 0x33u) << 2u) | ((value >> 2u) & 0x33u);
+    value = ((value & 0x0fu) << 4u) | ((value >> 4u) & 0x0fu);
+    return value >> 1u;
+}
+
+static inline void mlkem_multiply_basic(int a0, int a1, int b0, int b1,
+                                        int *c0, int *c1, int r) {
+    *c0 = (a0 * b0 + (a1 * b1 % q) * r) % q;
+    *c1 = (a0 * b1 + a1 * b0) % q;
+}
 
 const int* GenZeta(void) {
     return ZETA_TABLE;
@@ -64,7 +77,7 @@ void NTT(int* f, int* g, const int* zetas) {//input, output, zeta
     int t = 0;
     for (int len = n / 2;len >= 2;len = len / 2) {
         for (int start = 0;start < n;start = start + (2 * len)) {
-            int z = zetas[bit_rev(i)];
+            int z = zetas[mlkem_bit_reverse_7((unsigned int)i)];
             i++;
             for (int j = start;j < start + len;j++) {
                 t = (z * g[j + len]) % q;
@@ -88,7 +101,7 @@ void NTT_inv(int* f, int* g, const int* zetas) {
     int i = 127;
     for (int len = 2;len <= 128;len = len * 2) {
         for (int start = 0;start < n;start = start + (2 * len)) {
-            int z = zetas[bit_rev(i)];
+            int z = zetas[mlkem_bit_reverse_7((unsigned int)i)];
             i--;
             for (int j = start;j < start + len;j++) {
                 int t = g[j];
@@ -107,14 +120,17 @@ void NTT_inv(int* f, int* g, const int* zetas) {
 }
 
 void Multiply_basic(int a0, int a1, int  b0, int b1, int* c0, int* c1, int r) {
-    *c0 = (a0 * b0 + (a1 * b1 % q) * r) % q;
-    *c1 = (a0 * b1 + a1 * b0) % q;
+    mlkem_multiply_basic(a0, a1, b0, b1, c0, c1, r);
     return;
 }
 
 void Multiply_NTT(int* f, int* g, int* h, const int* zetas) {
     for (int i = 0;i < 128;i++) {
-        Multiply_basic(f[2 * i], f[2 * i + 1], g[2 * i], g[2 * i + 1], &h[2 * i], &h[2 * i + 1], zetas[(2 * bit_rev(i)) + 1]);
+        unsigned int reversed = mlkem_bit_reverse_7((unsigned int)i);
+        mlkem_multiply_basic(
+            f[2 * i], f[2 * i + 1], g[2 * i], g[2 * i + 1],
+            &h[2 * i], &h[2 * i + 1],
+            zetas[(2u * reversed) + 1u]);
     }
     return;
 }
