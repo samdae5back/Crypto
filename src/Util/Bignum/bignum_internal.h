@@ -11,13 +11,32 @@
 void crypto_bignum_init(LiberaCBignum *value);
 void crypto_bignum_free(LiberaCBignum *value);
 LiberaCError crypto_bignum_copy(LiberaCBignum *out, const LiberaCBignum *in);
+
+/* Promote a normal variable-length bignum into fixed storage.  This is a
+ * representation-boundary helper: its copy length follows in->LENGTH and it is
+ * therefore not itself a constant-schedule operation.  Once promoted, use the
+ * *_secret_fixed_ct helpers below for secret copies and serialization. */
 LiberaCError crypto_bignum_copy_secret_fixed(LiberaCBignum *out,
                                              const LiberaCBignum *in,
                                              size_t fixed_limbs);
+LiberaCError crypto_bignum_copy_secret_fixed_ct(LiberaCBignum *out,
+                                                const LiberaCBignum *in,
+                                                size_t fixed_limbs);
+LiberaCError crypto_bignum_from_bytes_be_secret_fixed_ct(
+    LiberaCBignum *out, const uint8_t *bytes, size_t input_length,
+    size_t fixed_limbs);
+LiberaCError crypto_bignum_from_bytes_le_secret_fixed_ct(
+    LiberaCBignum *out, const uint8_t *bytes, size_t input_length,
+    size_t fixed_limbs);
+LiberaCError crypto_bignum_to_bytes_be_secret_fixed_ct(
+    const LiberaCBignum *in, uint8_t *out, size_t output_length);
+LiberaCError crypto_bignum_to_bytes_le_secret_fixed_ct(
+    const LiberaCBignum *in, uint8_t *out, size_t output_length);
 LiberaCError crypto_bignum_sub_secret_fixed(LiberaCBignum *out,
                                             const LiberaCBignum *a,
                                             const LiberaCBignum *b,
                                             size_t fixed_limbs);
+
 LiberaCError crypto_bignum_set_u64(LiberaCBignum *out, uint64_t value);
 LiberaCError crypto_bignum_from_bytes_be(LiberaCBignum *out, const uint8_t *bytes, size_t length);
 LiberaCError crypto_bignum_from_bytes_le(LiberaCBignum *out, const uint8_t *bytes, size_t length);
@@ -36,6 +55,15 @@ LiberaCError crypto_bignum_mod_mul(LiberaCBignum *out, const LiberaCBignum *a,
                                    const LiberaCBignum *b, const LiberaCBignum *modulus);
 LiberaCError crypto_bignum_mod_square(LiberaCBignum *out,
                                       const LiberaCBignum *a,
+                                      const LiberaCBignum *modulus);
+
+/* Fixed-width modular multiplication for secret arithmetic.  Secret operands
+ * must already have at least modulus->LENGTH allocated limbs with zero-padded
+ * unused limbs.  The implementation stays in the Montgomery fixed-width layer
+ * and avoids the generic variable-time reduction path. */
+LiberaCError crypto_bignum_mod_mul_ct(LiberaCBignum *out,
+                                      const LiberaCBignum *a,
+                                      const LiberaCBignum *b,
                                       const LiberaCBignum *modulus);
 
 /* Legacy generic variable-time exponentiation retained as an even-modulus
