@@ -5,7 +5,6 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <string.h>
 
 #include "auxiliary.h"
 #include "hash.h"
@@ -112,7 +111,6 @@ int SampleNTT(const unsigned char *input, int *output, size_t input_length) {
     result = 0;
 
 cleanup:
-    memset(bytes, 0, sizeof(bytes));
     XOF_clear(&context);
     return result;
 }
