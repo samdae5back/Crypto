@@ -5,14 +5,14 @@
 
 /**
  * @file BlockCipher.h
- * @brief Runtime-selected AES encryption and decryption API.
+ * @brief Runtime-selected AES and Triple-DES encryption/decryption API.
  *
  * @defgroup crypto_block_cipher Block-cipher API
- * @brief AES-128, AES-192, and AES-256 in ECB, CBC, CTR, CCM, and GCM modes.
+ * @brief AES in ECB/CBC/CTR/CCM/GCM and three-key Triple-DES in ECB/CBC.
  *
- * Encryption and decryption preserve the input length.  No padding scheme is
- * applied: ECB and CBC callers must supply complete 16-byte blocks and add or
- * remove any required padding themselves.  CCM and GCM are authenticated modes
+ * Encryption and decryption preserve the input length. No padding scheme is
+ * applied: AES ECB/CBC callers supply 16-byte blocks and Triple-DES ECB/CBC
+ * callers supply 8-byte blocks. CCM and GCM are authenticated modes
  * and produce or consume a separate authentication tag.
  * @{
  */
@@ -31,13 +31,17 @@
 #define LIBERAC_AES_192_KEY_BYTES 24u
 /** AES-256 master-key size, in bytes. */
 #define LIBERAC_AES_256_KEY_BYTES 32u
+/** Three-key Triple-DES EDE master-key size, in bytes. */
+#define LIBERAC_TDES_EDE3_KEY_BYTES 24u
+/** Triple-DES block size and required ECB/CBC input alignment, in bytes. */
+#define LIBERAC_TDES_BLOCK_BYTES 8u
 
 LIBERAC_BEGIN_DECLS
 
 /**
- * @brief Return the master-key size required by an AES algorithm identifier.
+ * @brief Return the master-key size required by a block-cipher identifier.
  *
- * @param[in] ALG One of the @c LIBERAC_ALG_AES_* identifiers.
+ * @param[in] ALG A supported @c LIBERAC_ALG_AES_* or @c LIBERAC_ALG_TDES_* identifier.
  *
  * @return Required key size in bytes, or zero if @p ALG is not a supported
  *         block-cipher identifier.
@@ -58,14 +62,14 @@ LIBERAC_BEGIN_DECLS
 LIBERAC_API size_t LIBERAC_BLOCK_CIPHER_KEY_SIZE(LiberaCAlgID ALG);
 
 /**
- * @brief Encrypt data with a runtime-selected AES key size and mode.
+ * @brief Encrypt data with a runtime-selected block cipher and mode.
  *
  * The ciphertext length is exactly @p INPUT_LENGTH.  The mode-specific
  * requirements are:
  *
- * - ECB: @p INPUT_LENGTH is a multiple of 16; @p IV_LENGTH,
+ * - AES ECB: @p INPUT_LENGTH is a multiple of 16; @p IV_LENGTH,
  *   @p AAD_LENGTH, and @p TAG_LENGTH are zero.
- * - CBC: @p INPUT_LENGTH is a multiple of 16; the IV is exactly 16 bytes;
+ * - AES CBC: @p INPUT_LENGTH is a multiple of 16; the IV is exactly 16 bytes;
  *   @p AAD_LENGTH and @p TAG_LENGTH are zero.
  * - CTR: the initial counter is exactly 16 bytes; @p AAD_LENGTH and
  *   @p TAG_LENGTH are zero.  Any input length is accepted.
@@ -74,6 +78,8 @@ LIBERAC_API size_t LIBERAC_BLOCK_CIPHER_KEY_SIZE(LiberaCAlgID ALG);
  *   encodable message length.
  * - GCM: the IV is non-empty (12 bytes is the usual interoperable choice) and
  *   the tag length is 4, 8, or 12 through 16 bytes.
+ * - Triple-DES ECB/CBC: @p INPUT_LENGTH is a multiple of 8; CBC uses an
+ *   8-byte IV. AAD and tags are not accepted.
  *
  * A counter/nonce must never be reused with the same key in CTR, CCM, or GCM.
  * CBC IVs must be unpredictable and unique for the key.  ECB provides no
@@ -92,7 +98,7 @@ LIBERAC_API size_t LIBERAC_BLOCK_CIPHER_KEY_SIZE(LiberaCAlgID ALG);
  * @param[in]  INPUT Plaintext buffer.  May be NULL only when
  *                   @p INPUT_LENGTH is zero.
  * @param[in]  INPUT_LENGTH Plaintext length in bytes.
- * @param[in]  KEY AES master key.
+ * @param[in]  KEY Master key for the selected block cipher.
  * @param[in]  KEY_LENGTH Size of @p KEY in bytes; it must exactly match the
  *                        key size encoded by @p ALG.
  * @param[in]  IV Initialization vector, initial counter, or nonce as required
@@ -101,10 +107,10 @@ LIBERAC_API size_t LIBERAC_BLOCK_CIPHER_KEY_SIZE(LiberaCAlgID ALG);
  * @param[in]  AAD Additional authenticated data for CCM/GCM.  May be NULL when
  *                 @p AAD_LENGTH is zero and is not accepted by other modes.
  * @param[in]  AAD_LENGTH Additional authenticated-data length in bytes.
- * @param[in]  ALG One of the @c LIBERAC_ALG_AES_* identifiers.
+ * @param[in]  ALG A supported AES or Triple-DES identifier.
  *
  * @retval LIBERAC_SUCCESS Encryption completed successfully.
- * @retval LIBERAC_ERROR_INVALID_ALG_ID @p ALG is not a supported AES selector.
+ * @retval LIBERAC_ERROR_INVALID_ALG_ID @p ALG is not a supported selector.
  * @retval LIBERAC_ERROR_INVALID_ARGUMENT A pointer, length, or mode-specific
  *         parameter is invalid.
  * @retval LIBERAC_ERROR_INVALID_KEY @p KEY_LENGTH does not match @p ALG.
@@ -122,7 +128,7 @@ LIBERAC_API LiberaCError LIBERAC_BLOCK_CIPHER_ENCRYPT(
     LiberaCAlgID ALG);
 
 /**
- * @brief Decrypt data with a runtime-selected AES key size and mode.
+ * @brief Decrypt data with a runtime-selected block cipher and mode.
  *
  * Parameters and mode constraints are identical to
  * LIBERAC_BLOCK_CIPHER_ENCRYPT(), except that @p INPUT is ciphertext and
@@ -142,7 +148,7 @@ LIBERAC_API LiberaCError LIBERAC_BLOCK_CIPHER_ENCRYPT(
  * @param[in]  INPUT Ciphertext buffer.  May be NULL only when
  *                   @p INPUT_LENGTH is zero.
  * @param[in]  INPUT_LENGTH Ciphertext length in bytes.
- * @param[in]  KEY AES master key.
+ * @param[in]  KEY Master key for the selected block cipher.
  * @param[in]  KEY_LENGTH Size of @p KEY in bytes; it must exactly match the
  *                        key size encoded by @p ALG.
  * @param[in]  IV Initialization vector, initial counter, or nonce as required
@@ -151,11 +157,11 @@ LIBERAC_API LiberaCError LIBERAC_BLOCK_CIPHER_ENCRYPT(
  * @param[in]  AAD Additional authenticated data for CCM/GCM.  May be NULL when
  *                 @p AAD_LENGTH is zero and is not accepted by other modes.
  * @param[in]  AAD_LENGTH Additional authenticated-data length in bytes.
- * @param[in]  ALG One of the @c LIBERAC_ALG_AES_* identifiers.
+ * @param[in]  ALG A supported AES or Triple-DES identifier.
  *
  * @retval LIBERAC_SUCCESS Decryption and, for AEAD, authentication succeeded.
  * @retval LIBERAC_ERROR_AUTHENTICATION_FAILED The CCM/GCM tag is invalid.
- * @retval LIBERAC_ERROR_INVALID_ALG_ID @p ALG is not a supported AES selector.
+ * @retval LIBERAC_ERROR_INVALID_ALG_ID @p ALG is not a supported selector.
  * @retval LIBERAC_ERROR_INVALID_ARGUMENT A pointer, length, or mode-specific
  *         parameter is invalid.
  * @retval LIBERAC_ERROR_INVALID_KEY @p KEY_LENGTH does not match @p ALG.

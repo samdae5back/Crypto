@@ -5,10 +5,15 @@
 
 #include "BlockCipher.h"
 #include "BlockCipher/AES/aes_internal.h"
+#include "BlockCipher/TripleDES/triple_des_internal.h"
+
+typedef enum { BLOCK_CIPHER_AES = 1, BLOCK_CIPHER_TDES = 2 } BlockCipherFamily;
 
 typedef struct {
     size_t KEY_LENGTH;
     CryptoAesMode MODE;
+    BlockCipherFamily FAMILY;
+    CryptoTdesMode TDES_MODE;
 } BlockCipherParameters;
 
 /* Whitelist complete parameter-set identifiers; partial/malformed IDs fail. */
@@ -16,8 +21,22 @@ static LiberaCError block_cipher_parameters(LiberaCAlgID alg,
                                            BlockCipherParameters *parameters) {
     size_t key_length;
     CryptoAesMode mode;
+    BlockCipherFamily family = BLOCK_CIPHER_AES;
+    CryptoTdesMode tdes_mode = CRYPTO_TDES_MODE_ECB;
 
     switch (alg) {
+        case LIBERAC_ALG_TDES_EDE3_ECB:
+            key_length = LIBERAC_TDES_EDE3_KEY_BYTES;
+            mode = CRYPTO_AES_MODE_ECB;
+            family = BLOCK_CIPHER_TDES;
+            tdes_mode = CRYPTO_TDES_MODE_ECB;
+            break;
+        case LIBERAC_ALG_TDES_EDE3_CBC:
+            key_length = LIBERAC_TDES_EDE3_KEY_BYTES;
+            mode = CRYPTO_AES_MODE_CBC;
+            family = BLOCK_CIPHER_TDES;
+            tdes_mode = CRYPTO_TDES_MODE_CBC;
+            break;
         case LIBERAC_ALG_AES_128_ECB:
             key_length = LIBERAC_AES_128_KEY_BYTES;
             mode = CRYPTO_AES_MODE_ECB;
@@ -85,6 +104,8 @@ static LiberaCError block_cipher_parameters(LiberaCAlgID alg,
     if (parameters) {
         parameters->KEY_LENGTH = key_length;
         parameters->MODE = mode;
+        parameters->FAMILY = family;
+        parameters->TDES_MODE = tdes_mode;
     }
     return LIBERAC_SUCCESS;
 }
@@ -109,6 +130,13 @@ LiberaCError LIBERAC_BLOCK_CIPHER_ENCRYPT(
     LiberaCError err = block_cipher_parameters(ALG, &parameters);
 
     if (err != LIBERAC_SUCCESS) return err;
+    if (parameters.FAMILY == BLOCK_CIPHER_TDES) {
+        if (TAG != NULL || TAG_LENGTH != 0u || AAD != NULL || AAD_LENGTH != 0u)
+            return LIBERAC_ERROR_INVALID_ARGUMENT;
+        return crypto_tdes_ede3_crypt(
+            OUTPUT, OUTPUT_CAPACITY, INPUT, INPUT_LENGTH, KEY, KEY_LENGTH,
+            IV, IV_LENGTH, parameters.TDES_MODE, 1);
+    }
     return crypto_aes_encrypt(
         OUTPUT, OUTPUT_CAPACITY, TAG, TAG_LENGTH,
         INPUT, INPUT_LENGTH, KEY, KEY_LENGTH,
@@ -128,6 +156,13 @@ LiberaCError LIBERAC_BLOCK_CIPHER_DECRYPT(
     LiberaCError err = block_cipher_parameters(ALG, &parameters);
 
     if (err != LIBERAC_SUCCESS) return err;
+    if (parameters.FAMILY == BLOCK_CIPHER_TDES) {
+        if (TAG != NULL || TAG_LENGTH != 0u || AAD != NULL || AAD_LENGTH != 0u)
+            return LIBERAC_ERROR_INVALID_ARGUMENT;
+        return crypto_tdes_ede3_crypt(
+            OUTPUT, OUTPUT_CAPACITY, INPUT, INPUT_LENGTH, KEY, KEY_LENGTH,
+            IV, IV_LENGTH, parameters.TDES_MODE, 0);
+    }
     return crypto_aes_decrypt(
         OUTPUT, OUTPUT_CAPACITY, TAG, TAG_LENGTH,
         INPUT, INPUT_LENGTH, KEY, KEY_LENGTH,

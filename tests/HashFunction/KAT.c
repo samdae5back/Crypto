@@ -20,6 +20,12 @@ typedef struct hash_vector {
  * SHA-512/t and SHAKE records are the corresponding FIPS 180-4/FIPS 202 KATs.
  */
 static const hash_vector vectors[] = {
+    { "SHA-1 empty", "",
+      "da39a3ee5e6b4b0d3255bfef95601890afd80709",
+      LIBERAC_ALG_HASH_SHA1 },
+    { "SHA-1 abc", "616263",
+      "a9993e364706816aba3e25717850c26c9cd0d89d",
+      LIBERAC_ALG_HASH_SHA1 },
     { "SHA-224 empty", "",
       "d14a028c2a3a2bc9476102bb288234c415a2b01f828ea62ac5b3e42f",
       LIBERAC_ALG_HASH_SHA2_224 },

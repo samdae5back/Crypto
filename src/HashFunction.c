@@ -6,6 +6,7 @@
 #include "HashFunction.h"
 
 #include "HashFunction/LSH/lsh_internal.h"
+#include "HashFunction/SHA1/sha1_internal.h"
 #include "HashFunction/SHA2/sha2_internal.h"
 #include "HashFunction/SHA3/sha3_internal.h"
 #include "Util/Core/secure_zero.h"
@@ -16,6 +17,7 @@
 
 typedef enum crypto_hash_family {
     CRYPTO_HASH_FAMILY_NONE = 0,
+    CRYPTO_HASH_FAMILY_SHA1,
     CRYPTO_HASH_FAMILY_SHA2,
     CRYPTO_HASH_FAMILY_SHA3,
     CRYPTO_HASH_FAMILY_LSH
@@ -29,6 +31,7 @@ typedef enum crypto_hash_phase {
 } crypto_hash_phase;
 
 typedef union crypto_hash_algorithm_state {
+    crypto_sha1_context SHA1;
     crypto_sha2_context SHA2;
     crypto_sha3_context SHA3;
     crypto_lsh_context LSH;
@@ -46,6 +49,8 @@ _Static_assert(sizeof(crypto_hash_context_impl) <= LIBERAC_HASH_CONTEXT_BYTES,
 
 static crypto_hash_family hash_family(LiberaCAlgID algorithm) {
     switch (algorithm) {
+        case LIBERAC_ALG_HASH_SHA1:
+            return CRYPTO_HASH_FAMILY_SHA1;
         case LIBERAC_ALG_HASH_SHA2_224:
         case LIBERAC_ALG_HASH_SHA2_256:
         case LIBERAC_ALG_HASH_SHA2_384:
@@ -82,6 +87,8 @@ static int is_shake(LiberaCAlgID algorithm) {
 
 static size_t fixed_digest_length(LiberaCAlgID algorithm) {
     switch (algorithm) {
+        case LIBERAC_ALG_HASH_SHA1:
+            return 20u;
         case LIBERAC_ALG_HASH_SHA2_224:
         case LIBERAC_ALG_HASH_SHA2_512_224:
         case LIBERAC_ALG_HASH_LSH_256_224:
@@ -144,6 +151,10 @@ LiberaCError LIBERAC_HASH_INIT(
     crypto_zeroize(&implementation, sizeof(implementation));
 
     switch (family) {
+        case CRYPTO_HASH_FAMILY_SHA1:
+            crypto_sha1_init(&implementation.STATE.SHA1);
+            error = LIBERAC_SUCCESS;
+            break;
         case CRYPTO_HASH_FAMILY_SHA2:
             error = crypto_sha2_init(&implementation.STATE.SHA2, ALG);
             break;
@@ -182,6 +193,10 @@ LiberaCError LIBERAC_HASH_UPDATE(
     }
 
     switch (hash_family(implementation.ALG)) {
+        case CRYPTO_HASH_FAMILY_SHA1:
+            error = crypto_sha1_update(
+                &implementation.STATE.SHA1, INPUT, INPUT_LENGTH);
+            break;
         case CRYPTO_HASH_FAMILY_SHA2:
             error = crypto_sha2_update(
                 &implementation.STATE.SHA2, INPUT, INPUT_LENGTH);
@@ -217,6 +232,9 @@ LiberaCError LIBERAC_HASH_FINALIZE(LiberaCHashContext *CONTEXT) {
     }
 
     switch (hash_family(implementation.ALG)) {
+        case CRYPTO_HASH_FAMILY_SHA1:
+            crypto_sha1_finalize(&implementation.STATE.SHA1);
+            break;
         case CRYPTO_HASH_FAMILY_SHA2:
             crypto_sha2_finalize(&implementation.STATE.SHA2);
             break;
@@ -278,6 +296,9 @@ LiberaCError LIBERAC_HASH_SQUEEZE(
     }
 
     switch (hash_family(implementation.ALG)) {
+        case CRYPTO_HASH_FAMILY_SHA1:
+            crypto_sha1_squeeze(&implementation.STATE.SHA1, OUTPUT);
+            break;
         case CRYPTO_HASH_FAMILY_SHA2:
             crypto_sha2_squeeze(
                 &implementation.STATE.SHA2, OUTPUT, implementation.ALG);
