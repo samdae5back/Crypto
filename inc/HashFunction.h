@@ -8,7 +8,7 @@
  * @brief Runtime-selected one-shot and incremental hash/XOF API.
  *
  * @defgroup crypto_hash Hash-function API
- * @brief SHA-2, SHA-3, SHAKE, and LSH through one runtime-selected API.
+ * @brief SHA-1, SHA-2, SHA-3, SHAKE, and LSH through one runtime-selected API.
  * @{
  */
 #ifndef LIBERAC_HASH_FUNCTION_H
@@ -18,6 +18,8 @@
 
 /** Maximum digest size among the fixed-output hash algorithms, in bytes. */
 #define LIBERAC_HASH_MAX_DIGEST_BYTES 64u
+/** SHA-1 digest size, in bytes. SHA-1 is provided for legacy compatibility. */
+#define LIBERAC_SHA1_DIGEST_BYTES 20u
 /** SHA-224 digest size, in bytes. */
 #define LIBERAC_SHA2_224_DIGEST_BYTES 28u
 /** SHA-256 digest size, in bytes. */
@@ -114,7 +116,7 @@ LIBERAC_API LiberaCError LIBERAC_HASH(
 /**
  * @brief Initialize an incremental hash or XOF context.
  *
- * Any supported SHA-2, SHA-3, SHAKE, or LSH identifier may be selected.  The
+ * Any supported SHA-1, SHA-2, SHA-3, SHAKE, or LSH identifier may be selected. The
  * algorithm is retained in @p CONTEXT, so subsequent incremental calls do not
  * take an algorithm argument.
  *
@@ -175,7 +177,7 @@ LIBERAC_API LiberaCError LIBERAC_HASH_FINALIZE(
 /**
  * @brief Retrieve a fixed digest or the next bytes of SHAKE output.
  *
- * LIBERAC_HASH_FINALIZE() must be called first.  For SHA-2, SHA-3, and LSH,
+ * LIBERAC_HASH_FINALIZE() must be called first. For SHA-1, SHA-2, SHA-3, and LSH,
  * @p OUTPUT_LENGTH is the capacity of @p OUTPUT and must be at least the
  * selected algorithm's digest size.  Exactly one digest is written and a
  * second squeeze attempt is rejected.  Bytes beyond the digest are left

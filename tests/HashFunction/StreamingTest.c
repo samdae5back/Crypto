@@ -19,6 +19,7 @@ typedef struct hash_stream_case {
 } hash_stream_case;
 
 static const hash_stream_case HASH_STREAM_CASES[] = {
+    {LIBERAC_ALG_HASH_SHA1, LIBERAC_SHA1_DIGEST_BYTES, 0u},
     {LIBERAC_ALG_HASH_SHA2_224, LIBERAC_SHA2_224_DIGEST_BYTES, 0u},
     {LIBERAC_ALG_HASH_SHA2_256, LIBERAC_SHA2_256_DIGEST_BYTES, 0u},
     {LIBERAC_ALG_HASH_SHA2_384, LIBERAC_SHA2_384_DIGEST_BYTES, 0u},
@@ -270,6 +271,8 @@ int main(void) {
         fprintf(stderr, "streaming hash tests: %d failure(s)\n", failures);
         return 1;
     }
-    puts("streaming hash tests passed for all 18 algorithms");
+    printf("streaming hash tests passed for all %u algorithms\n",
+           (unsigned int)(sizeof(HASH_STREAM_CASES) /
+                          sizeof(HASH_STREAM_CASES[0])));
     return 0;
 }

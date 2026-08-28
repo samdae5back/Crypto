@@ -10,8 +10,9 @@
  *
  * Algorithm identifiers are stable runtime selectors.  Pass only an identifier
  * from the family accepted by a particular operation; for example,
- * LIBERAC_HASH() accepts the @c LIBERAC_ALG_HASH_* identifiers, while the block-cipher
- * operations accept the @c LIBERAC_ALG_AES_* identifiers.
+ * LIBERAC_HASH() accepts the @c LIBERAC_ALG_HASH_* identifiers, while the
+ * block-cipher operations accept the @c LIBERAC_ALG_AES_* and
+ * @c LIBERAC_ALG_TDES_* identifiers.
  *
  * @defgroup crypto_core Core API definitions
  * @brief Types and constants shared by every public API family.
@@ -90,6 +91,9 @@ typedef int32_t LiberaCError;
 enum {
     /** No algorithm selected; rejected by all cryptographic operations. */
     LIBERAC_ALG_NONE = 0,
+
+    /** SHA-1 fixed-output hash (legacy compatibility only). */
+    LIBERAC_ALG_HASH_SHA1 = 0x0001,
 
     /** SHA3-224 fixed-output hash. */
     LIBERAC_ALG_HASH_SHA3_224 = 0x0100,
@@ -186,6 +190,11 @@ enum {
     LIBERAC_ALG_AES_192_GCM = 0x00580218,
     /** AES-256 in Galois/counter (GCM) mode. */
     LIBERAC_ALG_AES_256_GCM = 0x00580220,
+
+    /** Three-key Triple-DES EDE in electronic codebook (ECB) mode. */
+    LIBERAC_ALG_TDES_EDE3_ECB = 0x00400118,
+    /** Three-key Triple-DES EDE in cipher block chaining (CBC) mode. */
+    LIBERAC_ALG_TDES_EDE3_CBC = 0x00400218,
 
     /** AES-128 CTR_DRBG using the derivation function. */
     LIBERAC_ALG_CTR_DRBG_AES_128_DF = 0x6001,

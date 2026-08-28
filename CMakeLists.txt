@@ -70,6 +70,7 @@ set(LIBERAC_SOURCES
     src/Util/Core/memory.c
     src/BlockCipher/AES/aes.c
     src/BlockCipher/AES/aes_aead.c
+    src/BlockCipher/TripleDES/triple_des.c
     src/RandomNumberGeneration/CTR_DRBG/ctr_drbg.c
     src/RandomNumberGeneration/KAT/pqc_kat_rng.c
     src/Util/Bignum/bignum.c
@@ -77,6 +78,7 @@ set(LIBERAC_SOURCES
     src/AsymmetricCipher/RSA/rsa.c
     src/AsymmetricCipher/ElGamal/elgamal.c
     src/HashFunction/SHA2/sha2.c
+    src/HashFunction/SHA1/sha1.c
     src/HashFunction/SHA3/sha3.c
     src/HashFunction/LSH/lsh.c
     src/RandomNumberGeneration/Noise/random.c

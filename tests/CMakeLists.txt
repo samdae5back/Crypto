@@ -51,6 +51,12 @@ crypto_add_public_test(
     BlockCipher/AES/KAT.c
     "kat;block-cipher;aes"
 )
+crypto_add_public_test(
+    crypto_triple_des_kat
+    LiberaCrypt.BlockCipher.TripleDES.KAT
+    BlockCipher/TripleDES/KAT.c
+    "kat;block-cipher;triple-des;legacy"
+)
 
 crypto_add_public_test(
     crypto_hash_function_unit

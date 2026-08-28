@@ -46,9 +46,9 @@ umbrella header, and the `LiberaCrypt::LiberaCrypt` CMake target.
 inc/                              public category API headers only
 src/*.c                           public category API entry points
 src/AsymmetricCipher/{RSA,ElGamal}
-src/BlockCipher/AES
+src/BlockCipher/{AES,TripleDES}
 src/DigitalSignature/{AIMer,HAETAE,ML-DSA,SLH-DSA}
-src/HashFunction/{SHA2,SHA3,LSH}
+src/HashFunction/{SHA1,SHA2,SHA3,LSH}
 src/KeyEncapsulation/{ML-KEM,NTRU-Plus,SMAUG-T}
 src/RandomNumberGeneration/{CTR_DRBG,KAT,Noise}
 src/Util/{Bignum,Bit,Core,Endian,NTT,Prime}
@@ -121,7 +121,9 @@ Public operation names start with `LIBERAC_`. For APIs that accept an algorithm
 identifier, `LiberaCAlgID` is the last argument. The complete identifier set is
 in `inc/Def.h` and is available from `LiberaCrypt.h`.
 
-AES encryption and decryption use one API pair for all key sizes and modes:
+AES and Triple-DES encryption and decryption use one API pair for all key sizes
+and modes. Triple-DES is included strictly for interoperability with legacy
+systems; new protocols should use an authenticated AES mode such as GCM.
 
 AES does not define a separate master-key construction algorithm. Generate a
 uniform random key with the size required by the selected identifier; round-key
@@ -156,6 +158,10 @@ CCM, and GCM. ECB and CBC inputs must be block-aligned; padding is intentionally
 left to the caller. AEAD decryption clears the plaintext output when tag
 authentication fails.
 
+The same dispatcher supports three-key Triple-DES EDE in ECB and CBC modes with
+a 24-byte key and 8-byte block alignment. It does not support two-key TDEA or
+single DES. DES parity bits are ignored rather than corrected or validated.
+
 All fixed-output hashes and XOFs use the same hash API:
 
 ```c
@@ -169,6 +175,7 @@ LiberaCError error = LIBERAC_HASH(
 
 Supported hash identifiers are:
 
+- SHA-1 (legacy compatibility only; do not use for new security designs)
 - SHA-224, SHA-256, SHA-384, SHA-512, SHA-512/224, and SHA-512/256
 - LSH-256-224, LSH-256-256, LSH-512-224, LSH-512-256, LSH-512-384, and
   LSH-512-512
@@ -294,9 +301,9 @@ When `LIBERAC_BUILD_TESTS` is enabled, CMake generates:
 - public-header isolation checks
 - operation-level unit tests for key generation, encryption/decryption,
   encapsulation/decapsulation, and signing/verification
-- AES known-answer tests for every mode, plus round-trip coverage for every
+- AES and Triple-DES known-answer tests, plus round-trip coverage for every
   supported mode and key size
-- SHA-2, SHA-3, SHAKE, and LSH known-answer tests
+- SHA-1, SHA-2, SHA-3, SHAKE, and LSH known-answer tests
 - CTR_DRBG known-answer and derivation-function tests
 - operation tests for every supported post-quantum KEM and signature family
 - 100-record KATs for all 9 KEM parameter sets and all 24 current signature
