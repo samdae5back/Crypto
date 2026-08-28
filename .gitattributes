@@ -2,9 +2,3 @@
 # Preserve tracked KAT vectors byte for byte so their SHA-256 manifest remains
 # stable on every checkout.
 KAT/*.kat -text -diff !eol
-
-# Keep bundled third-party backends in the repository while excluding them from
-# GitHub Linguist language statistics for the LiberaCrypt project itself.
-src/DigitalSignature/ML-DSA/Backend/** linguist-vendored
-src/DigitalSignature/SLH-DSA/Backend/** linguist-vendored
-src/DigitalSignature/AIMer/Backend/** linguist-vendored
