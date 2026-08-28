@@ -3,9 +3,12 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+#include <stdint.h>
 #include <string.h>
+
 #include "NTT_.h"
 #include "parameter.h"
+#include "reduce.h"
 
 
 static const int ZETA_TABLE[256] = {
@@ -47,8 +50,20 @@ static unsigned int mlkem_bit_reverse_7(unsigned int value) {
 
 static inline void mlkem_multiply_basic(int a0, int a1, int b0, int b1,
                                         int *c0, int *c1, int r) {
-    *c0 = (a0 * b0 + (a1 * b1 % q) * r) % q;
-    *c1 = (a0 * b1 + a1 * b0) % q;
+    uint32_t first_product = (uint32_t)a0 * (uint32_t)b0;
+    uint32_t second_product =
+        (uint32_t)mlkem_mul_mod_q(a1, b1) * (uint32_t)r;
+    uint32_t cross_products =
+        (uint32_t)a0 * (uint32_t)b1 +
+        (uint32_t)a1 * (uint32_t)b0;
+
+    /*
+     * All inputs are canonical coefficients below q.  first_product and
+     * second_product are each at most (q-1)^2, so their sum is below 2q^2
+     * (= 22,151,168 for q = 3329), comfortably inside uint32_t.
+     */
+    *c0 = (int)mlkem_barrett_reduce_u32(first_product + second_product);
+    *c1 = (int)mlkem_barrett_reduce_u32(cross_products);
 }
 
 const int* GenZeta(void) {
@@ -74,22 +89,18 @@ int bit_rev(int x) {
 void NTT(int* f, int* g, const int* zetas) {//input, output, zeta
     memcpy(g, f, n * sizeof(int));
     int i = 1;
-    int t = 0;
     for (int len = n / 2;len >= 2;len = len / 2) {
         for (int start = 0;start < n;start = start + (2 * len)) {
             int z = zetas[mlkem_bit_reverse_7((unsigned int)i)];
             i++;
             for (int j = start;j < start + len;j++) {
-                t = (z * g[j + len]) % q;
-                g[j + len] = (g[j] - t) % q;
-                g[j] = (g[j] + t) % q;
+                int first = g[j];
+                int product = mlkem_mul_mod_q(z, g[j + len]);
+
+                /* Keep every butterfly output canonical in [0, q). */
+                g[j + len] = mlkem_sub_mod_q(first, product);
+                g[j] = mlkem_add_mod_q(first, product);
             }
-        }
-    }
-    for (int index = 0;index < n;index++) {
-        g[index] = g[index] % q;
-        while (g[index] < 0) {
-            g[index] = g[index] + q;
         }
     }
     return;
@@ -104,17 +115,17 @@ void NTT_inv(int* f, int* g, const int* zetas) {
             int z = zetas[mlkem_bit_reverse_7((unsigned int)i)];
             i--;
             for (int j = start;j < start + len;j++) {
-                int t = g[j];
-                g[j] = (t +g[j + len]) % q;
-                g[j + len] = (z * (g[j + len] - t)) % q;
+                int first = g[j];
+                int second = g[j + len];
+                int difference = mlkem_sub_mod_q(second, first);
+
+                g[j] = mlkem_add_mod_q(first, second);
+                g[j + len] = mlkem_mul_mod_q(z, difference);
             }
         }
     }
     for (int index = 0;index < n;index++) {
-        g[index] = (g[index] * 3303) % q;
-        while (g[index] < 0) {
-            g[index] = g[index] + q;
-        }
+        g[index] = mlkem_mul_mod_q(g[index], 3303);
     }
     return;
 }
