@@ -34,15 +34,17 @@ LiberaCError crypto_bignum_mod_square(LiberaCBignum *out,
                                       const LiberaCBignum *a,
                                       const LiberaCBignum *modulus);
 
-/* Variable-time high-performance path.  The exponent controls conditional
- * multiplies, so this helper is for public/non-secret exponents only. */
+/* Legacy generic variable-time exponentiation retained as an even-modulus
+ * compatibility fallback.  New public/non-secret call sites should use the
+ * explicitly named optimized vartime entry point below. */
 LiberaCError crypto_bignum_mod_exp(LiberaCBignum *out, const LiberaCBignum *base,
                                    const LiberaCBignum *exponent, const LiberaCBignum *modulus);
-static inline LiberaCError crypto_bignum_mod_exp_vartime(
+
+/* Public/non-secret exponent path.  Uses early identities, sliding windows,
+ * direct odd-power lookup tables, and public-data early exits. */
+LiberaCError crypto_bignum_mod_exp_vartime(
     LiberaCBignum *out, const LiberaCBignum *base,
-    const LiberaCBignum *exponent, const LiberaCBignum *modulus) {
-    return crypto_bignum_mod_exp(out, base, exponent, modulus);
-}
+    const LiberaCBignum *exponent, const LiberaCBignum *modulus);
 
 /* Secret-exponent path.  It executes one Montgomery square and one Montgomery
  * multiply for every modulus limb bit, then selects with a mask rather than a
