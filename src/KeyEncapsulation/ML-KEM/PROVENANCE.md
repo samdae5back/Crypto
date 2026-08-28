@@ -19,14 +19,14 @@ ML-KEM-768, and ML-KEM-1024 code under this directory.
 The following implementations are provided as external reference points for
 readers who want to compare design choices or implementation structure:
 
-- CRYSTALS-Kyber official reference implementation, the reference-code lineage
-  from which ML-KEM was standardized:
+- CRYSTALS-Kyber official reference implementation, the predecessor/reference
+  code lineage from which ML-KEM was standardized:
   <https://github.com/pq-crystals/kyber/tree/main/ref>
 - `mlkem-native`, a maintained FIPS 203 implementation from the PQ Code Package:
   <https://github.com/pq-code-package/mlkem-native>
 
 These links are informational only. LiberaCrypt's ML-KEM source was implemented
-independently from the FIPS 203 specification rather than by consulting,
+independently using FIPS 203 as the implementation basis, without consulting,
 copying, or adapting either implementation above.
 
 ## Local implementation
