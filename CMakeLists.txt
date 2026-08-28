@@ -76,6 +76,7 @@ set(LIBERAC_SOURCES
     src/Util/Bignum/bignum.c
     src/Util/Bignum/bignum_secure.c
     src/Util/Bignum/bignum_secret_arith.c
+    src/Util/Bignum/bignum_secret_io.c
     src/Util/Bignum/bignum_vartime.c
     src/Util/Prime/prime.c
     src/AsymmetricCipher/RSA/rsa.c
