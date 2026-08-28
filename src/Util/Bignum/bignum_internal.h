@@ -14,6 +14,10 @@ LiberaCError crypto_bignum_copy(LiberaCBignum *out, const LiberaCBignum *in);
 LiberaCError crypto_bignum_copy_secret_fixed(LiberaCBignum *out,
                                              const LiberaCBignum *in,
                                              size_t fixed_limbs);
+LiberaCError crypto_bignum_sub_secret_fixed(LiberaCBignum *out,
+                                            const LiberaCBignum *a,
+                                            const LiberaCBignum *b,
+                                            size_t fixed_limbs);
 LiberaCError crypto_bignum_set_u64(LiberaCBignum *out, uint64_t value);
 LiberaCError crypto_bignum_from_bytes_be(LiberaCBignum *out, const uint8_t *bytes, size_t length);
 LiberaCError crypto_bignum_from_bytes_le(LiberaCBignum *out, const uint8_t *bytes, size_t length);
