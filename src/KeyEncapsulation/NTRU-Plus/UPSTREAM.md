@@ -1,8 +1,13 @@
 # NTRU+ source provenance
 
-This implementation is derived from the NTRU+ reference implementation at
-<https://github.com/ntruplus/ntruplus>, pinned to commit
-`3991b2ae08d6f0008d37e41b8aceaaab27b4ec89`.
+This implementation is derived from the official NTRU+ reference
+implementation distributed by the NTRU+ project.
+
+- Official homepage: <https://www.ntruplus.org/>
+- Official reference implementation, pinned to the vendored revision:
+  <https://github.com/ntruplus/ntruplus/tree/3991b2ae08d6f0008d37e41b8aceaaab27b4ec89/Reference_Implementation>
+- Pinned implementation commit:
+  `3991b2ae08d6f0008d37e41b8aceaaab27b4ec89`
 
 The upstream `Reference_Implementation/NTRU+768`, `NTRU+864`, and
 `NTRU+1152` sources were consolidated into one runtime-parameter
