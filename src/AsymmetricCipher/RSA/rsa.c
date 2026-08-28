@@ -87,13 +87,17 @@ LiberaCError crypto_rsa_keygen_internal(LiberaCAlgID ALG, LiberaCRsaPublicKey *P
         if (bignum_mod_u32(&phi, RSA_DEFAULT_E) == 0) continue;
         if (make_private_exponent(&d, &phi) != 0) continue;
 
+        /* Crossing from key-generation arithmetic into persistent secret state
+         * is the one variable-length promotion.  Subsequent private-key copies
+         * use the complete public modulus width. */
+        if (crypto_bignum_copy_secret_fixed(&d, &d, n.LENGTH) != LIBERAC_SUCCESS)
+            goto alloc_fail;
+
         crypto_rsa_public_key_free_internal(PUBLIC_KEY); crypto_rsa_public_key_init_internal(PUBLIC_KEY);
         crypto_rsa_private_key_free_internal(PRIVATE_KEY); crypto_rsa_private_key_init_internal(PRIVATE_KEY);
         if (crypto_bignum_copy(&PUBLIC_KEY->N, &n) != 0 || crypto_bignum_set_u64(&PUBLIC_KEY->E, RSA_DEFAULT_E) != 0 ||
             crypto_bignum_copy(&PRIVATE_KEY->N, &n) != 0 ||
-            /* Keep D padded to the public modulus limb width so secret
-             * exponentiation scans a fixed amount of storage. */
-            crypto_bignum_copy_secret_fixed(&PRIVATE_KEY->D, &d, n.LENGTH) != LIBERAC_SUCCESS ||
+            crypto_bignum_copy_secret_fixed_ct(&PRIVATE_KEY->D, &d, n.LENGTH) != LIBERAC_SUCCESS ||
             crypto_bignum_copy(&PRIVATE_KEY->P, &p) != 0 || crypto_bignum_copy(&PRIVATE_KEY->Q, &q) != 0) goto alloc_fail;
         crypto_bignum_free(&p); crypto_bignum_free(&q); crypto_bignum_free(&n); crypto_bignum_free(&p1); crypto_bignum_free(&q1); crypto_bignum_free(&phi); crypto_bignum_free(&d);
         return LIBERAC_SUCCESS;
