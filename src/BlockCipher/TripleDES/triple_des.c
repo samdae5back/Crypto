@@ -60,6 +60,11 @@ static const uint32_t TRUTH_TABLE[64] = {
     UINT32_C(0x4d2d549c), UINT32_C(0x38dbf9cb)
 };
 
+typedef struct des_round_workspace {
+    uint32_t PLANES[6];
+    uint32_t NODES[32];
+} des_round_workspace;
+
 static uint64_t load64_be(const uint8_t *input) {
     uint64_t value = 0u;
     size_t index;
@@ -138,14 +143,16 @@ static uint64_t final_permutation(uint64_t input) {
     return ((uint64_t)left << 32) | right;
 }
 
-static uint32_t des_round_function(uint32_t right, uint64_t round_key) {
+static uint32_t des_round_function(
+    uint32_t right, uint64_t round_key,
+    des_round_workspace *workspace) {
     uint64_t expanded;
-    uint32_t planes[6] = {0u, 0u, 0u, 0u, 0u, 0u};
-    uint32_t nodes[32];
     unsigned int box;
     unsigned int bit;
     unsigned int index;
     unsigned int node_count;
+
+    memset(workspace->PLANES, 0, sizeof(workspace->PLANES));
 
     /* Spell out E rather than walking its table on every block. */
     expanded = (uint64_t)(((right & 1u) << 5) | (right >> 27)) << 42;
@@ -163,27 +170,28 @@ static uint32_t des_round_function(uint32_t right, uint64_t round_key) {
             (uint32_t)(expanded >> (42u - 6u * box)) & 63u;
         for (bit = 0u; bit < 6u; ++bit) {
             const uint32_t mask = 0u - ((input >> bit) & 1u);
-            planes[bit] |= mask & SBOX_OUTPUT_MASKS[box];
+            workspace->PLANES[bit] |= mask & SBOX_OUTPUT_MASKS[box];
         }
     }
 
     /* First Shannon-expansion level reads the fixed truth table directly. */
     for (index = 0u; index < 32u; ++index) {
         const uint32_t left = TRUTH_TABLE[2u * index];
-        nodes[index] = left ^
-                       (planes[0] & (left ^ TRUTH_TABLE[2u * index + 1u]));
+        workspace->NODES[index] = left ^
+            (workspace->PLANES[0] &
+             (left ^ TRUTH_TABLE[2u * index + 1u]));
     }
     node_count = 32u;
     for (bit = 1u; bit < 6u; ++bit) {
         node_count >>= 1;
         for (index = 0u; index < node_count; ++index) {
-            const uint32_t left = nodes[2u * index];
-            nodes[index] = left ^
-                           (planes[bit] &
-                            (left ^ nodes[2u * index + 1u]));
+            const uint32_t left = workspace->NODES[2u * index];
+            workspace->NODES[index] = left ^
+                (workspace->PLANES[bit] &
+                 (left ^ workspace->NODES[2u * index + 1u]));
         }
     }
-    return nodes[0];
+    return workspace->NODES[0];
 }
 
 static void des_key_schedule(const uint8_t key[8], uint64_t round_keys[16]) {
@@ -204,7 +212,8 @@ static void des_key_schedule(const uint8_t key[8], uint64_t round_keys[16]) {
 
 /* Input and output remain in the IP domain so adjacent EDE stages cancel. */
 static uint64_t des_rounds(
-    uint64_t input, const uint64_t round_keys[16], int encrypt) {
+    uint64_t input, const uint64_t round_keys[16], int encrypt,
+    des_round_workspace *workspace) {
     uint32_t left = (uint32_t)(input >> 32);
     uint32_t right = (uint32_t)input;
     uint32_t temporary;
@@ -213,24 +222,26 @@ static uint64_t des_rounds(
     for (round = 0u; round < 16u; ++round) {
         temporary = right;
         right = left ^ des_round_function(
-            right, round_keys[encrypt != 0 ? round : 15u - round]);
+            right, round_keys[encrypt != 0 ? round : 15u - round],
+            workspace);
         left = temporary;
     }
     return ((uint64_t)right << 32) | left;
 }
 
 static uint64_t triple_des_block(
-    uint64_t block, uint64_t round_keys[3][16], int encrypt) {
+    uint64_t block, uint64_t round_keys[3][16], int encrypt,
+    des_round_workspace *workspace) {
     uint64_t state = initial_permutation(block);
 
     if (encrypt != 0) {
-        state = des_rounds(state, round_keys[0], 1);
-        state = des_rounds(state, round_keys[1], 0);
-        state = des_rounds(state, round_keys[2], 1);
+        state = des_rounds(state, round_keys[0], 1, workspace);
+        state = des_rounds(state, round_keys[1], 0, workspace);
+        state = des_rounds(state, round_keys[2], 1, workspace);
     } else {
-        state = des_rounds(state, round_keys[2], 0);
-        state = des_rounds(state, round_keys[1], 1);
-        state = des_rounds(state, round_keys[0], 0);
+        state = des_rounds(state, round_keys[2], 0, workspace);
+        state = des_rounds(state, round_keys[1], 1, workspace);
+        state = des_rounds(state, round_keys[0], 0, workspace);
     }
     return final_permutation(state);
 }
@@ -245,6 +256,7 @@ LiberaCError crypto_tdes_ede3_crypt(
     uint64_t chain = 0u;
     uint64_t block = 0u;
     uint64_t result = 0u;
+    des_round_workspace workspace;
     size_t offset;
 
     if (key == NULL ||
@@ -286,7 +298,7 @@ LiberaCError crypto_tdes_ede3_crypt(
         if (encrypt != 0 && mode == CRYPTO_TDES_MODE_CBC) {
             block ^= chain;
         }
-        result = triple_des_block(block, round_keys, encrypt);
+        result = triple_des_block(block, round_keys, encrypt, &workspace);
         if (encrypt == 0 && mode == CRYPTO_TDES_MODE_CBC) {
             result ^= chain;
             chain = block;
@@ -297,6 +309,7 @@ LiberaCError crypto_tdes_ede3_crypt(
     }
 
     crypto_zeroize(round_keys, sizeof(round_keys));
+    crypto_zeroize(&workspace, sizeof(workspace));
     chain = 0u;
     block = 0u;
     result = 0u;
