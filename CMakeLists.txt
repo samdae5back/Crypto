@@ -163,9 +163,8 @@ set_target_properties(LiberaCrypt PROPERTIES
 )
 
 if(WIN32 AND BUILD_SHARED_LIBS)
-    # MinGW otherwise emits libliberacrypt.dll, which collides with the common
-    # LibreSSL/OpenSSL runtime name in the Windows system search path.  Match
-    # MSVC's prefix-free liberacrypt.dll name for every Windows toolchain.
+    # Keep a prefix-free DLL name on every Windows toolchain so MinGW and MSVC
+    # install the same runtime filename: liberacrypt.dll.
     set_target_properties(LiberaCrypt PROPERTIES PREFIX "")
 endif()
 
