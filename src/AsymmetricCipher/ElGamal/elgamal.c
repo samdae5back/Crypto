@@ -85,8 +85,8 @@ LiberaCError crypto_elgamal_keygen_internal(LiberaCAlgID alg, LiberaCElgamalPubl
     }
     err = elgamal_random_nonzero(&x, &q);
     if (err != LIBERAC_SUCCESS) goto fail;
-    /* Secret exponentiation scans the public modulus width.  Pad x once so its
-     * significant limb count is not exposed by later exponent scans. */
+    /* Secret exponentiation scans the public modulus width.  Promote x once at
+     * the generation boundary; later copies use the complete fixed width. */
     err = crypto_bignum_copy_secret_fixed(&x, &x, p.LENGTH);
     if (err != LIBERAC_SUCCESS) goto fail;
     if (crypto_bignum_mod_exp_ct(&h, &g, &x, &p) != LIBERAC_SUCCESS) {
@@ -98,7 +98,7 @@ LiberaCError crypto_elgamal_keygen_internal(LiberaCAlgID alg, LiberaCElgamalPubl
     crypto_elgamal_private_key_free_internal(private_key); crypto_elgamal_private_key_init_internal(private_key);
     if (crypto_bignum_copy(&public_key->P, &p) != LIBERAC_SUCCESS || crypto_bignum_copy(&public_key->Q, &q) != LIBERAC_SUCCESS ||
         crypto_bignum_copy(&public_key->G, &g) != LIBERAC_SUCCESS || crypto_bignum_copy(&public_key->H, &h) != LIBERAC_SUCCESS ||
-        crypto_bignum_copy_secret_fixed(&private_key->X, &x, p.LENGTH) != LIBERAC_SUCCESS) {
+        crypto_bignum_copy_secret_fixed_ct(&private_key->X, &x, p.LENGTH) != LIBERAC_SUCCESS) {
         err = LIBERAC_ERROR_ALLOCATION_FAILED;
         goto fail;
     }
