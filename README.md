@@ -260,6 +260,19 @@ build or runtime dependency. In-place CBC, invalid-argument behavior, strict
 C11 `-O0`/`-O2`/`-O3` warning builds, and AddressSanitizer/
 UndefinedBehaviorSanitizer runs were also exercised.
 
+### ElGamal
+
+| Area | Previous implementation | LiberaCrypt optimization | Effect |
+| --- | --- | --- | --- |
+| Safe-prime subgroup generator candidate | Form the fixed exponent `2` as a bignum and route `hseed^2 mod p` through generic modular exponentiation. | Use the shared `crypto_bignum_mod_square` helper, which expresses the operation as one modular multiplication. | Avoids generic exponentiation setup for a fixed square. Safe-prime generation still dominates total key-generation cost, so the wall-clock keygen gain is expected to be smaller than the local generator-step gain. |
+| Decryption factor | Compute `shared = c1^x mod p`, then invert it with a second full exponentiation `shared^(p-2) mod p`. | For nonzero `c1`, use Fermat's theorem to compute the inverse factor directly as `c1^(p-1-x) mod p`, then multiply by `c2`. | Reduces the decryption path from two full modular exponentiations to one full modular exponentiation plus one modular multiplication. Invalid `c1 = 0` ciphertexts are rejected because zero has no multiplicative inverse. |
+
+The ElGamal changes preserve the generated subgroup and valid-ciphertext
+semantics. No exact speedup is claimed here until a reproducible benchmark is
+retained in the repository; the decryption transformation removes roughly half
+of the full modular-exponentiation calls on that path, while the actual runtime
+ratio also depends on bignum reduction and allocation overhead.
+
 ### Other algorithms and shared paths
 
 Not every optimization is a throughput optimization. The following verified
