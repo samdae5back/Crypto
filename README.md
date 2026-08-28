@@ -227,6 +227,60 @@ Key, ciphertext, and signature size-query APIs also take the runtime
 `LiberaCAlgID`, so applications do not need parameter-specific builds or
 headers.
 
+## Implementation optimization and reference comparison
+
+The comparisons below describe implementation structure, not changes to the
+standard algorithms or their wire formats. Here, a *reference-shaped baseline*
+means a direct translation of the standard pseudocode or the project's initial
+pre-optimization implementation; it does not mean that an official NIST
+software package was benchmarked. Bundled upstream code and its exact versions
+are identified in `THIRD_PARTY_NOTICES.md` and the component provenance files.
+
+### SHA-1 and Triple-DES
+
+| Area | Reference-shaped or initial baseline | LiberaCrypt implementation | Effect |
+| --- | --- | --- | --- |
+| SHA-1 message schedule | Materialize all 80 32-bit schedule words described by the compression procedure. | Keep a 16-word circular schedule and overwrite a word after its last use. | Reduces schedule storage from 320 to 64 bytes per compression call without changing the 80 rounds. |
+| SHA-1 streaming input | Copy every input byte through the context's 64-byte staging buffer. | Drain an existing partial block, compress complete input blocks directly, and buffer only the final remainder. | Avoids one copy for aligned full blocks while preserving arbitrary chunk boundaries. |
+| DES S-boxes and P permutation | A textbook table implementation uses secret-derived S-box indices; the first hardened LiberaCrypt revision instead scanned all 64 entries for every S-box. | Evaluate the FIPS 46-3 S/P truth functions with a fixed-index Boolean multiplexer tree. | Avoids secret-indexed table or cache access and removes the 64-entry scan. |
+| DES E, IP, and FP permutations | Walk the E/IP/FP tables bit by bit, and perform IP plus FP around each of the three DES stages. | Spell E out with fixed shifts, use a 32-bit permutation network for IP/FP, and keep intermediate E-D-E stages in the IP domain. | Replaces hot generic permutation loops and cancels the two intermediate FP/IP pairs. |
+| Secret lifetime | Round schedules and temporary round state remain ordinary automatic storage until return. | Explicitly clear all three round-key schedules and the reusable Boolean-round workspace after the operation. | Reduces residual key-dependent data while avoiding per-round workspace setup. |
+
+In a same-host development microbenchmark built with GCC 13.3 and `-O3`, the
+current Triple-DES path processed about 4.3 times as much data as the initial
+constant-scan implementation (0.829 MB/s to 3.544 MB/s). This is a comparison
+between two LiberaCrypt revisions, not a cross-library benchmark, and absolute
+throughput will vary by compiler and machine.
+
+The optimized legacy primitives were checked with SHA-1 empty-string, `abc`,
+padding-boundary, and million-`a` known-answer cases; all 19 incremental hash
+identifiers; standard Triple-DES vectors; and 1,000 randomized ECB/CBC cases
+against OpenSSL 3.0.13. OpenSSL is only a development test oracle and is not a
+build or runtime dependency. In-place CBC, invalid-argument behavior, strict
+C11 `-O0`/`-O2`/`-O3` warning builds, and AddressSanitizer/
+UndefinedBehaviorSanitizer runs were also exercised.
+
+### Other algorithms and shared paths
+
+Not every optimization is a throughput optimization. The following verified
+changes target cache behavior, memory traffic, code size, build duplication, or
+portable execution; no speedup is claimed where the project does not retain a
+reproducible benchmark.
+
+| Area | Reference or previous organization | LiberaCrypt optimization | Primary goal |
+| --- | --- | --- | --- |
+| AES-128/192/256 | Common compact implementations index an S-box or T-table with secret-derived bytes. | Compute the S-box and inverse S-box algebraically over GF(2^8) with a fixed operation sequence; round keys and temporary state are explicitly cleared. | Cache-timing hardening and secret-data hygiene, with portability favored over table-driven throughput. |
+| SHA-2 and LSH streaming | A simple update path copies every block into context storage before compression. | After completing a partial block, pass complete input blocks directly to the compression function and copy only the remainder. | Lower memory traffic for large or block-aligned updates. |
+| Generic hash API | Separate one-shot and incremental implementations can duplicate padding and state-transition logic. | Build the one-shot operation on the runtime-selected init/update/finalize/squeeze path; SHAKE retains repeated-squeeze streaming. | One validated state machine and less duplicate code across SHA-1, SHA-2, SHA-3/SHAKE, and LSH. |
+| ML-KEM | Build parameter-specialized copies for ML-KEM-512/768/1024. | Compile the implementation once, select a complete FIPS 203 parameter record at the API boundary, and use maximum-sized portable work arrays. | Lower build/code duplication and one runtime-dispatched implementation; this is not a claimed cryptographic-operation speedup. |
+| ML-DSA and SLH-DSA integration | Independently compile all shared support for every parameter set. | Use the pinned mldsa-native multilevel mode so shared code is emitted once, and expose all 12 SLH-DSA parameter objects from one portable backend build. | Reduce duplicated backend code and keep one library artifact for all levels. Native assembly is deliberately disabled in the current ML-DSA adapter for consistent portable builds. |
+| HAETAE | The upstream-oriented arithmetic relied in places on signed right shifts, plain-`char` behavior, and implicit fixed-point widths. | Use explicit floor division and unsigned sign extraction, define signed-byte serialization, prove FFT widths, evaluate Q16 intermediates in `int64_t`, and accumulate magnitudes in `uint64_t`. | Defined behavior across compilers and architectures while preserving current and legacy KAT output. |
+| AES authentication and PQC validation | AES tags, ML-KEM validation, and PQC adapters carried separate equality loops; ML-KEM and NTRU+ carried separate overlap predicates. | Share one constant-time byte-equality helper and one overflow-aware buffer-overlap helper. | Remove security-sensitive duplicate code and keep validation behavior consistent. |
+
+These notes distinguish security, portability, and code-footprint work from
+measured performance work. Algorithm outputs remain validated against the
+known-answer and compatibility tests described below.
+
 ## Portability considerations
 
 Portability in LiberaCrypt is treated as a correctness property rather than only
