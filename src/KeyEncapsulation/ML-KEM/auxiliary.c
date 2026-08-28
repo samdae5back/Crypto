@@ -4,6 +4,7 @@
  */
 
 #include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 
 #include "auxiliary.h"
@@ -20,47 +21,65 @@ static int mlkem_power_of_two(int exponent) {
 }
 
 int ByteEncode(const int *input, size_t bit_width, unsigned char *output) {
+    uint32_t bit_buffer = 0u;
+    unsigned int buffered_bits = 0u;
+    uint32_t mask;
     size_t coefficient;
-    size_t bit;
 
     if (!input || !output || bit_width < 1u || bit_width > 12u) return -1;
 
-    memset(output, 0, bit_width * 32u);
+    mask = (UINT32_C(1) << bit_width) - UINT32_C(1);
     for (coefficient = 0u; coefficient < MLKEM_N; ++coefficient) {
-        unsigned int value = (unsigned int)input[coefficient];
-        for (bit = 0u; bit < bit_width; ++bit) {
-            size_t output_bit = coefficient * bit_width + bit;
-            output[output_bit / 8u] |=
-                (unsigned char)(((value >> bit) & 1u)
-                                << (output_bit % 8u));
+        uint32_t value = (uint32_t)input[coefficient] & mask;
+
+        /*
+         * At most seven bits remain before the next coefficient is appended,
+         * so a 32-bit reservoir is ample for every supported width (<= 12).
+         * The loop shape depends only on the public encoding width.
+         */
+        bit_buffer |= value << buffered_bits;
+        buffered_bits += (unsigned int)bit_width;
+        while (buffered_bits >= 8u) {
+            *output++ = (unsigned char)bit_buffer;
+            bit_buffer >>= 8u;
+            buffered_bits -= 8u;
         }
     }
     return 0;
 }
 
 int ByteDecode(const unsigned char *input, size_t bit_width, int *output) {
-    int modulus;
+    uint32_t bit_buffer = 0u;
+    unsigned int buffered_bits = 0u;
+    uint32_t mask;
+    unsigned int modulus;
     size_t coefficient;
-    size_t bit;
 
     if (!input || !output || bit_width < 1u || bit_width > 12u) return -1;
-    modulus = bit_width == 12u ? MLKEM_Q : mlkem_power_of_two((int)bit_width);
 
-    memset(output, 0, sizeof(*output) * MLKEM_N);
+    mask = (UINT32_C(1) << bit_width) - UINT32_C(1);
+    modulus = bit_width == 12u ? (unsigned int)MLKEM_Q
+                               : (unsigned int)mlkem_power_of_two((int)bit_width);
+
     for (coefficient = 0u; coefficient < MLKEM_N; ++coefficient) {
-        unsigned int value = 0u;
-        for (bit = 0u; bit < bit_width; ++bit) {
-            size_t input_bit = coefficient * bit_width + bit;
-            value |= mlkem_bit_at(input, input_bit) << bit;
+        uint32_t value;
+
+        while (buffered_bits < bit_width) {
+            bit_buffer |= (uint32_t)(*input++) << buffered_bits;
+            buffered_bits += 8u;
         }
-        output[coefficient] = (int)(value % (unsigned int)modulus);
+        value = bit_buffer & mask;
+        bit_buffer >>= (unsigned int)bit_width;
+        buffered_bits -= (unsigned int)bit_width;
+        output[coefficient] = (int)(value % modulus);
     }
     return 0;
 }
 
 int SampleNTT(const unsigned char *input, int *output, size_t input_length) {
+    enum { MLKEM_SHAKE128_RATE_BYTES = 168 };
     crypto_sha3_ctx context;
-    unsigned char bytes[3];
+    unsigned char bytes[MLKEM_SHAKE128_RATE_BYTES];
     size_t index = 0u;
     int result = -1;
 
@@ -69,18 +88,31 @@ int SampleNTT(const unsigned char *input, int *output, size_t input_length) {
     XOF_init(&context);
     XOF_absorb(&context, input, input_length);
     while (index < MLKEM_N) {
-        int first;
-        int second;
+        size_t offset;
 
+        /*
+         * Consume one full SHAKE128 rate block at a time.  The former code
+         * squeezed three bytes per call; parsing the same byte stream in
+         * 3-byte groups preserves the FIPS 203 rejection-sampling order while
+         * avoiding roughly one XOF helper call per candidate pair.
+         */
         if (XOF_squeeze(&context, bytes, sizeof(bytes)) != 0) goto cleanup;
-        first = (int)bytes[0] + MLKEM_N * ((int)bytes[1] % 16);
-        second = ((int)bytes[1] / 16) + 16 * (int)bytes[2];
-        if (first < MLKEM_Q) output[index++] = first;
-        if (second < MLKEM_Q && index < MLKEM_N) output[index++] = second;
+        for (offset = 0u; offset < sizeof(bytes) && index < MLKEM_N;
+             offset += 3u) {
+            int first = (int)bytes[offset] +
+                        MLKEM_N * ((int)bytes[offset + 1u] % 16);
+            int second = ((int)bytes[offset + 1u] / 16) +
+                         16 * (int)bytes[offset + 2u];
+
+            if (first < MLKEM_Q) output[index++] = first;
+            if (second < MLKEM_Q && index < MLKEM_N)
+                output[index++] = second;
+        }
     }
     result = 0;
 
 cleanup:
+    memset(bytes, 0, sizeof(bytes));
     XOF_clear(&context);
     return result;
 }
