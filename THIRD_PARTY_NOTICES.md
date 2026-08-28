@@ -13,7 +13,7 @@ by LiberaCrypt. A Git repository listed as the vendored implementation source
 should not be read as replacing the algorithm's official specification or
 project provenance.
 
-## ML-KEM provenance (not a third-party backend)
+## ML-KEM (reference links only; not a third-party backend)
 
 LiberaCrypt's ML-KEM implementation is original project source rather than a
 vendored backend. Its primary implementation source is NIST FIPS 203,
@@ -30,7 +30,7 @@ not copied, ported, or adapted from those implementations.
 Because this code is LiberaCrypt original source, it is covered by the
 project's `AGPL-3.0-only` license rather than an upstream third-party license.
 
-## mldsa-native
+## ML-DSA
 
 - Algorithm standard: NIST FIPS 204, Module-Lattice-Based Digital Signature
   Standard: <https://csrc.nist.gov/pubs/fips/204/final>
@@ -51,7 +51,7 @@ The adapter in `src/DigitalSignature/ML-DSA/` builds the portable upstream
 source in a multi-level configuration and supplies randomness through this
 library's private operating-system entropy adapter.
 
-## slhdsa-c
+## SLH-DSA
 
 - Algorithm standard: NIST FIPS 205, Stateless Hash-Based Digital Signature
   Standard: <https://csrc.nist.gov/pubs/fips/205/final>
