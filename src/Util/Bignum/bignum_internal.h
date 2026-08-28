@@ -31,12 +31,6 @@ LiberaCError crypto_bignum_mod_square(LiberaCBignum *out,
                                       const LiberaCBignum *modulus);
 LiberaCError crypto_bignum_mod_exp(LiberaCBignum *out, const LiberaCBignum *base,
                                    const LiberaCBignum *exponent, const LiberaCBignum *modulus);
-LiberaCError crypto_bignum_mod_exp_pair(LiberaCBignum *out_a,
-                                        LiberaCBignum *out_b,
-                                        const LiberaCBignum *base_a,
-                                        const LiberaCBignum *base_b,
-                                        const LiberaCBignum *exponent,
-                                        const LiberaCBignum *modulus);
 LiberaCError crypto_bignum_random_bits(LiberaCBignum *out, size_t bits, int set_top_bit, int set_odd);
 LiberaCError crypto_bignum_random_range(LiberaCBignum *out, const LiberaCBignum *upper_exclusive);
 
