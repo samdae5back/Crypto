@@ -57,14 +57,9 @@ LiberaCError crypto_bignum_mod_square(LiberaCBignum *out,
                                       const LiberaCBignum *a,
                                       const LiberaCBignum *modulus);
 
-/* Fixed-width modular multiplication for secret arithmetic.  Secret operands
- * must already have at least modulus->LENGTH allocated limbs with zero-padded
- * unused limbs.  The implementation stays in the Montgomery fixed-width layer
- * and avoids the generic variable-time reduction path. */
-LiberaCError crypto_bignum_mod_mul_ct(LiberaCBignum *out,
-                                      const LiberaCBignum *a,
-                                      const LiberaCBignum *b,
-                                      const LiberaCBignum *modulus);
+/* Generic add/sub/mul/mod/reduction above remain variable-time by design.  The
+ * secret arithmetic layer keeps sensitive modular state in fixed-width
+ * Montgomery buffers instead of calling generic division/reduction helpers. */
 
 /* Legacy generic variable-time exponentiation retained as an even-modulus
  * compatibility fallback.  New public/non-secret call sites should use the
