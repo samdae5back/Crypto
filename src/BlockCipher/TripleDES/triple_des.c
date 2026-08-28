@@ -7,44 +7,298 @@
 
 #include <string.h>
 
-static const uint8_t IP[64] = {58,50,42,34,26,18,10,2,60,52,44,36,28,20,12,4,62,54,46,38,30,22,14,6,64,56,48,40,32,24,16,8,57,49,41,33,25,17,9,1,59,51,43,35,27,19,11,3,61,53,45,37,29,21,13,5,63,55,47,39,31,23,15,7};
-static const uint8_t FP[64] = {40,8,48,16,56,24,64,32,39,7,47,15,55,23,63,31,38,6,46,14,54,22,62,30,37,5,45,13,53,21,61,29,36,4,44,12,52,20,60,28,35,3,43,11,51,19,59,27,34,2,42,10,50,18,58,26,33,1,41,9,49,17,57,25};
 static const uint8_t PC1[56] = {57,49,41,33,25,17,9,1,58,50,42,34,26,18,10,2,59,51,43,35,27,19,11,3,60,52,44,36,63,55,47,39,31,23,15,7,62,54,46,38,30,22,14,6,61,53,45,37,29,21,13,5,28,20,12,4};
 static const uint8_t PC2[48] = {14,17,11,24,1,5,3,28,15,6,21,10,23,19,12,4,26,8,16,7,27,20,13,2,41,52,31,37,47,55,30,40,51,45,33,48,44,49,39,56,34,53,46,42,50,36,29,32};
-static const uint8_t E[48] = {32,1,2,3,4,5,4,5,6,7,8,9,8,9,10,11,12,13,12,13,14,15,16,17,16,17,18,19,20,21,20,21,22,23,24,25,24,25,26,27,28,29,28,29,30,31,32,1};
-static const uint8_t P[32] = {16,7,20,21,29,12,28,17,1,15,23,26,5,18,31,10,2,8,24,14,32,27,3,9,19,13,30,6,22,11,4,25};
 static const uint8_t ROT[16] = {1,1,2,2,2,2,2,2,1,2,2,2,2,2,2,1};
-static const uint8_t S[8][64] = {
- {14,4,13,1,2,15,11,8,3,10,6,12,5,9,0,7,0,15,7,4,14,2,13,1,10,6,12,11,9,5,3,8,4,1,14,8,13,6,2,11,15,12,9,7,3,10,5,0,15,12,8,2,4,9,1,7,5,11,3,14,10,0,6,13},
- {15,1,8,14,6,11,3,4,9,7,2,13,12,0,5,10,3,13,4,7,15,2,8,14,12,0,1,10,6,9,11,5,0,14,7,11,10,4,13,1,5,8,12,6,9,3,2,15,13,8,10,1,3,15,4,2,11,6,7,12,0,5,14,9},
- {10,0,9,14,6,3,15,5,1,13,12,7,11,4,2,8,13,7,0,9,3,4,6,10,2,8,5,14,12,11,15,1,13,6,4,9,8,15,3,0,11,1,2,12,5,10,14,7,1,10,13,0,6,9,8,7,4,15,14,3,11,5,2,12},
- {7,13,14,3,0,6,9,10,1,2,8,5,11,12,4,15,13,8,11,5,6,15,0,3,4,7,2,12,1,10,14,9,10,6,9,0,12,11,7,13,15,1,3,14,5,2,8,4,3,15,0,6,10,1,13,8,9,4,5,11,12,7,2,14},
- {2,12,4,1,7,10,11,6,8,5,3,15,13,0,14,9,14,11,2,12,4,7,13,1,5,0,15,10,3,9,8,6,4,2,1,11,10,13,7,8,15,9,12,5,6,3,0,14,11,8,12,7,1,14,2,13,6,15,0,9,10,4,5,3},
- {12,1,10,15,9,2,6,8,0,13,3,4,14,7,5,11,10,15,4,2,7,12,9,5,6,1,13,14,0,11,3,8,9,14,15,5,2,8,12,3,7,0,4,10,1,13,11,6,4,3,2,12,9,5,15,10,11,14,1,7,6,0,8,13},
- {4,11,2,14,15,0,8,13,3,12,9,7,5,10,6,1,13,0,11,7,4,9,1,10,14,3,5,12,2,15,8,6,1,4,11,13,12,3,7,14,10,15,6,8,0,5,9,2,6,11,13,8,1,4,10,7,9,5,0,15,14,2,3,12},
- {13,2,8,4,6,15,11,1,10,9,3,14,5,0,12,7,1,15,13,8,10,3,7,4,12,5,6,11,0,14,9,2,7,11,4,1,9,12,14,2,0,6,10,13,15,3,5,8,2,1,14,7,4,10,8,13,15,12,9,0,3,5,6,11}
+
+/*
+ * The four output bits of each DES S-box after permutation P. TRUTH_TABLE
+ * packs the corresponding 32 one-bit Boolean functions for each possible
+ * six-bit input. Both tables are derived mechanically from FIPS 46-3 S/P.
+ * They are accessed only at public, fixed indices; secret selection is done
+ * by the Boolean multiplexer tree in des_round_function().
+ */
+static const uint32_t SBOX_OUTPUT_MASKS[8] = {
+    UINT32_C(0x00808202), UINT32_C(0x40084010),
+    UINT32_C(0x04010104), UINT32_C(0x80401040),
+    UINT32_C(0x21040080), UINT32_C(0x10202008),
+    UINT32_C(0x02100401), UINT32_C(0x08020820)
 };
 
-static uint64_t load64(const uint8_t *p) { uint64_t x=0; size_t i; for(i=0;i<8;i++) x=(x<<8)|p[i]; return x; }
-static void store64(uint8_t *p,uint64_t x) { size_t i; for(i=0;i<8;i++) p[7-i]=(uint8_t)(x>>(8*i)); }
-static uint64_t perm(uint64_t x,unsigned inbits,const uint8_t *tab,size_t n) { uint64_t y=0; size_t i; for(i=0;i<n;i++) y=(y<<1)|((x>>(inbits-tab[i]))&1u); return y; }
-static uint8_t ct_eq6(uint8_t a,uint8_t b) { uint32_t x=(uint32_t)(a^b); x=(x-1u)>>31; return (uint8_t)(0u-x); }
-static uint8_t sbox(unsigned box,uint8_t six) { uint8_t row=(uint8_t)(((six&0x20u)>>4)|(six&1u)); uint8_t col=(uint8_t)((six>>1)&15u); uint8_t idx=(uint8_t)(row*16u+col),v=0; unsigned i; for(i=0;i<64;i++) v|=(uint8_t)(S[box][i]&ct_eq6(idx,(uint8_t)i)); return v; }
-static uint32_t f(uint32_t r,uint64_t k) { uint64_t x=perm(r,32,E,48)^k; uint32_t y=0; unsigned i; for(i=0;i<8;i++) y=(y<<4)|sbox(i,(uint8_t)((x>>(42u-6u*i))&63u)); return (uint32_t)perm(y,32,P,32); }
-static void schedule(const uint8_t key[8],uint64_t k[16]) { uint64_t p=perm(load64(key),64,PC1,56); uint32_t c=(uint32_t)(p>>28),d=(uint32_t)(p&0xfffffff); unsigned i; for(i=0;i<16;i++){c=((c<<ROT[i])|(c>>(28-ROT[i])))&0xfffffff;d=((d<<ROT[i])|(d>>(28-ROT[i])))&0xfffffff;k[i]=perm(((uint64_t)c<<28)|d,56,PC2,48);} }
-static uint64_t des(uint64_t block,const uint64_t k[16],int enc) { uint64_t x=perm(block,64,IP,64); uint32_t l=(uint32_t)(x>>32),r=(uint32_t)x,t; unsigned i; for(i=0;i<16;i++){t=r;r=l^f(r,k[enc?i:15u-i]);l=t;} return perm(((uint64_t)r<<32)|l,64,FP,64); }
-static uint64_t tdes(uint64_t b,const uint64_t k[3][16],int enc) { if(enc){b=des(b,k[0],1);b=des(b,k[1],0);return des(b,k[2],1);} b=des(b,k[2],0);b=des(b,k[1],1);return des(b,k[0],0); }
+static const uint32_t TRUTH_TABLE[64] = {
+    UINT32_C(0xd8d8dbbc), UINT32_C(0xd73559c1),
+    UINT32_C(0x8306f441), UINT32_C(0x3dabeafe),
+    UINT32_C(0x1cec9542), UINT32_C(0x8a408efb),
+    UINT32_C(0xf079253f), UINT32_C(0xcf34d510),
+    UINT32_C(0x721726b5), UINT32_C(0x4cfef21c),
+    UINT32_C(0x4deadaa6), UINT32_C(0xf2471ac9),
+    UINT32_C(0xeda34bcf), UINT32_C(0x338fa826),
+    UINT32_C(0x16d508d1), UINT32_C(0xe048253f),
+    UINT32_C(0x8f0a4602), UINT32_C(0x28bc163d),
+    UINT32_C(0x7cd56b19), UINT32_C(0x8240bf20),
+    UINT32_C(0x6223abc1), UINT32_C(0x37d7e0a8),
+    UINT32_C(0xaf9fd4bc), UINT32_C(0x59bb1bcf),
+    UINT32_C(0xb77c897e), UINT32_C(0xe0810592),
+    UINT32_C(0x00a1344b), UINT32_C(0x3f7ae567),
+    UINT32_C(0x091474bc), UINT32_C(0x4d697b47),
+    UINT32_C(0xf36abb62), UINT32_C(0x949644d0),
+    UINT32_C(0x1647a960), UINT32_C(0xa5dac69a),
+    UINT32_C(0x587b189e), UINT32_C(0x83e8bd45),
+    UINT32_C(0xf2a1e679), UINT32_C(0x4fbf0121),
+    UINT32_C(0x67986989), UINT32_C(0x30465aa9),
+    UINT32_C(0x49b899c3), UINT32_C(0x7241e064),
+    UINT32_C(0xbf458774), UINT32_C(0xcd9e619a),
+    UINT32_C(0xbe5e56bc), UINT32_C(0x982035db),
+    UINT32_C(0x81b27643), UINT32_C(0x7f358e66),
+    UINT32_C(0xa5e4f7df), UINT32_C(0xda2fe8e3),
+    UINT32_C(0xa79a8421), UINT32_C(0x7fb513be),
+    UINT32_C(0x89de041e), UINT32_C(0xc8017b16),
+    UINT32_C(0x78659b73), UINT32_C(0xa7f8a65d),
+    UINT32_C(0x8c0f7aa2), UINT32_C(0x05b21fcd),
+    UINT32_C(0x72d26b8c), UINT32_C(0x84455c30),
+    UINT32_C(0x5221a967), UINT32_C(0x724e8634),
+    UINT32_C(0x4d2d549c), UINT32_C(0x38dbf9cb)
+};
 
-LiberaCError crypto_tdes_ede3_crypt(uint8_t *out,size_t cap,const uint8_t *in,size_t len,const uint8_t *key,size_t keylen,const uint8_t *iv,size_t ivlen,CryptoTdesMode mode,int enc) {
-    uint64_t keys[3][16], chain=0, block, result; size_t off;
-    if (key == NULL || keylen != LIBERAC_TDES_EDE3_KEY_BYTES) return LIBERAC_ERROR_INVALID_KEY;
-    if ((out == NULL || in == NULL) && len != 0u) return LIBERAC_ERROR_INVALID_ARGUMENT;
-    if (cap < len) return LIBERAC_ERROR_BUFFER_TOO_SMALL;
-    if ((len & 7u) != 0u) return LIBERAC_ERROR_INVALID_ARGUMENT;
-    if (mode == CRYPTO_TDES_MODE_ECB) { if (iv != NULL || ivlen != 0u) return LIBERAC_ERROR_INVALID_ARGUMENT; }
-    else if (mode == CRYPTO_TDES_MODE_CBC) { if (iv == NULL || ivlen != 8u) return LIBERAC_ERROR_INVALID_ARGUMENT; chain=load64(iv); }
-    else return LIBERAC_ERROR_INVALID_ALG_ID;
-    schedule(key,keys[0]); schedule(key+8,keys[1]); schedule(key+16,keys[2]);
-    for(off=0;off<len;off+=8){ block=load64(in+off); if(enc&&mode==CRYPTO_TDES_MODE_CBC) block^=chain; result=tdes(block,keys,enc); if(!enc&&mode==CRYPTO_TDES_MODE_CBC){result^=chain;chain=block;} else if(enc&&mode==CRYPTO_TDES_MODE_CBC) chain=result; store64(out+off,result); }
-    crypto_zeroize(keys,sizeof(keys)); block=result=chain=0; return LIBERAC_SUCCESS;
+static uint64_t load64_be(const uint8_t *input) {
+    uint64_t value = 0u;
+    size_t index;
+
+    for (index = 0u; index < 8u; ++index) {
+        value = (value << 8) | input[index];
+    }
+    return value;
+}
+
+static void store64_be(uint8_t *output, uint64_t value) {
+    size_t index;
+
+    for (index = 0u; index < 8u; ++index) {
+        output[7u - index] = (uint8_t)(value >> (8u * index));
+    }
+}
+
+static uint64_t permute_bits(
+    uint64_t input, unsigned int input_bits,
+    const uint8_t *table, size_t output_bits) {
+    uint64_t output = 0u;
+    size_t index;
+
+    for (index = 0u; index < output_bits; ++index) {
+        output = (output << 1) |
+                 ((input >> (input_bits - table[index])) & UINT64_C(1));
+    }
+    return output;
+}
+
+/* Richard Outerbridge's public-domain IP network, expressed with uint32_t. */
+static uint64_t initial_permutation(uint64_t input) {
+    uint32_t left = (uint32_t)(input >> 32);
+    uint32_t right = (uint32_t)input;
+    uint32_t temporary;
+
+    temporary = ((left >> 4) ^ right) & UINT32_C(0x0f0f0f0f);
+    right ^= temporary;
+    left ^= temporary << 4;
+    temporary = ((left >> 16) ^ right) & UINT32_C(0x0000ffff);
+    right ^= temporary;
+    left ^= temporary << 16;
+    temporary = ((right >> 2) ^ left) & UINT32_C(0x33333333);
+    left ^= temporary;
+    right ^= temporary << 2;
+    temporary = ((right >> 8) ^ left) & UINT32_C(0x00ff00ff);
+    left ^= temporary;
+    right ^= temporary << 8;
+    temporary = ((left >> 1) ^ right) & UINT32_C(0x55555555);
+    right ^= temporary;
+    left ^= temporary << 1;
+    return ((uint64_t)left << 32) | right;
+}
+
+static uint64_t final_permutation(uint64_t input) {
+    uint32_t left = (uint32_t)(input >> 32);
+    uint32_t right = (uint32_t)input;
+    uint32_t temporary;
+
+    temporary = ((left >> 1) ^ right) & UINT32_C(0x55555555);
+    right ^= temporary;
+    left ^= temporary << 1;
+    temporary = ((right >> 8) ^ left) & UINT32_C(0x00ff00ff);
+    left ^= temporary;
+    right ^= temporary << 8;
+    temporary = ((right >> 2) ^ left) & UINT32_C(0x33333333);
+    left ^= temporary;
+    right ^= temporary << 2;
+    temporary = ((left >> 16) ^ right) & UINT32_C(0x0000ffff);
+    right ^= temporary;
+    left ^= temporary << 16;
+    temporary = ((left >> 4) ^ right) & UINT32_C(0x0f0f0f0f);
+    right ^= temporary;
+    left ^= temporary << 4;
+    return ((uint64_t)left << 32) | right;
+}
+
+static uint32_t des_round_function(uint32_t right, uint64_t round_key) {
+    uint64_t expanded;
+    uint32_t planes[6] = {0u, 0u, 0u, 0u, 0u, 0u};
+    uint32_t nodes[32];
+    unsigned int box;
+    unsigned int bit;
+    unsigned int index;
+    unsigned int node_count;
+
+    /* Spell out E rather than walking its table on every block. */
+    expanded = (uint64_t)(((right & 1u) << 5) | (right >> 27)) << 42;
+    expanded |= (uint64_t)((right >> 23) & 63u) << 36;
+    expanded |= (uint64_t)((right >> 19) & 63u) << 30;
+    expanded |= (uint64_t)((right >> 15) & 63u) << 24;
+    expanded |= (uint64_t)((right >> 11) & 63u) << 18;
+    expanded |= (uint64_t)((right >> 7) & 63u) << 12;
+    expanded |= (uint64_t)((right >> 3) & 63u) << 6;
+    expanded |= (uint64_t)(((right & 31u) << 1) | (right >> 31));
+    expanded ^= round_key;
+
+    for (box = 0u; box < 8u; ++box) {
+        const uint32_t input =
+            (uint32_t)(expanded >> (42u - 6u * box)) & 63u;
+        for (bit = 0u; bit < 6u; ++bit) {
+            const uint32_t mask = 0u - ((input >> bit) & 1u);
+            planes[bit] |= mask & SBOX_OUTPUT_MASKS[box];
+        }
+    }
+
+    /* First Shannon-expansion level reads the fixed truth table directly. */
+    for (index = 0u; index < 32u; ++index) {
+        const uint32_t left = TRUTH_TABLE[2u * index];
+        nodes[index] = left ^
+                       (planes[0] & (left ^ TRUTH_TABLE[2u * index + 1u]));
+    }
+    node_count = 32u;
+    for (bit = 1u; bit < 6u; ++bit) {
+        node_count >>= 1;
+        for (index = 0u; index < node_count; ++index) {
+            const uint32_t left = nodes[2u * index];
+            nodes[index] = left ^
+                           (planes[bit] &
+                            (left ^ nodes[2u * index + 1u]));
+        }
+    }
+    return nodes[0];
+}
+
+static void des_key_schedule(const uint8_t key[8], uint64_t round_keys[16]) {
+    const uint64_t permuted = permute_bits(load64_be(key), 64u, PC1, 56u);
+    uint32_t left = (uint32_t)(permuted >> 28);
+    uint32_t right = (uint32_t)(permuted & UINT32_C(0x0fffffff));
+    unsigned int index;
+
+    for (index = 0u; index < 16u; ++index) {
+        left = ((left << ROT[index]) | (left >> (28u - ROT[index]))) &
+               UINT32_C(0x0fffffff);
+        right = ((right << ROT[index]) | (right >> (28u - ROT[index]))) &
+                UINT32_C(0x0fffffff);
+        round_keys[index] = permute_bits(
+            ((uint64_t)left << 28) | right, 56u, PC2, 48u);
+    }
+}
+
+/* Input and output remain in the IP domain so adjacent EDE stages cancel. */
+static uint64_t des_rounds(
+    uint64_t input, const uint64_t round_keys[16], int encrypt) {
+    uint32_t left = (uint32_t)(input >> 32);
+    uint32_t right = (uint32_t)input;
+    uint32_t temporary;
+    unsigned int round;
+
+    for (round = 0u; round < 16u; ++round) {
+        temporary = right;
+        right = left ^ des_round_function(
+            right, round_keys[encrypt != 0 ? round : 15u - round]);
+        left = temporary;
+    }
+    return ((uint64_t)right << 32) | left;
+}
+
+static uint64_t triple_des_block(
+    uint64_t block, uint64_t round_keys[3][16], int encrypt) {
+    uint64_t state = initial_permutation(block);
+
+    if (encrypt != 0) {
+        state = des_rounds(state, round_keys[0], 1);
+        state = des_rounds(state, round_keys[1], 0);
+        state = des_rounds(state, round_keys[2], 1);
+    } else {
+        state = des_rounds(state, round_keys[2], 0);
+        state = des_rounds(state, round_keys[1], 1);
+        state = des_rounds(state, round_keys[0], 0);
+    }
+    return final_permutation(state);
+}
+
+LiberaCError crypto_tdes_ede3_crypt(
+    uint8_t *output, size_t output_capacity,
+    const uint8_t *input, size_t input_length,
+    const uint8_t *key, size_t key_length,
+    const uint8_t *iv, size_t iv_length,
+    CryptoTdesMode mode, int encrypt) {
+    uint64_t round_keys[3][16];
+    uint64_t chain = 0u;
+    uint64_t block = 0u;
+    uint64_t result = 0u;
+    size_t offset;
+
+    if (key == NULL ||
+        ((input == NULL || output == NULL) && input_length != 0u)) {
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
+    }
+    if (key_length != LIBERAC_TDES_EDE3_KEY_BYTES) {
+        return LIBERAC_ERROR_INVALID_KEY;
+    }
+    if ((input_length % LIBERAC_TDES_BLOCK_BYTES) != 0u) {
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
+    }
+    if (mode == CRYPTO_TDES_MODE_ECB) {
+        if (iv_length != 0u) {
+            return LIBERAC_ERROR_INVALID_ARGUMENT;
+        }
+    } else if (mode == CRYPTO_TDES_MODE_CBC) {
+        if (iv == NULL || iv_length != LIBERAC_TDES_BLOCK_BYTES) {
+            return LIBERAC_ERROR_INVALID_ARGUMENT;
+        }
+        chain = load64_be(iv);
+    } else {
+        return LIBERAC_ERROR_INVALID_ALG_ID;
+    }
+    if (output_capacity < input_length) {
+        return LIBERAC_ERROR_BUFFER_TOO_SMALL;
+    }
+    if (input_length == 0u) {
+        return LIBERAC_SUCCESS;
+    }
+
+    des_key_schedule(key, round_keys[0]);
+    des_key_schedule(key + 8u, round_keys[1]);
+    des_key_schedule(key + 16u, round_keys[2]);
+
+    for (offset = 0u; offset < input_length;
+         offset += LIBERAC_TDES_BLOCK_BYTES) {
+        block = load64_be(input + offset);
+        if (encrypt != 0 && mode == CRYPTO_TDES_MODE_CBC) {
+            block ^= chain;
+        }
+        result = triple_des_block(block, round_keys, encrypt);
+        if (encrypt == 0 && mode == CRYPTO_TDES_MODE_CBC) {
+            result ^= chain;
+            chain = block;
+        } else if (mode == CRYPTO_TDES_MODE_CBC) {
+            chain = result;
+        }
+        store64_be(output + offset, result);
+    }
+
+    crypto_zeroize(round_keys, sizeof(round_keys));
+    chain = 0u;
+    block = 0u;
+    result = 0u;
+    return LIBERAC_SUCCESS;
 }

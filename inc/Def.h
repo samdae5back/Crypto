@@ -10,8 +10,9 @@
  *
  * Algorithm identifiers are stable runtime selectors.  Pass only an identifier
  * from the family accepted by a particular operation; for example,
- * LIBERAC_HASH() accepts the @c LIBERAC_ALG_HASH_* identifiers, while the block-cipher
- * operations accept the @c LIBERAC_ALG_AES_* identifiers.
+ * LIBERAC_HASH() accepts the @c LIBERAC_ALG_HASH_* identifiers, while the
+ * block-cipher operations accept the @c LIBERAC_ALG_AES_* and
+ * @c LIBERAC_ALG_TDES_* identifiers.
  *
  * @defgroup crypto_core Core API definitions
  * @brief Types and constants shared by every public API family.

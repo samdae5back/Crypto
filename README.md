@@ -160,7 +160,7 @@ authentication fails.
 
 The same dispatcher supports three-key Triple-DES EDE in ECB and CBC modes with
 a 24-byte key and 8-byte block alignment. It does not support two-key TDEA or
-single DES.
+single DES. DES parity bits are ignored rather than corrected or validated.
 
 All fixed-output hashes and XOFs use the same hash API:
 

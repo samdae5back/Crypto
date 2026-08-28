@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 #include "HashFunction/SHA1/sha1_internal.h"
+#include "Util/Core/secure_zero.h"
 
 #include <string.h>
 
@@ -21,24 +22,28 @@ static void store_be32(uint8_t *p, uint32_t x) {
 }
 
 static void sha1_compress(crypto_sha1_context *ctx, const uint8_t block[64]) {
-    uint32_t w[80], a, b, c, d, e, f, k, t;
+    uint32_t w[16], a, b, c, d, e, f, k, t;
     size_t i;
     for (i = 0; i < 16; ++i) w[i] = load_be32(block + 4u * i);
-    for (; i < 80; ++i)
-        w[i] = rol32(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1);
     a = ctx->STATE[0]; b = ctx->STATE[1]; c = ctx->STATE[2];
     d = ctx->STATE[3]; e = ctx->STATE[4];
     for (i = 0; i < 80; ++i) {
+        if (i >= 16u) {
+            w[i & 15u] = rol32(w[(i - 3u) & 15u] ^
+                                w[(i - 8u) & 15u] ^
+                                w[(i - 14u) & 15u] ^
+                                w[i & 15u], 1u);
+        }
         if (i < 20) { f = (b & c) | (~b & d); k = UINT32_C(0x5a827999); }
         else if (i < 40) { f = b ^ c ^ d; k = UINT32_C(0x6ed9eba1); }
         else if (i < 60) { f = (b & c) | (b & d) | (c & d); k = UINT32_C(0x8f1bbcdc); }
         else { f = b ^ c ^ d; k = UINT32_C(0xca62c1d6); }
-        t = rol32(a, 5) + f + e + k + w[i];
+        t = rol32(a, 5u) + f + e + k + w[i & 15u];
         e = d; d = c; c = rol32(b, 30); b = a; a = t;
     }
     ctx->STATE[0] += a; ctx->STATE[1] += b; ctx->STATE[2] += c;
     ctx->STATE[3] += d; ctx->STATE[4] += e;
-    memset(w, 0, sizeof(w));
+    crypto_zeroize(w, sizeof(w));
 }
 
 void crypto_sha1_init(crypto_sha1_context *ctx) {
@@ -50,18 +55,36 @@ void crypto_sha1_init(crypto_sha1_context *ctx) {
 
 LiberaCError crypto_sha1_update(crypto_sha1_context *ctx,
                                 const uint8_t *input, size_t length) {
-    size_t take;
+    size_t available;
+    size_t copied;
+
     if (length > (UINT64_MAX - ctx->LENGTH) / 8u)
         return LIBERAC_ERROR_MESSAGE_TOO_LARGE;
     ctx->LENGTH += (uint64_t)length * 8u;
-    while (length != 0u) {
-        take = 64u - ctx->BUFFER_LENGTH;
-        if (take > length) take = length;
-        memcpy(ctx->BLOCK + ctx->BUFFER_LENGTH, input, take);
-        ctx->BUFFER_LENGTH += take; input += take; length -= take;
-        if (ctx->BUFFER_LENGTH == 64u) {
-            sha1_compress(ctx, ctx->BLOCK); ctx->BUFFER_LENGTH = 0u;
+
+    if (ctx->BUFFER_LENGTH != 0u) {
+        available = 64u - ctx->BUFFER_LENGTH;
+        copied = length < available ? length : available;
+        if (copied != 0u) {
+            memcpy(ctx->BLOCK + ctx->BUFFER_LENGTH, input, copied);
+            ctx->BUFFER_LENGTH += copied;
+            input += copied;
+            length -= copied;
         }
+        if (ctx->BUFFER_LENGTH == 64u) {
+            sha1_compress(ctx, ctx->BLOCK);
+            ctx->BUFFER_LENGTH = 0u;
+        }
+    }
+
+    while (length >= 64u) {
+        sha1_compress(ctx, input);
+        input += 64u;
+        length -= 64u;
+    }
+    if (length != 0u) {
+        memcpy(ctx->BLOCK, input, length);
+        ctx->BUFFER_LENGTH = length;
     }
     return LIBERAC_SUCCESS;
 }

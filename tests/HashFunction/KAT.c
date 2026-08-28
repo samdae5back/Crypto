@@ -26,6 +26,11 @@ static const hash_vector vectors[] = {
     { "SHA-1 abc", "616263",
       "a9993e364706816aba3e25717850c26c9cd0d89d",
       LIBERAC_ALG_HASH_SHA1 },
+    { "SHA-1 two-block padding", "6162636462636465636465666465666765666768"
+      "666768696768696a68696a6b696a6b6c6a6b6c6d6b6c6d6e6c6d6e6f6d6e"
+      "6f706e6f7071",
+      "84983e441c3bd26ebaae4aa1f95129e5e54670f1",
+      LIBERAC_ALG_HASH_SHA1 },
     { "SHA-224 empty", "",
       "d14a028c2a3a2bc9476102bb288234c415a2b01f828ea62ac5b3e42f",
       LIBERAC_ALG_HASH_SHA2_224 },
@@ -186,12 +191,48 @@ static int run_vector(const hash_vector *vector) {
     return 0;
 }
 
+static int sha1_million_a_kat(void) {
+    static const uint8_t expected[LIBERAC_SHA1_DIGEST_BYTES] = {
+        0x34,0xaa,0x97,0x3c,0xd4,0xc4,0xda,0xa4,0xf6,0x1e,
+        0xeb,0x2b,0xdb,0xad,0x27,0x31,0x65,0x34,0x01,0x6f
+    };
+    uint8_t input[1000];
+    uint8_t actual[LIBERAC_SHA1_DIGEST_BYTES];
+    LiberaCHashContext context;
+    size_t index;
+
+    memset(input, 'a', sizeof(input));
+    if (LIBERAC_HASH_INIT(&context, LIBERAC_ALG_HASH_SHA1) != LIBERAC_SUCCESS) {
+        return 1;
+    }
+    for (index = 0u; index < 1000u; ++index) {
+        if (LIBERAC_HASH_UPDATE(&context, input, sizeof(input)) !=
+            LIBERAC_SUCCESS) {
+            LIBERAC_HASH_CLEAR(&context);
+            return 1;
+        }
+    }
+    if (LIBERAC_HASH_FINALIZE(&context) != LIBERAC_SUCCESS ||
+        LIBERAC_HASH_SQUEEZE(&context, actual, sizeof(actual)) !=
+            LIBERAC_SUCCESS ||
+        memcmp(actual, expected, sizeof(expected)) != 0) {
+        LIBERAC_HASH_CLEAR(&context);
+        return 1;
+    }
+    LIBERAC_HASH_CLEAR(&context);
+    return 0;
+}
+
 int main(void) {
     size_t index;
     int failures = 0;
 
     for (index = 0; index < sizeof(vectors) / sizeof(vectors[0]); ++index) {
         failures += run_vector(&vectors[index]);
+    }
+    if (sha1_million_a_kat() != 0) {
+        fputs("SHA-1 million-'a' KAT failed\n", stderr);
+        ++failures;
     }
     if (failures != 0) {
         fprintf(stderr, "hash KAT: %d failure(s)\n", failures);

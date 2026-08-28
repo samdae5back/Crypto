@@ -86,6 +86,11 @@ LIBERAC_API size_t LIBERAC_BLOCK_CIPHER_KEY_SIZE(LiberaCAlgID ALG);
  * semantic security for repeated blocks and should only be used when a
  * protocol explicitly requires it.
  *
+ * Triple-DES is exposed only for interoperability with legacy systems. Its
+ * 64-bit block size and obsolete security margin make it unsuitable for new
+ * designs. The 24-byte key is interpreted as K1 || K2 || K3; DES parity bits
+ * are ignored and are not corrected or validated.
+ *
  * @param[out] OUTPUT Ciphertext buffer.  May be NULL only when
  *                    @p INPUT_LENGTH is zero.
  * @param[in]  OUTPUT_CAPACITY Size of @p OUTPUT in bytes; must be at least

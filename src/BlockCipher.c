@@ -131,7 +131,7 @@ LiberaCError LIBERAC_BLOCK_CIPHER_ENCRYPT(
 
     if (err != LIBERAC_SUCCESS) return err;
     if (parameters.FAMILY == BLOCK_CIPHER_TDES) {
-        if (TAG != NULL || TAG_LENGTH != 0u || AAD != NULL || AAD_LENGTH != 0u)
+        if (TAG_LENGTH != 0u || AAD_LENGTH != 0u)
             return LIBERAC_ERROR_INVALID_ARGUMENT;
         return crypto_tdes_ede3_crypt(
             OUTPUT, OUTPUT_CAPACITY, INPUT, INPUT_LENGTH, KEY, KEY_LENGTH,
@@ -157,7 +157,7 @@ LiberaCError LIBERAC_BLOCK_CIPHER_DECRYPT(
 
     if (err != LIBERAC_SUCCESS) return err;
     if (parameters.FAMILY == BLOCK_CIPHER_TDES) {
-        if (TAG != NULL || TAG_LENGTH != 0u || AAD != NULL || AAD_LENGTH != 0u)
+        if (TAG_LENGTH != 0u || AAD_LENGTH != 0u)
             return LIBERAC_ERROR_INVALID_ARGUMENT;
         return crypto_tdes_ede3_crypt(
             OUTPUT, OUTPUT_CAPACITY, INPUT, INPUT_LENGTH, KEY, KEY_LENGTH,
