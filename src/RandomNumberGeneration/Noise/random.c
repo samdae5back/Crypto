@@ -82,7 +82,7 @@ int random_os_bytes(uint8_t *out, size_t length) {
 }
 #endif
 
-CryptoError crypto_random_bytes_internal(uint8_t *out, size_t length) {
-    if (!out && length) return CRYPTO_ERROR_INVALID_ARGUMENT;
-    return random_os_bytes(out, length) == 0 ? CRYPTO_SUCCESS : CRYPTO_ERROR_RANDOM_FAILED;
+LiberaCError crypto_random_bytes_internal(uint8_t *out, size_t length) {
+    if (!out && length) return LIBERAC_ERROR_INVALID_ARGUMENT;
+    return random_os_bytes(out, length) == 0 ? LIBERAC_SUCCESS : LIBERAC_ERROR_RANDOM_FAILED;
 }

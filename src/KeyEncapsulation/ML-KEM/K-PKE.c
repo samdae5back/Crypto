@@ -64,23 +64,23 @@ static void mlkem_workspace_free(void *workspace, size_t workspace_size) {
     free(workspace);
 }
 
-CryptoError K_PKE_KeyGen(const unsigned char *seed, unsigned char *public_key,
+LiberaCError K_PKE_KeyGen(const unsigned char *seed, unsigned char *public_key,
                          unsigned char *private_key) {
     mlkem_keygen_workspace *workspace = NULL;
     unsigned char rho[32] = { 0 };
     unsigned char sigma[32] = { 0 };
     unsigned char nonce = 0u;
     const int *zetas;
-    CryptoError result = CRYPTO_ERROR_INTERNAL;
+    LiberaCError result = LIBERAC_ERROR_INTERNAL;
     int i;
     int j;
     int coefficient;
 
     if (!seed || !public_key || !private_key || !mlkem_parameters_valid())
-        return CRYPTO_ERROR_INTERNAL;
+        return LIBERAC_ERROR_INTERNAL;
 
     workspace = (mlkem_keygen_workspace *)calloc(1u, sizeof(*workspace));
-    if (!workspace) return CRYPTO_ERROR_ALLOCATION_FAILED;
+    if (!workspace) return LIBERAC_ERROR_ALLOCATION_FAILED;
 
     memcpy(workspace->byte_buffer, seed, 32u);
     workspace->byte_buffer[32] = (unsigned char)k;
@@ -139,7 +139,7 @@ CryptoError K_PKE_KeyGen(const unsigned char *seed, unsigned char *public_key,
             goto cleanup;
     }
     memcpy(public_key + (size_t)k * 384u, rho, sizeof(rho));
-    result = CRYPTO_SUCCESS;
+    result = LIBERAC_SUCCESS;
 
 cleanup:
     crypto_zeroize(rho, sizeof(rho));
@@ -148,7 +148,7 @@ cleanup:
     return result;
 }
 
-CryptoError K_PKE_Enc(const unsigned char *public_key,
+LiberaCError K_PKE_Enc(const unsigned char *public_key,
                       const unsigned char *message,
                       const unsigned char *randomness,
                       unsigned char *ciphertext) {
@@ -156,17 +156,17 @@ CryptoError K_PKE_Enc(const unsigned char *public_key,
     unsigned char rho[32] = { 0 };
     unsigned char nonce = 0u;
     const int *zetas;
-    CryptoError result = CRYPTO_ERROR_INTERNAL;
+    LiberaCError result = LIBERAC_ERROR_INTERNAL;
     int i;
     int j;
     int coefficient;
 
     if (!public_key || !message || !randomness || !ciphertext ||
         !mlkem_parameters_valid())
-        return CRYPTO_ERROR_INTERNAL;
+        return LIBERAC_ERROR_INTERNAL;
 
     workspace = (mlkem_encrypt_workspace *)calloc(1u, sizeof(*workspace));
-    if (!workspace) return CRYPTO_ERROR_ALLOCATION_FAILED;
+    if (!workspace) return LIBERAC_ERROR_ALLOCATION_FAILED;
 
     for (i = 0; i < k; ++i) {
         if (ByteDecode(public_key + (size_t)i * 384u, 12u,
@@ -262,7 +262,7 @@ CryptoError K_PKE_Enc(const unsigned char *public_key,
         ByteEncode(workspace->polynomial, (size_t)d_v,
                    ciphertext + (size_t)k * 32u * (size_t)d_u) != 0)
         goto cleanup;
-    result = CRYPTO_SUCCESS;
+    result = LIBERAC_SUCCESS;
 
 cleanup:
     crypto_zeroize(rho, sizeof(rho));
@@ -270,20 +270,20 @@ cleanup:
     return result;
 }
 
-CryptoError K_PKE_Dec(const unsigned char *private_key,
+LiberaCError K_PKE_Dec(const unsigned char *private_key,
                       const unsigned char *ciphertext,
                       unsigned char *message) {
     mlkem_decrypt_workspace *workspace = NULL;
     const int *zetas;
-    CryptoError result = CRYPTO_ERROR_INTERNAL;
+    LiberaCError result = LIBERAC_ERROR_INTERNAL;
     int i;
     int coefficient;
 
     if (!private_key || !ciphertext || !message || !mlkem_parameters_valid())
-        return CRYPTO_ERROR_INTERNAL;
+        return LIBERAC_ERROR_INTERNAL;
 
     workspace = (mlkem_decrypt_workspace *)calloc(1u, sizeof(*workspace));
-    if (!workspace) return CRYPTO_ERROR_ALLOCATION_FAILED;
+    if (!workspace) return LIBERAC_ERROR_ALLOCATION_FAILED;
 
     for (i = 0; i < k; ++i) {
         if (ByteDecode(ciphertext + (size_t)i * 32u * (size_t)d_u,
@@ -331,7 +331,7 @@ CryptoError K_PKE_Dec(const unsigned char *private_key,
              MLKEM_N) != 0 ||
         ByteEncode(workspace->polynomial, 1u, message) != 0)
         goto cleanup;
-    result = CRYPTO_SUCCESS;
+    result = LIBERAC_SUCCESS;
 
 cleanup:
     mlkem_workspace_free(workspace, sizeof(*workspace));

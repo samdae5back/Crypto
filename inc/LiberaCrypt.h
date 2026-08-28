@@ -4,7 +4,7 @@
  */
 
 /**
- * @file Crypto.h
+ * @file LiberaCrypt.h
  * @brief Umbrella header for the complete public Crypto C API.
  *
  * Include this header to use every supported API family.  Applications that
@@ -14,18 +14,18 @@
  * @mainpage Crypto C API
  *
  * The library exposes one operation-oriented API per cryptographic family.
- * Algorithms and parameter sets are selected at runtime with an AlgID passed
+ * Algorithms and parameter sets are selected at runtime with an LiberaCAlgID passed
  * as the final function argument.  Public functions are prefixed with
- * @c CRYPTO_, and failures are reported using CryptoError status codes.
+ * @c LIBERAC_, and failures are reported using LiberaCError status codes.
  *
  * @section crypto_quick_start Quick start
  * @code{.c}
- * #include <Crypto.h>
+ * #include <LiberaCrypt.h>
  *
- * uint8_t digest[CRYPTO_SHA2_256_DIGEST_BYTES];
- * CryptoError error = CRYPTO_HASH(
+ * uint8_t digest[LIBERAC_SHA2_256_DIGEST_BYTES];
+ * LiberaCError error = LIBERAC_HASH(
  *     digest, sizeof(digest), message, message_length,
- *     ALG_HASH_SHA2_256);
+ *     LIBERAC_ALG_HASH_SHA2_256);
  * @endcode
  *
  * See each family header for buffer ownership, parameter-set sizes, and
@@ -33,8 +33,8 @@
  * output buffers on behalf of the caller; managed bignum and asymmetric-key
  * objects allocate their internal storage as needed.
  */
-#ifndef CRYPTO_H
-#define CRYPTO_H
+#ifndef LIBERAC_H
+#define LIBERAC_H
 
 #include "Def.h"
 #include "BlockCipher.h"

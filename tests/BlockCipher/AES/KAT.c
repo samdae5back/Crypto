@@ -32,8 +32,8 @@ static int ecb_kat(void) {
         {0x8e,0xa2,0xb7,0xca,0x51,0x67,0x45,0xbf,
          0xea,0xfc,0x49,0x90,0x4b,0x49,0x60,0x89}
     };
-    static const AlgID algorithms[3] = {
-        ALG_AES_128_ECB, ALG_AES_192_ECB, ALG_AES_256_ECB
+    static const LiberaCAlgID algorithms[3] = {
+        LIBERAC_ALG_AES_128_ECB, LIBERAC_ALG_AES_192_ECB, LIBERAC_ALG_AES_256_ECB
     };
     static const size_t key_lengths[3] = {16u, 24u, 32u};
     uint8_t ciphertext[16];
@@ -41,18 +41,18 @@ static int ecb_kat(void) {
     size_t i;
 
     for (i = 0u; i < 3u; ++i) {
-        if (CRYPTO_BLOCK_CIPHER_ENCRYPT(
+        if (LIBERAC_BLOCK_CIPHER_ENCRYPT(
                 ciphertext, sizeof(ciphertext), NULL, 0u,
                 plaintext, sizeof(plaintext), keys[i], key_lengths[i],
-                NULL, 0u, NULL, 0u, algorithms[i]) != CRYPTO_SUCCESS) {
+                NULL, 0u, NULL, 0u, algorithms[i]) != LIBERAC_SUCCESS) {
             return 1;
         }
         if (memcmp(ciphertext, expected[i], sizeof(ciphertext)) != 0)
             return 1;
-        if (CRYPTO_BLOCK_CIPHER_DECRYPT(
+        if (LIBERAC_BLOCK_CIPHER_DECRYPT(
                 recovered, sizeof(recovered), NULL, 0u,
                 ciphertext, sizeof(ciphertext), keys[i], key_lengths[i],
-                NULL, 0u, NULL, 0u, algorithms[i]) != CRYPTO_SUCCESS) {
+                NULL, 0u, NULL, 0u, algorithms[i]) != LIBERAC_SUCCESS) {
             return 1;
         }
         if (memcmp(recovered, plaintext, sizeof(recovered)) != 0) return 1;
@@ -63,13 +63,13 @@ static int ecb_kat(void) {
 /* Additional AESAVS records retained from the former mixed KAT runner. */
 static int ecb_iotcc_kat(void) {
     static const struct {
-        AlgID algorithm;
+        LiberaCAlgID algorithm;
         size_t key_length;
         uint8_t expected[16];
     } vectors[] = {
-        { ALG_AES_128_ECB, 16u, {0x3a,0xd7,0x8e,0x72,0x6c,0x1e,0xc0,0x2b,0x7e,0xbf,0xe9,0x2b,0x23,0xd9,0xec,0x34} },
-        { ALG_AES_192_ECB, 24u, {0x6c,0xd0,0x25,0x13,0xe8,0xd4,0xdc,0x98,0x6b,0x4a,0xfe,0x08,0x7a,0x60,0xbd,0x0c} },
-        { ALG_AES_256_ECB, 32u, {0xdd,0xc6,0xbf,0x79,0x0c,0x15,0x76,0x0d,0x8d,0x9a,0xeb,0x6f,0x9a,0x75,0xfd,0x4e} }
+        { LIBERAC_ALG_AES_128_ECB, 16u, {0x3a,0xd7,0x8e,0x72,0x6c,0x1e,0xc0,0x2b,0x7e,0xbf,0xe9,0x2b,0x23,0xd9,0xec,0x34} },
+        { LIBERAC_ALG_AES_192_ECB, 24u, {0x6c,0xd0,0x25,0x13,0xe8,0xd4,0xdc,0x98,0x6b,0x4a,0xfe,0x08,0x7a,0x60,0xbd,0x0c} },
+        { LIBERAC_ALG_AES_256_ECB, 32u, {0xdd,0xc6,0xbf,0x79,0x0c,0x15,0x76,0x0d,0x8d,0x9a,0xeb,0x6f,0x9a,0x75,0xfd,0x4e} }
     };
     uint8_t key[32] = {0};
     uint8_t plaintext[16] = {0x80};
@@ -77,10 +77,10 @@ static int ecb_iotcc_kat(void) {
     size_t i;
 
     for (i = 0u; i < sizeof(vectors) / sizeof(vectors[0]); ++i) {
-        if (CRYPTO_BLOCK_CIPHER_ENCRYPT(
+        if (LIBERAC_BLOCK_CIPHER_ENCRYPT(
                 ciphertext, sizeof(ciphertext), NULL, 0u,
                 plaintext, sizeof(plaintext), key, vectors[i].key_length,
-                NULL, 0u, NULL, 0u, vectors[i].algorithm) != CRYPTO_SUCCESS ||
+                NULL, 0u, NULL, 0u, vectors[i].algorithm) != LIBERAC_SUCCESS ||
             memcmp(ciphertext, vectors[i].expected, sizeof(ciphertext)) != 0) {
             return 1;
         }
@@ -128,11 +128,11 @@ static int cbc_ctr_kat(void) {
         {0x60,0x1e,0xc3,0x13,0x77,0x57,0x89,0xa5,
          0xb7,0xa7,0xf5,0x04,0xbb,0xf3,0xd2,0x28}
     };
-    static const AlgID cbc_algorithms[3] = {
-        ALG_AES_128_CBC, ALG_AES_192_CBC, ALG_AES_256_CBC
+    static const LiberaCAlgID cbc_algorithms[3] = {
+        LIBERAC_ALG_AES_128_CBC, LIBERAC_ALG_AES_192_CBC, LIBERAC_ALG_AES_256_CBC
     };
-    static const AlgID ctr_algorithms[3] = {
-        ALG_AES_128_CTR, ALG_AES_192_CTR, ALG_AES_256_CTR
+    static const LiberaCAlgID ctr_algorithms[3] = {
+        LIBERAC_ALG_AES_128_CTR, LIBERAC_ALG_AES_192_CTR, LIBERAC_ALG_AES_256_CTR
     };
     static const size_t key_lengths[3] = {16u, 24u, 32u};
     uint8_t output[16];
@@ -140,35 +140,35 @@ static int cbc_ctr_kat(void) {
     size_t i;
 
     for (i = 0u; i < 3u; ++i) {
-        if (CRYPTO_BLOCK_CIPHER_ENCRYPT(
+        if (LIBERAC_BLOCK_CIPHER_ENCRYPT(
                 output, sizeof(output), NULL, 0u,
                 plaintext, sizeof(plaintext), keys[i], key_lengths[i],
                 iv, sizeof(iv), NULL, 0u,
-                cbc_algorithms[i]) != CRYPTO_SUCCESS ||
+                cbc_algorithms[i]) != LIBERAC_SUCCESS ||
             memcmp(output, cbc_expected[i], sizeof(output)) != 0) {
             return 1;
         }
-        if (CRYPTO_BLOCK_CIPHER_DECRYPT(
+        if (LIBERAC_BLOCK_CIPHER_DECRYPT(
                 recovered, sizeof(recovered), NULL, 0u,
                 cbc_expected[i], sizeof(cbc_expected[i]),
                 keys[i], key_lengths[i], iv, sizeof(iv), NULL, 0u,
-                cbc_algorithms[i]) != CRYPTO_SUCCESS ||
+                cbc_algorithms[i]) != LIBERAC_SUCCESS ||
             memcmp(recovered, plaintext, sizeof(recovered)) != 0) {
             return 1;
         }
-        if (CRYPTO_BLOCK_CIPHER_ENCRYPT(
+        if (LIBERAC_BLOCK_CIPHER_ENCRYPT(
                 output, sizeof(output), NULL, 0u,
                 plaintext, sizeof(plaintext), keys[i], key_lengths[i],
                 counter, sizeof(counter), NULL, 0u,
-                ctr_algorithms[i]) != CRYPTO_SUCCESS ||
+                ctr_algorithms[i]) != LIBERAC_SUCCESS ||
             memcmp(output, ctr_expected[i], sizeof(output)) != 0) {
             return 1;
         }
-        if (CRYPTO_BLOCK_CIPHER_DECRYPT(
+        if (LIBERAC_BLOCK_CIPHER_DECRYPT(
                 recovered, sizeof(recovered), NULL, 0u,
                 ctr_expected[i], sizeof(ctr_expected[i]),
                 keys[i], key_lengths[i], counter, sizeof(counter), NULL, 0u,
-                ctr_algorithms[i]) != CRYPTO_SUCCESS ||
+                ctr_algorithms[i]) != LIBERAC_SUCCESS ||
             memcmp(recovered, plaintext, sizeof(recovered)) != 0) {
             return 1;
         }
@@ -179,8 +179,8 @@ static int cbc_ctr_kat(void) {
 static int gcm_kat(void) {
     static const uint8_t keys[3][32] = {{0}, {0}, {0}};
     static const size_t key_lengths[3] = {16u, 24u, 32u};
-    static const AlgID algorithms[3] = {
-        ALG_AES_128_GCM, ALG_AES_192_GCM, ALG_AES_256_GCM
+    static const LiberaCAlgID algorithms[3] = {
+        LIBERAC_ALG_AES_128_GCM, LIBERAC_ALG_AES_192_GCM, LIBERAC_ALG_AES_256_GCM
     };
     static const uint8_t expected_ciphertext[3][16] = {
         {0x03,0x88,0xda,0xce,0x60,0xb6,0xa3,0x92,
@@ -206,23 +206,23 @@ static int gcm_kat(void) {
     size_t i;
 
     for (i = 0u; i < 3u; ++i) {
-        if (CRYPTO_BLOCK_CIPHER_ENCRYPT(
+        if (LIBERAC_BLOCK_CIPHER_ENCRYPT(
                 ciphertext, sizeof(ciphertext), tag, sizeof(tag),
                 plaintext, sizeof(plaintext), keys[i], key_lengths[i],
                 iv, sizeof(iv), NULL, 0u,
-                algorithms[i]) != CRYPTO_SUCCESS) {
+                algorithms[i]) != LIBERAC_SUCCESS) {
             return 1;
         }
         if (memcmp(ciphertext, expected_ciphertext[i], sizeof(ciphertext)) != 0 ||
             memcmp(tag, expected_tag[i], sizeof(tag)) != 0) {
             return 1;
         }
-        if (CRYPTO_BLOCK_CIPHER_DECRYPT(
+        if (LIBERAC_BLOCK_CIPHER_DECRYPT(
                 recovered, sizeof(recovered), expected_tag[i],
                 sizeof(expected_tag[i]), expected_ciphertext[i],
                 sizeof(expected_ciphertext[i]), keys[i], key_lengths[i],
                 iv, sizeof(iv), NULL, 0u,
-                algorithms[i]) != CRYPTO_SUCCESS ||
+                algorithms[i]) != LIBERAC_SUCCESS ||
             memcmp(recovered, plaintext, sizeof(recovered)) != 0) {
             return 1;
         }
@@ -257,22 +257,22 @@ static int ccm_kat(void) {
     uint8_t recovered[23];
     uint8_t tag[8];
 
-    if (CRYPTO_BLOCK_CIPHER_ENCRYPT(
+    if (LIBERAC_BLOCK_CIPHER_ENCRYPT(
             ciphertext, sizeof(ciphertext), tag, sizeof(tag),
             plaintext, sizeof(plaintext), key, sizeof(key),
             nonce, sizeof(nonce), aad, sizeof(aad),
-            ALG_AES_128_CCM) != CRYPTO_SUCCESS) {
+            LIBERAC_ALG_AES_128_CCM) != LIBERAC_SUCCESS) {
         return 1;
     }
     if (memcmp(ciphertext, expected_ciphertext, sizeof(ciphertext)) != 0 ||
         memcmp(tag, expected_tag, sizeof(tag)) != 0) {
         return 1;
     }
-    if (CRYPTO_BLOCK_CIPHER_DECRYPT(
+    if (LIBERAC_BLOCK_CIPHER_DECRYPT(
             recovered, sizeof(recovered), expected_tag, sizeof(expected_tag),
             expected_ciphertext, sizeof(expected_ciphertext),
             key, sizeof(key), nonce, sizeof(nonce), aad, sizeof(aad),
-            ALG_AES_128_CCM) != CRYPTO_SUCCESS) {
+            LIBERAC_ALG_AES_128_CCM) != LIBERAC_SUCCESS) {
         return 1;
     }
     return memcmp(recovered, plaintext, sizeof(recovered)) != 0;

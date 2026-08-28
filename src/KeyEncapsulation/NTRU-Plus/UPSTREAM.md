@@ -7,7 +7,7 @@ This implementation is derived from the NTRU+ reference implementation at
 The upstream `Reference_Implementation/NTRU+768`, `NTRU+864`, and
 `NTRU+1152` sources were consolidated into one runtime-parameter
 implementation. Upstream Keccak and random-byte implementations are not
-included; the Crypto library's private SHA3/SHAKE and random-byte providers
+included; the LiberaCrypt library's private SHA3/SHAKE and random-byte providers
 are used instead. Internal symbols use the `crypto_ntru_plus_` namespace.
 
 The upstream MIT license is reproduced in [LICENSE](LICENSE).

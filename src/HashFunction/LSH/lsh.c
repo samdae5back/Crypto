@@ -466,51 +466,51 @@ static void LSH_512_512_Return(unsigned char out[64], const unsigned char in[128
 	lsh512_return(out, in, 64);
 }
 
-CryptoError crypto_lsh_init(
+LiberaCError crypto_lsh_init(
 	crypto_lsh_context *CONTEXT,
-	AlgID ALG)
+	LiberaCAlgID ALG)
 {
 	if (CONTEXT == NULL) {
-		return CRYPTO_ERROR_INVALID_ARGUMENT;
+		return LIBERAC_ERROR_INVALID_ARGUMENT;
 	}
 	crypto_zeroize(CONTEXT, sizeof(*CONTEXT));
 	switch (ALG) {
-	case ALG_HASH_LSH_256_224:
+	case LIBERAC_ALG_HASH_LSH_256_224:
 		LSH_256_224_Preprocess(CONTEXT->STATE);
 		CONTEXT->BLOCK_LENGTH = 128u;
 		break;
-	case ALG_HASH_LSH_256_256:
+	case LIBERAC_ALG_HASH_LSH_256_256:
 		LSH_256_256_Preprocess(CONTEXT->STATE);
 		CONTEXT->BLOCK_LENGTH = 128u;
 		break;
-	case ALG_HASH_LSH_512_224:
+	case LIBERAC_ALG_HASH_LSH_512_224:
 		LSH_512_224_Preprocess(CONTEXT->STATE);
 		CONTEXT->BLOCK_LENGTH = 256u;
 		CONTEXT->USE_LSH512 = 1u;
 		break;
-	case ALG_HASH_LSH_512_256:
+	case LIBERAC_ALG_HASH_LSH_512_256:
 		LSH_512_256_Preprocess(CONTEXT->STATE);
 		CONTEXT->BLOCK_LENGTH = 256u;
 		CONTEXT->USE_LSH512 = 1u;
 		break;
-	case ALG_HASH_LSH_512_384:
+	case LIBERAC_ALG_HASH_LSH_512_384:
 		LSH_512_384_Preprocess(CONTEXT->STATE);
 		CONTEXT->BLOCK_LENGTH = 256u;
 		CONTEXT->USE_LSH512 = 1u;
 		break;
-	case ALG_HASH_LSH_512_512:
+	case LIBERAC_ALG_HASH_LSH_512_512:
 		LSH_512_512_Preprocess(CONTEXT->STATE);
 		CONTEXT->BLOCK_LENGTH = 256u;
 		CONTEXT->USE_LSH512 = 1u;
 		break;
 	default:
 		crypto_zeroize(CONTEXT, sizeof(*CONTEXT));
-		return CRYPTO_ERROR_INVALID_ALG_ID;
+		return LIBERAC_ERROR_INVALID_ALG_ID;
 	}
-	return CRYPTO_SUCCESS;
+	return LIBERAC_SUCCESS;
 }
 
-CryptoError crypto_lsh_update(
+LiberaCError crypto_lsh_update(
 	crypto_lsh_context *CONTEXT,
 	const uint8_t *INPUT, size_t INPUT_LENGTH)
 {
@@ -518,10 +518,10 @@ CryptoError crypto_lsh_update(
 	size_t copied;
 
 	if (CONTEXT == NULL || (INPUT == NULL && INPUT_LENGTH != 0u)) {
-		return CRYPTO_ERROR_INVALID_ARGUMENT;
+		return LIBERAC_ERROR_INVALID_ARGUMENT;
 	}
 	if (CONTEXT->BLOCK_LENGTH != 128u && CONTEXT->BLOCK_LENGTH != 256u) {
-		return CRYPTO_ERROR_INVALID_ARGUMENT;
+		return LIBERAC_ERROR_INVALID_ARGUMENT;
 	}
 
 	if (CONTEXT->BUFFER_LENGTH != 0u) {
@@ -556,7 +556,7 @@ CryptoError crypto_lsh_update(
 		memcpy(CONTEXT->BLOCK, INPUT, INPUT_LENGTH);
 		CONTEXT->BUFFER_LENGTH = INPUT_LENGTH;
 	}
-	return CRYPTO_SUCCESS;
+	return LIBERAC_SUCCESS;
 }
 
 void crypto_lsh_finalize(crypto_lsh_context *CONTEXT)
@@ -580,28 +580,28 @@ void crypto_lsh_finalize(crypto_lsh_context *CONTEXT)
 void crypto_lsh_squeeze(
 	const crypto_lsh_context *CONTEXT,
 	uint8_t *OUTPUT,
-	AlgID ALG)
+	LiberaCAlgID ALG)
 {
 	if (CONTEXT == NULL || OUTPUT == NULL) {
 		return;
 	}
 	switch (ALG) {
-	case ALG_HASH_LSH_256_224:
+	case LIBERAC_ALG_HASH_LSH_256_224:
 		LSH_256_224_Return(OUTPUT, CONTEXT->STATE);
 		break;
-	case ALG_HASH_LSH_256_256:
+	case LIBERAC_ALG_HASH_LSH_256_256:
 		LSH_256_256_Return(OUTPUT, CONTEXT->STATE);
 		break;
-	case ALG_HASH_LSH_512_224:
+	case LIBERAC_ALG_HASH_LSH_512_224:
 		LSH_512_224_Return(OUTPUT, CONTEXT->STATE);
 		break;
-	case ALG_HASH_LSH_512_256:
+	case LIBERAC_ALG_HASH_LSH_512_256:
 		LSH_512_256_Return(OUTPUT, CONTEXT->STATE);
 		break;
-	case ALG_HASH_LSH_512_384:
+	case LIBERAC_ALG_HASH_LSH_512_384:
 		LSH_512_384_Return(OUTPUT, CONTEXT->STATE);
 		break;
-	case ALG_HASH_LSH_512_512:
+	case LIBERAC_ALG_HASH_LSH_512_512:
 		LSH_512_512_Return(OUTPUT, CONTEXT->STATE);
 		break;
 	default:

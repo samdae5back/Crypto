@@ -24,17 +24,17 @@ typedef struct crypto_sha2_context {
     uint8_t USE_SHA512;
 } crypto_sha2_context;
 
-CryptoError crypto_sha2_init(
+LiberaCError crypto_sha2_init(
     crypto_sha2_context *CONTEXT,
-    AlgID ALG);
-CryptoError crypto_sha2_update(
+    LiberaCAlgID ALG);
+LiberaCError crypto_sha2_update(
     crypto_sha2_context *CONTEXT,
     const uint8_t *INPUT, size_t INPUT_LENGTH);
 void crypto_sha2_finalize(crypto_sha2_context *CONTEXT);
 void crypto_sha2_squeeze(
     const crypto_sha2_context *CONTEXT,
     uint8_t *OUTPUT,
-    AlgID ALG);
+    LiberaCAlgID ALG);
 void crypto_sha2_clear(crypto_sha2_context *CONTEXT);
 
 #endif

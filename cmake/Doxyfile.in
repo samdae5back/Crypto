@@ -1,7 +1,7 @@
-PROJECT_NAME           = "Crypto"
+PROJECT_NAME           = "LiberaCrypt"
 PROJECT_NUMBER         = "@PROJECT_VERSION@"
 PROJECT_BRIEF          = "Runtime-selected portable C cryptography API"
-OUTPUT_DIRECTORY       = "@CRYPTO_DOXYGEN_OUTPUT_DIR@"
+OUTPUT_DIRECTORY       = "@LIBERAC_DOXYGEN_OUTPUT_DIR@"
 CREATE_SUBDIRS         = NO
 OUTPUT_LANGUAGE        = English
 BRIEF_MEMBER_DESC      = YES
@@ -49,7 +49,7 @@ WARN_IF_UNDOCUMENTED   = YES
 WARN_IF_UNDOC_ENUM_VAL = YES
 WARN_IF_DOC_ERROR      = YES
 WARN_NO_PARAMDOC       = YES
-WARN_LOGFILE           = "@CRYPTO_DOXYGEN_OUTPUT_DIR@/warnings.log"
+WARN_LOGFILE           = "@LIBERAC_DOXYGEN_OUTPUT_DIR@/warnings.log"
 INPUT_FILTER           =
 FILTER_PATTERNS        =
 FILTER_SOURCE_PATTERNS =
@@ -58,9 +58,9 @@ MACRO_EXPANSION        = YES
 EXPAND_ONLY_PREDEF     = YES
 SEARCH_INCLUDES        = YES
 INCLUDE_PATH           = "@CMAKE_CURRENT_SOURCE_DIR@/inc"
-PREDEFINED             = CRYPTO_API= \
-                         CRYPTO_BEGIN_DECLS= \
-                         CRYPTO_END_DECLS=
+PREDEFINED             = LIBERAC_API= \
+                         LIBERAC_BEGIN_DECLS= \
+                         LIBERAC_END_DECLS=
 SKIP_FUNCTION_MACROS   = YES
 ALPHABETICAL_INDEX     = YES
 GENERATE_HTML          = YES

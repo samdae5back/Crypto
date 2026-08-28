@@ -160,9 +160,9 @@ static void sha512_compress(uint64_t state[8], const uint8_t block[SHA512_BLOCK_
     crypto_zeroize(schedule, sizeof(schedule));
 }
 
-CryptoError crypto_sha2_init(
+LiberaCError crypto_sha2_init(
     crypto_sha2_context *CONTEXT,
-    AlgID ALG) {
+    LiberaCAlgID ALG) {
     static const uint32_t iv224[8] = {
         0xc1059ed8u, 0x367cd507u, 0x3070dd17u, 0xf70e5939u,
         0xffc00b31u, 0x68581511u, 0x64f98fa7u, 0xbefa4fa4u
@@ -197,41 +197,41 @@ CryptoError crypto_sha2_init(
     };
 
     if (CONTEXT == NULL) {
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
     crypto_zeroize(CONTEXT, sizeof(*CONTEXT));
 
     switch (ALG) {
-        case ALG_HASH_SHA2_224:
+        case LIBERAC_ALG_HASH_SHA2_224:
             memcpy(CONTEXT->STATE.WORDS32, iv224, sizeof(iv224));
             break;
-        case ALG_HASH_SHA2_256:
+        case LIBERAC_ALG_HASH_SHA2_256:
             memcpy(CONTEXT->STATE.WORDS32, iv256, sizeof(iv256));
             break;
-        case ALG_HASH_SHA2_384:
+        case LIBERAC_ALG_HASH_SHA2_384:
             memcpy(CONTEXT->STATE.WORDS64, iv384, sizeof(iv384));
             CONTEXT->USE_SHA512 = 1u;
             break;
-        case ALG_HASH_SHA2_512:
+        case LIBERAC_ALG_HASH_SHA2_512:
             memcpy(CONTEXT->STATE.WORDS64, iv512, sizeof(iv512));
             CONTEXT->USE_SHA512 = 1u;
             break;
-        case ALG_HASH_SHA2_512_224:
+        case LIBERAC_ALG_HASH_SHA2_512_224:
             memcpy(CONTEXT->STATE.WORDS64, iv512_224, sizeof(iv512_224));
             CONTEXT->USE_SHA512 = 1u;
             break;
-        case ALG_HASH_SHA2_512_256:
+        case LIBERAC_ALG_HASH_SHA2_512_256:
             memcpy(CONTEXT->STATE.WORDS64, iv512_256, sizeof(iv512_256));
             CONTEXT->USE_SHA512 = 1u;
             break;
         default:
             crypto_zeroize(CONTEXT, sizeof(*CONTEXT));
-            return CRYPTO_ERROR_INVALID_ALG_ID;
+            return LIBERAC_ERROR_INVALID_ALG_ID;
     }
-    return CRYPTO_SUCCESS;
+    return LIBERAC_SUCCESS;
 }
 
-static CryptoError sha2_add_length(
+static LiberaCError sha2_add_length(
     crypto_sha2_context *context, size_t input_length) {
     const uint64_t maximum_high = UINT64_MAX >> 3;
     const uint64_t addition = (uint64_t)input_length;
@@ -242,24 +242,24 @@ static CryptoError sha2_add_length(
         const uint64_t maximum_length = UINT64_MAX >> 3;
         if (context->LENGTH_HIGH != 0u ||
             addition > maximum_length - context->LENGTH_LOW) {
-            return CRYPTO_ERROR_MESSAGE_TOO_LARGE;
+            return LIBERAC_ERROR_MESSAGE_TOO_LARGE;
         }
         context->LENGTH_LOW += addition;
-        return CRYPTO_SUCCESS;
+        return LIBERAC_SUCCESS;
     }
 
     new_low = context->LENGTH_LOW + addition;
     new_high = context->LENGTH_HIGH +
                (uint64_t)(new_low < context->LENGTH_LOW);
     if (new_high < context->LENGTH_HIGH || new_high > maximum_high) {
-        return CRYPTO_ERROR_MESSAGE_TOO_LARGE;
+        return LIBERAC_ERROR_MESSAGE_TOO_LARGE;
     }
     context->LENGTH_LOW = new_low;
     context->LENGTH_HIGH = new_high;
-    return CRYPTO_SUCCESS;
+    return LIBERAC_SUCCESS;
 }
 
-CryptoError crypto_sha2_update(
+LiberaCError crypto_sha2_update(
     crypto_sha2_context *CONTEXT,
     const uint8_t *INPUT, size_t INPUT_LENGTH) {
     const size_t block_length = CONTEXT != NULL && CONTEXT->USE_SHA512 != 0u
@@ -267,13 +267,13 @@ CryptoError crypto_sha2_update(
                                     : SHA256_BLOCK_BYTES;
     size_t available;
     size_t copied;
-    CryptoError error;
+    LiberaCError error;
 
     if (CONTEXT == NULL || (INPUT == NULL && INPUT_LENGTH != 0u)) {
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
     error = sha2_add_length(CONTEXT, INPUT_LENGTH);
-    if (error != CRYPTO_SUCCESS) {
+    if (error != LIBERAC_SUCCESS) {
         return error;
     }
 
@@ -309,7 +309,7 @@ CryptoError crypto_sha2_update(
         memcpy(CONTEXT->BLOCK, INPUT, INPUT_LENGTH);
         CONTEXT->BUFFER_LENGTH = INPUT_LENGTH;
     }
-    return CRYPTO_SUCCESS;
+    return LIBERAC_SUCCESS;
 }
 
 void crypto_sha2_finalize(crypto_sha2_context *CONTEXT) {
@@ -355,7 +355,7 @@ void crypto_sha2_finalize(crypto_sha2_context *CONTEXT) {
 void crypto_sha2_squeeze(
     const crypto_sha2_context *CONTEXT,
     uint8_t *OUTPUT,
-    AlgID ALG) {
+    LiberaCAlgID ALG) {
     uint8_t digest[64];
     size_t digest_length;
     size_t index;
@@ -377,18 +377,18 @@ void crypto_sha2_squeeze(
     }
 
     switch (ALG) {
-        case ALG_HASH_SHA2_224:
-        case ALG_HASH_SHA2_512_224:
+        case LIBERAC_ALG_HASH_SHA2_224:
+        case LIBERAC_ALG_HASH_SHA2_512_224:
             digest_length = 28u;
             break;
-        case ALG_HASH_SHA2_256:
-        case ALG_HASH_SHA2_512_256:
+        case LIBERAC_ALG_HASH_SHA2_256:
+        case LIBERAC_ALG_HASH_SHA2_512_256:
             digest_length = 32u;
             break;
-        case ALG_HASH_SHA2_384:
+        case LIBERAC_ALG_HASH_SHA2_384:
             digest_length = 48u;
             break;
-        case ALG_HASH_SHA2_512:
+        case LIBERAC_ALG_HASH_SHA2_512:
             digest_length = 64u;
             break;
         default:

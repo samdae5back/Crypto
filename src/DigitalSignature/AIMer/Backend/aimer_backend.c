@@ -220,7 +220,7 @@ static void commit_and_expand_tape(crypto_aimer_tape *tape, uint8_t *commit,
   crypto_aimer_hash_clear(&ctx);
 }
 
-static CryptoError run_phase_1(uint8_t *sig, uint8_t *commits, uint8_t *nodes,
+static LiberaCError run_phase_1(uint8_t *sig, uint8_t *commits, uint8_t *nodes,
                         crypto_aimer_mult_check (*mult_chk)[CRYPTO_AIMER_MAX_PARTIES],
                         crypto_aimer_gf (*alpha_v_shares)[2][CRYPTO_AIMER_MAX_PARTIES],
                         const uint8_t *sk, const uint8_t *rnd,
@@ -265,12 +265,12 @@ static CryptoError run_phase_1(uint8_t *sig, uint8_t *commits, uint8_t *nodes,
     crypto_zeroize(vector_b, sizeof(vector_b));
     crypto_zeroize(mu, sizeof(mu));
     crypto_zeroize(root_seeds, sizeof(root_seeds));
-    return CRYPTO_ERROR_ALLOCATION_FAILED;
+    return LIBERAC_ERROR_ALLOCATION_FAILED;
   }
   {
-    const CryptoError matrix_error = crypto_aimer_aim2_generate_linear(
+    const LiberaCError matrix_error = crypto_aimer_aim2_generate_linear(
       matrix_A, vector_b, sk + alg->field_bytes, alg);
-    if (matrix_error != CRYPTO_SUCCESS)
+    if (matrix_error != LIBERAC_SUCCESS)
     {
       crypto_zeroize(matrix_A,
                      sizeof(crypto_aimer_gf) * alg->multiplications *
@@ -381,7 +381,7 @@ static CryptoError run_phase_1(uint8_t *sig, uint8_t *commits, uint8_t *nodes,
   crypto_zeroize(vector_b, sizeof(vector_b));
   crypto_zeroize(mu, sizeof(mu));
   crypto_zeroize(root_seeds, sizeof(root_seeds));
-  return CRYPTO_SUCCESS;
+  return LIBERAC_SUCCESS;
 }
 
 static void run_phase_2_and_3(uint8_t *sig,
@@ -439,17 +439,17 @@ static void run_phase_2_and_3(uint8_t *sig,
   crypto_zeroize(alpha, sizeof(alpha));
 }
 
-CryptoError crypto_aimer_backend_keypair(uint8_t *pk, uint8_t *sk,
+LiberaCError crypto_aimer_backend_keypair(uint8_t *pk, uint8_t *sk,
                             const uint8_t *pt, const uint8_t *iv,
                             const crypto_aimer_params *alg)
 {
   if (pk == NULL || sk == NULL || pt == NULL || iv == NULL || alg == NULL)
-    return CRYPTO_ERROR_INVALID_ARGUMENT;
+    return LIBERAC_ERROR_INVALID_ARGUMENT;
 
   {
-    const CryptoError error =
+    const LiberaCError error =
       crypto_aimer_aim2(pk + alg->iv_bytes, pt, iv, alg);
-    if (error != CRYPTO_SUCCESS)
+    if (error != LIBERAC_SUCCESS)
       return error;
   }
 
@@ -458,10 +458,10 @@ CryptoError crypto_aimer_backend_keypair(uint8_t *pk, uint8_t *sk,
   memcpy(sk + alg->field_bytes, pk,
          alg->iv_bytes + alg->field_bytes);
 
-  return CRYPTO_SUCCESS;
+  return LIBERAC_SUCCESS;
 }
 
-CryptoError crypto_aimer_backend_sign(uint8_t *sig,
+LiberaCError crypto_aimer_backend_sign(uint8_t *sig,
                               const uint8_t *m, size_t mlen,
                               const uint8_t *pre, size_t prelen,
                               const uint8_t *rnd,
@@ -479,11 +479,11 @@ CryptoError crypto_aimer_backend_sign(uint8_t *sig,
   size_t commits_bytes;
   size_t mult_checks_bytes;
   size_t alpha_shares_bytes;
-  CryptoError error = CRYPTO_ERROR_ALLOCATION_FAILED;
+  LiberaCError error = LIBERAC_ERROR_ALLOCATION_FAILED;
 
   if (sig == NULL || (!m && mlen != 0u) || (!pre && prelen != 0u) ||
       rnd == NULL || sk == NULL || alg == NULL)
-    return CRYPTO_ERROR_INVALID_ARGUMENT;
+    return LIBERAC_ERROR_INVALID_ARGUMENT;
 
   nodes_bytes = alg->repetitions * (2U * alg->parties - 1U) * alg->seed_bytes;
   commits_bytes = alg->repetitions * alg->parties * alg->commit_bytes;
@@ -499,7 +499,7 @@ CryptoError crypto_aimer_backend_sign(uint8_t *sig,
 
   error = run_phase_1(sig, commits, nodes, mult_chk, alpha_v_shares, sk, rnd,
                       m, mlen, pre, prelen, alg);
-  if (error != CRYPTO_SUCCESS)
+  if (error != LIBERAC_SUCCESS)
     goto cleanup;
   run_phase_2_and_3(sig, alpha_v_shares,
                     (const crypto_aimer_mult_check (*)[CRYPTO_AIMER_MAX_PARTIES])mult_chk, alg);
@@ -521,7 +521,7 @@ CryptoError crypto_aimer_backend_sign(uint8_t *sig,
     crypto_aimer_field_to_bytes(proof_missing_alpha(proof, alg), alpha_v_shares[rep][0][i_bar], alg);
   }
 
-  error = CRYPTO_SUCCESS;
+  error = LIBERAC_SUCCESS;
 
 cleanup:
   crypto_aimer_hash_clear(&ctx);
@@ -539,7 +539,7 @@ cleanup:
   return error;
 }
 
-CryptoError crypto_aimer_backend_verify(const uint8_t *sig, size_t siglen,
+LiberaCError crypto_aimer_backend_verify(const uint8_t *sig, size_t siglen,
                            const uint8_t *m, size_t mlen,
                            const uint8_t *pre, size_t prelen,
                            const uint8_t *pk,
@@ -565,15 +565,15 @@ CryptoError crypto_aimer_backend_verify(const uint8_t *sig, size_t siglen,
   size_t matrix_bytes;
   size_t nodes_bytes;
   size_t shares_bytes;
-  CryptoError error = CRYPTO_ERROR_SIGNATURE_INVALID;
+  LiberaCError error = LIBERAC_ERROR_SIGNATURE_INVALID;
 
   if (sig == NULL || (!m && mlen != 0u) || (!pre && prelen != 0u) ||
       pk == NULL || alg == NULL)
-    return CRYPTO_ERROR_INVALID_ARGUMENT;
+    return LIBERAC_ERROR_INVALID_ARGUMENT;
 
   if (siglen != alg->signature_bytes)
   {
-    return CRYPTO_ERROR_SIGNATURE_INVALID;
+    return LIBERAC_ERROR_SIGNATURE_INVALID;
   }
 
   matrix_bytes = sizeof(crypto_aimer_gf) * alg->multiplications * alg->field_bits;
@@ -587,16 +587,16 @@ CryptoError crypto_aimer_backend_verify(const uint8_t *sig, size_t siglen,
   if (matrix_A == NULL || nodes == NULL || pt_shares == NULL ||
       alpha_shares == NULL || v_shares == NULL)
   {
-    error = CRYPTO_ERROR_ALLOCATION_FAILED;
+    error = LIBERAC_ERROR_ALLOCATION_FAILED;
     goto cleanup;
   }
 
   crypto_aimer_field_from_bytes(ct_gf, pk + alg->iv_bytes, alg);
 
   {
-    const CryptoError matrix_error =
+    const LiberaCError matrix_error =
       crypto_aimer_aim2_generate_linear(matrix_A, vector_b, pk, alg);
-    if (matrix_error != CRYPTO_SUCCESS)
+    if (matrix_error != LIBERAC_SUCCESS)
     {
       error = matrix_error;
       goto cleanup;
@@ -736,7 +736,7 @@ CryptoError crypto_aimer_backend_verify(const uint8_t *sig, size_t siglen,
 
     if ((h1_matches & h2_matches) != 0)
     {
-      error = CRYPTO_SUCCESS;
+      error = LIBERAC_SUCCESS;
     }
   }
 

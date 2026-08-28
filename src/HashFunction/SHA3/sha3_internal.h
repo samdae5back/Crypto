@@ -16,9 +16,9 @@ typedef struct crypto_sha3_context {
     uint8_t finalized;
 } crypto_sha3_context;
 
-CryptoError crypto_sha3_init(
+LiberaCError crypto_sha3_init(
     crypto_sha3_context *CONTEXT,
-    AlgID ALG);
+    LiberaCAlgID ALG);
 
 void crypto_sha3_256(
     uint8_t OUTPUT[32], const uint8_t *INPUT, size_t INPUT_LENGTH);

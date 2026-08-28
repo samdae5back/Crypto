@@ -14,21 +14,21 @@
 
 typedef struct crypto_test_aimer_case {
     const char *name;
-    AlgID alg;
+    LiberaCAlgID alg;
 } CRYPTO_TEST_AIMER_CASE;
 
 static const CRYPTO_TEST_AIMER_CASE aimer_cases[] = {
-    { "AIMer-128f", ALG_AIMER_128F },
-    { "AIMer-128s", ALG_AIMER_128S },
-    { "AIMer-192f", ALG_AIMER_192F },
-    { "AIMer-192s", ALG_AIMER_192S },
-    { "AIMer-256f", ALG_AIMER_256F },
-    { "AIMer-256s", ALG_AIMER_256S }
+    { "AIMer-128f", LIBERAC_ALG_AIMER_128F },
+    { "AIMer-128s", LIBERAC_ALG_AIMER_128S },
+    { "AIMer-192f", LIBERAC_ALG_AIMER_192F },
+    { "AIMer-192s", LIBERAC_ALG_AIMER_192S },
+    { "AIMer-256f", LIBERAC_ALG_AIMER_256F },
+    { "AIMer-256s", LIBERAC_ALG_AIMER_256S }
 };
 
 static int report_crypto_error(
     const CRYPTO_TEST_KAT_READER *reader, const char *operation,
-    CryptoError error) {
+    LiberaCError error) {
     fprintf(stderr, "%s: record %zu: %s failed (%d)\n",
             reader->path, reader->record, operation, (int)error);
     return -1;
@@ -54,9 +54,9 @@ static int run_kat(const char *path, const CRYPTO_TEST_AIMER_CASE *test_case) {
     int kat_active = 0;
     int status = 1;
 
-    public_key_length = CRYPTO_AIMER_PUBLIC_KEY_SIZE(test_case->alg);
-    private_key_length = CRYPTO_AIMER_PRIVATE_KEY_SIZE(test_case->alg);
-    signature_length = CRYPTO_AIMER_SIGNATURE_SIZE(test_case->alg);
+    public_key_length = LIBERAC_AIMER_PUBLIC_KEY_SIZE(test_case->alg);
+    private_key_length = LIBERAC_AIMER_PRIVATE_KEY_SIZE(test_case->alg);
+    signature_length = LIBERAC_AIMER_SIGNATURE_SIZE(test_case->alg);
     if (public_key_length == 0u || private_key_length == 0u ||
         signature_length == 0u) {
         fprintf(stderr, "%s: unsupported AIMer algorithm\n", test_case->name);
@@ -79,7 +79,7 @@ static int run_kat(const char *path, const CRYPTO_TEST_AIMER_CASE *test_case) {
     for (index = 0u; index < 100u; ++index) {
         size_t count;
         size_t signed_message_length;
-        CryptoError error;
+        LiberaCError error;
 
         reader.record = index;
         if (crypto_test_kat_read_size(&reader, "count", &count) != 0)
@@ -123,25 +123,25 @@ static int run_kat(const char *path, const CRYPTO_TEST_AIMER_CASE *test_case) {
         }
 
         error = crypto_pqc_kat_initialize_internal(seed);
-        if (error != CRYPTO_SUCCESS) {
+        if (error != LIBERAC_SUCCESS) {
             report_crypto_error(&reader, "KAT DRBG initialization", error);
             goto close_reader;
         }
         kat_active = 1;
-        error = CRYPTO_AIMER_KEYGEN(
+        error = LIBERAC_AIMER_KEYGEN(
             actual_public_key, public_key_length,
             actual_private_key, private_key_length,
             test_case->alg);
-        if (error != CRYPTO_SUCCESS) {
+        if (error != LIBERAC_SUCCESS) {
             report_crypto_error(&reader, "key generation", error);
             goto close_reader;
         }
-        error = CRYPTO_AIMER_SIGN(
+        error = LIBERAC_AIMER_SIGN(
             actual_private_key, private_key_length,
             message, message_length, NULL, 0u,
             actual_signature, signature_length,
             test_case->alg);
-        if (error != CRYPTO_SUCCESS) {
+        if (error != LIBERAC_SUCCESS) {
             report_crypto_error(&reader, "signature generation", error);
             goto close_reader;
         }
@@ -160,12 +160,12 @@ static int run_kat(const char *path, const CRYPTO_TEST_AIMER_CASE *test_case) {
                 actual_signature, signature_length) != 0) {
             goto close_reader;
         }
-        error = CRYPTO_AIMER_VERIFY(
+        error = LIBERAC_AIMER_VERIFY(
             actual_public_key, public_key_length,
             message, message_length, NULL, 0u,
             actual_signature, signature_length,
             test_case->alg);
-        if (error != CRYPTO_SUCCESS) {
+        if (error != LIBERAC_SUCCESS) {
             report_crypto_error(&reader, "signature verification", error);
             goto close_reader;
         }

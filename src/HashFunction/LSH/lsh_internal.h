@@ -19,17 +19,17 @@ typedef struct crypto_lsh_context {
     uint8_t USE_LSH512;
 } crypto_lsh_context;
 
-CryptoError crypto_lsh_init(
+LiberaCError crypto_lsh_init(
     crypto_lsh_context *CONTEXT,
-    AlgID ALG);
-CryptoError crypto_lsh_update(
+    LiberaCAlgID ALG);
+LiberaCError crypto_lsh_update(
     crypto_lsh_context *CONTEXT,
     const uint8_t *INPUT, size_t INPUT_LENGTH);
 void crypto_lsh_finalize(crypto_lsh_context *CONTEXT);
 void crypto_lsh_squeeze(
     const crypto_lsh_context *CONTEXT,
     uint8_t *OUTPUT,
-    AlgID ALG);
+    LiberaCAlgID ALG);
 void crypto_lsh_clear(crypto_lsh_context *CONTEXT);
 
 #endif

@@ -36,38 +36,38 @@ typedef union crypto_hash_algorithm_state {
 
 typedef struct crypto_hash_context_impl {
     uint32_t MAGIC;
-    AlgID ALG;
+    LiberaCAlgID ALG;
     uint8_t PHASE;
     crypto_hash_algorithm_state STATE;
 } crypto_hash_context_impl;
 
-_Static_assert(sizeof(crypto_hash_context_impl) <= CRYPTO_HASH_CONTEXT_BYTES,
-               "CRYPTO_HASH_CONTEXT_BYTES is too small");
+_Static_assert(sizeof(crypto_hash_context_impl) <= LIBERAC_HASH_CONTEXT_BYTES,
+               "LIBERAC_HASH_CONTEXT_BYTES is too small");
 
-static crypto_hash_family hash_family(AlgID algorithm) {
+static crypto_hash_family hash_family(LiberaCAlgID algorithm) {
     switch (algorithm) {
-        case ALG_HASH_SHA2_224:
-        case ALG_HASH_SHA2_256:
-        case ALG_HASH_SHA2_384:
-        case ALG_HASH_SHA2_512:
-        case ALG_HASH_SHA2_512_224:
-        case ALG_HASH_SHA2_512_256:
+        case LIBERAC_ALG_HASH_SHA2_224:
+        case LIBERAC_ALG_HASH_SHA2_256:
+        case LIBERAC_ALG_HASH_SHA2_384:
+        case LIBERAC_ALG_HASH_SHA2_512:
+        case LIBERAC_ALG_HASH_SHA2_512_224:
+        case LIBERAC_ALG_HASH_SHA2_512_256:
             return CRYPTO_HASH_FAMILY_SHA2;
 
-        case ALG_HASH_SHA3_224:
-        case ALG_HASH_SHA3_256:
-        case ALG_HASH_SHA3_384:
-        case ALG_HASH_SHA3_512:
-        case ALG_HASH_SHAKE128:
-        case ALG_HASH_SHAKE256:
+        case LIBERAC_ALG_HASH_SHA3_224:
+        case LIBERAC_ALG_HASH_SHA3_256:
+        case LIBERAC_ALG_HASH_SHA3_384:
+        case LIBERAC_ALG_HASH_SHA3_512:
+        case LIBERAC_ALG_HASH_SHAKE128:
+        case LIBERAC_ALG_HASH_SHAKE256:
             return CRYPTO_HASH_FAMILY_SHA3;
 
-        case ALG_HASH_LSH_256_224:
-        case ALG_HASH_LSH_256_256:
-        case ALG_HASH_LSH_512_224:
-        case ALG_HASH_LSH_512_256:
-        case ALG_HASH_LSH_512_384:
-        case ALG_HASH_LSH_512_512:
+        case LIBERAC_ALG_HASH_LSH_256_224:
+        case LIBERAC_ALG_HASH_LSH_256_256:
+        case LIBERAC_ALG_HASH_LSH_512_224:
+        case LIBERAC_ALG_HASH_LSH_512_256:
+        case LIBERAC_ALG_HASH_LSH_512_384:
+        case LIBERAC_ALG_HASH_LSH_512_512:
             return CRYPTO_HASH_FAMILY_LSH;
 
         default:
@@ -75,32 +75,32 @@ static crypto_hash_family hash_family(AlgID algorithm) {
     }
 }
 
-static int is_shake(AlgID algorithm) {
-    return algorithm == ALG_HASH_SHAKE128 ||
-           algorithm == ALG_HASH_SHAKE256;
+static int is_shake(LiberaCAlgID algorithm) {
+    return algorithm == LIBERAC_ALG_HASH_SHAKE128 ||
+           algorithm == LIBERAC_ALG_HASH_SHAKE256;
 }
 
-static size_t fixed_digest_length(AlgID algorithm) {
+static size_t fixed_digest_length(LiberaCAlgID algorithm) {
     switch (algorithm) {
-        case ALG_HASH_SHA2_224:
-        case ALG_HASH_SHA2_512_224:
-        case ALG_HASH_LSH_256_224:
-        case ALG_HASH_LSH_512_224:
-        case ALG_HASH_SHA3_224:
+        case LIBERAC_ALG_HASH_SHA2_224:
+        case LIBERAC_ALG_HASH_SHA2_512_224:
+        case LIBERAC_ALG_HASH_LSH_256_224:
+        case LIBERAC_ALG_HASH_LSH_512_224:
+        case LIBERAC_ALG_HASH_SHA3_224:
             return 28u;
-        case ALG_HASH_SHA2_256:
-        case ALG_HASH_SHA2_512_256:
-        case ALG_HASH_LSH_256_256:
-        case ALG_HASH_LSH_512_256:
-        case ALG_HASH_SHA3_256:
+        case LIBERAC_ALG_HASH_SHA2_256:
+        case LIBERAC_ALG_HASH_SHA2_512_256:
+        case LIBERAC_ALG_HASH_LSH_256_256:
+        case LIBERAC_ALG_HASH_LSH_512_256:
+        case LIBERAC_ALG_HASH_SHA3_256:
             return 32u;
-        case ALG_HASH_SHA2_384:
-        case ALG_HASH_LSH_512_384:
-        case ALG_HASH_SHA3_384:
+        case LIBERAC_ALG_HASH_SHA2_384:
+        case LIBERAC_ALG_HASH_LSH_512_384:
+        case LIBERAC_ALG_HASH_SHA3_384:
             return 48u;
-        case ALG_HASH_SHA2_512:
-        case ALG_HASH_LSH_512_512:
-        case ALG_HASH_SHA3_512:
+        case LIBERAC_ALG_HASH_SHA2_512:
+        case LIBERAC_ALG_HASH_LSH_512_512:
+        case LIBERAC_ALG_HASH_SHA3_512:
             return 64u;
         default:
             return 0u;
@@ -109,7 +109,7 @@ static size_t fixed_digest_length(AlgID algorithm) {
 
 static int hash_context_load(
     crypto_hash_context_impl *implementation,
-    const CRYPTO_HASH_CONTEXT *context) {
+    const LiberaCHashContext *context) {
     if (implementation == NULL || context == NULL) {
         return 0;
     }
@@ -124,23 +124,23 @@ static int hash_context_load(
 }
 
 static void hash_context_save(
-    CRYPTO_HASH_CONTEXT *context,
+    LiberaCHashContext *context,
     const crypto_hash_context_impl *implementation) {
     crypto_zeroize(context, sizeof(*context));
     memcpy(context->INTERNAL, implementation, sizeof(*implementation));
 }
 
-CryptoError CRYPTO_HASH_INIT(
-    CRYPTO_HASH_CONTEXT *CONTEXT,
-    AlgID ALG) {
+LiberaCError LIBERAC_HASH_INIT(
+    LiberaCHashContext *CONTEXT,
+    LiberaCAlgID ALG) {
     crypto_hash_context_impl implementation;
     const crypto_hash_family family = hash_family(ALG);
-    CryptoError error;
+    LiberaCError error;
 
     if (CONTEXT == NULL) {
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
-    CRYPTO_HASH_CLEAR(CONTEXT);
+    LIBERAC_HASH_CLEAR(CONTEXT);
     crypto_zeroize(&implementation, sizeof(implementation));
 
     switch (family) {
@@ -154,10 +154,10 @@ CryptoError CRYPTO_HASH_INIT(
             error = crypto_lsh_init(&implementation.STATE.LSH, ALG);
             break;
         default:
-            error = CRYPTO_ERROR_INVALID_ALG_ID;
+            error = LIBERAC_ERROR_INVALID_ALG_ID;
             break;
     }
-    if (error == CRYPTO_SUCCESS) {
+    if (error == LIBERAC_SUCCESS) {
         implementation.MAGIC = CRYPTO_HASH_CONTEXT_MAGIC;
         implementation.ALG = ALG;
         implementation.PHASE = CRYPTO_HASH_PHASE_ABSORBING;
@@ -167,18 +167,18 @@ CryptoError CRYPTO_HASH_INIT(
     return error;
 }
 
-CryptoError CRYPTO_HASH_UPDATE(
-    CRYPTO_HASH_CONTEXT *CONTEXT,
+LiberaCError LIBERAC_HASH_UPDATE(
+    LiberaCHashContext *CONTEXT,
     const uint8_t *INPUT, size_t INPUT_LENGTH) {
     crypto_hash_context_impl implementation;
-    CryptoError error;
+    LiberaCError error;
 
     crypto_zeroize(&implementation, sizeof(implementation));
     if ((INPUT == NULL && INPUT_LENGTH != 0u) ||
         !hash_context_load(&implementation, CONTEXT) ||
         implementation.PHASE != CRYPTO_HASH_PHASE_ABSORBING) {
         crypto_zeroize(&implementation, sizeof(implementation));
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
 
     switch (hash_family(implementation.ALG)) {
@@ -189,31 +189,31 @@ CryptoError CRYPTO_HASH_UPDATE(
         case CRYPTO_HASH_FAMILY_SHA3:
             crypto_sha3_update(
                 &implementation.STATE.SHA3, INPUT, INPUT_LENGTH);
-            error = CRYPTO_SUCCESS;
+            error = LIBERAC_SUCCESS;
             break;
         case CRYPTO_HASH_FAMILY_LSH:
             error = crypto_lsh_update(
                 &implementation.STATE.LSH, INPUT, INPUT_LENGTH);
             break;
         default:
-            error = CRYPTO_ERROR_INVALID_ARGUMENT;
+            error = LIBERAC_ERROR_INVALID_ARGUMENT;
             break;
     }
-    if (error == CRYPTO_SUCCESS) {
+    if (error == LIBERAC_SUCCESS) {
         hash_context_save(CONTEXT, &implementation);
     }
     crypto_zeroize(&implementation, sizeof(implementation));
     return error;
 }
 
-CryptoError CRYPTO_HASH_FINALIZE(CRYPTO_HASH_CONTEXT *CONTEXT) {
+LiberaCError LIBERAC_HASH_FINALIZE(LiberaCHashContext *CONTEXT) {
     crypto_hash_context_impl implementation;
 
     crypto_zeroize(&implementation, sizeof(implementation));
     if (!hash_context_load(&implementation, CONTEXT) ||
         implementation.PHASE != CRYPTO_HASH_PHASE_ABSORBING) {
         crypto_zeroize(&implementation, sizeof(implementation));
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
 
     switch (hash_family(implementation.ALG)) {
@@ -228,16 +228,16 @@ CryptoError CRYPTO_HASH_FINALIZE(CRYPTO_HASH_CONTEXT *CONTEXT) {
             break;
         default:
             crypto_zeroize(&implementation, sizeof(implementation));
-            return CRYPTO_ERROR_INVALID_ARGUMENT;
+            return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
     implementation.PHASE = CRYPTO_HASH_PHASE_FINALIZED;
     hash_context_save(CONTEXT, &implementation);
     crypto_zeroize(&implementation, sizeof(implementation));
-    return CRYPTO_SUCCESS;
+    return LIBERAC_SUCCESS;
 }
 
-CryptoError CRYPTO_HASH_SQUEEZE(
-    CRYPTO_HASH_CONTEXT *CONTEXT,
+LiberaCError LIBERAC_HASH_SQUEEZE(
+    LiberaCHashContext *CONTEXT,
     uint8_t *OUTPUT, size_t OUTPUT_LENGTH) {
     crypto_hash_context_impl implementation;
     size_t digest_length;
@@ -246,35 +246,35 @@ CryptoError CRYPTO_HASH_SQUEEZE(
     if ((OUTPUT == NULL && OUTPUT_LENGTH != 0u) ||
         !hash_context_load(&implementation, CONTEXT)) {
         crypto_zeroize(&implementation, sizeof(implementation));
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
 
     if (is_shake(implementation.ALG)) {
         if (implementation.PHASE != CRYPTO_HASH_PHASE_FINALIZED &&
             implementation.PHASE != CRYPTO_HASH_PHASE_SQUEEZING) {
             crypto_zeroize(&implementation, sizeof(implementation));
-            return CRYPTO_ERROR_INVALID_ARGUMENT;
+            return LIBERAC_ERROR_INVALID_ARGUMENT;
         }
         crypto_sha3_squeeze(
             &implementation.STATE.SHA3, OUTPUT, OUTPUT_LENGTH);
         implementation.PHASE = CRYPTO_HASH_PHASE_SQUEEZING;
         hash_context_save(CONTEXT, &implementation);
         crypto_zeroize(&implementation, sizeof(implementation));
-        return CRYPTO_SUCCESS;
+        return LIBERAC_SUCCESS;
     }
 
     if (implementation.PHASE != CRYPTO_HASH_PHASE_FINALIZED) {
         crypto_zeroize(&implementation, sizeof(implementation));
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
     digest_length = fixed_digest_length(implementation.ALG);
     if (OUTPUT_LENGTH < digest_length) {
         crypto_zeroize(&implementation, sizeof(implementation));
-        return CRYPTO_ERROR_BUFFER_TOO_SMALL;
+        return LIBERAC_ERROR_BUFFER_TOO_SMALL;
     }
     if (OUTPUT == NULL) {
         crypto_zeroize(&implementation, sizeof(implementation));
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
 
     switch (hash_family(implementation.ALG)) {
@@ -292,53 +292,53 @@ CryptoError CRYPTO_HASH_SQUEEZE(
             break;
         default:
             crypto_zeroize(&implementation, sizeof(implementation));
-            return CRYPTO_ERROR_INVALID_ARGUMENT;
+            return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
 
     crypto_zeroize(&implementation.STATE, sizeof(implementation.STATE));
     implementation.PHASE = CRYPTO_HASH_PHASE_CONSUMED;
     hash_context_save(CONTEXT, &implementation);
     crypto_zeroize(&implementation, sizeof(implementation));
-    return CRYPTO_SUCCESS;
+    return LIBERAC_SUCCESS;
 }
 
-void CRYPTO_HASH_CLEAR(CRYPTO_HASH_CONTEXT *CONTEXT) {
+void LIBERAC_HASH_CLEAR(LiberaCHashContext *CONTEXT) {
     if (CONTEXT != NULL) {
         crypto_zeroize(CONTEXT, sizeof(*CONTEXT));
     }
 }
 
-CryptoError CRYPTO_HASH(
+LiberaCError LIBERAC_HASH(
     uint8_t *OUTPUT, size_t OUTPUT_LENGTH,
     const uint8_t *INPUT, size_t INPUT_LENGTH,
-    AlgID ALG) {
-    CRYPTO_HASH_CONTEXT context;
+    LiberaCAlgID ALG) {
+    LiberaCHashContext context;
     const size_t digest_length = fixed_digest_length(ALG);
-    CryptoError error;
+    LiberaCError error;
 
     if ((INPUT == NULL && INPUT_LENGTH != 0u) ||
         (OUTPUT == NULL && OUTPUT_LENGTH != 0u)) {
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
     if (!is_shake(ALG)) {
         if (digest_length == 0u) {
-            return CRYPTO_ERROR_INVALID_ALG_ID;
+            return LIBERAC_ERROR_INVALID_ALG_ID;
         }
         if (OUTPUT_LENGTH < digest_length) {
-            return CRYPTO_ERROR_BUFFER_TOO_SMALL;
+            return LIBERAC_ERROR_BUFFER_TOO_SMALL;
         }
     }
 
-    error = CRYPTO_HASH_INIT(&context, ALG);
-    if (error == CRYPTO_SUCCESS) {
-        error = CRYPTO_HASH_UPDATE(&context, INPUT, INPUT_LENGTH);
+    error = LIBERAC_HASH_INIT(&context, ALG);
+    if (error == LIBERAC_SUCCESS) {
+        error = LIBERAC_HASH_UPDATE(&context, INPUT, INPUT_LENGTH);
     }
-    if (error == CRYPTO_SUCCESS) {
-        error = CRYPTO_HASH_FINALIZE(&context);
+    if (error == LIBERAC_SUCCESS) {
+        error = LIBERAC_HASH_FINALIZE(&context);
     }
-    if (error == CRYPTO_SUCCESS) {
-        error = CRYPTO_HASH_SQUEEZE(&context, OUTPUT, OUTPUT_LENGTH);
+    if (error == LIBERAC_SUCCESS) {
+        error = LIBERAC_HASH_SQUEEZE(&context, OUTPUT, OUTPUT_LENGTH);
     }
-    CRYPTO_HASH_CLEAR(&context);
+    LIBERAC_HASH_CLEAR(&context);
     return error;
 }

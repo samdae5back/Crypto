@@ -6,7 +6,7 @@
 
 #include "haetae.h"
 
-CryptoError crypto_haetae_sign_core(
+LiberaCError crypto_haetae_sign_core(
     uint8_t *signature,
     const uint8_t *message,
     size_t message_length,
@@ -16,7 +16,7 @@ CryptoError crypto_haetae_sign_core(
     const uint8_t *private_key,
     const crypto_haetae_parameters *parameters);
 
-CryptoError crypto_haetae_verify_core(
+LiberaCError crypto_haetae_verify_core(
     const uint8_t *signature,
     size_t signature_length,
     const uint8_t *message,

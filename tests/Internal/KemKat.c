@@ -14,14 +14,14 @@
 
 static int report_crypto_error(
     const CRYPTO_TEST_KAT_READER *reader, const char *operation,
-    CryptoError error) {
+    LiberaCError error) {
     fprintf(stderr, "%s: record %zu: %s failed (%d)\n",
             reader->path, reader->record, operation, (int)error);
     return -1;
 }
 
 int crypto_test_run_kem_kat(
-    const char *path, const char *algorithm_name, AlgID alg,
+    const char *path, const char *algorithm_name, LiberaCAlgID alg,
     const CRYPTO_TEST_KEM_API *api, size_t record_count) {
     CRYPTO_TEST_KAT_READER reader = { NULL, NULL, 0u };
     uint8_t seed[CRYPTO_PQC_KAT_SEED_BYTES] = { 0 };
@@ -78,7 +78,7 @@ int crypto_test_run_kem_kat(
 
     for (index = 0u; index < record_count; ++index) {
         size_t count;
-        CryptoError error;
+        LiberaCError error;
 
         reader.record = index;
         if (crypto_test_kat_read_size(&reader, "count", &count) != 0)
@@ -106,7 +106,7 @@ int crypto_test_run_kem_kat(
         }
 
         error = crypto_pqc_kat_initialize_internal(seed);
-        if (error != CRYPTO_SUCCESS) {
+        if (error != LIBERAC_SUCCESS) {
             report_crypto_error(&reader, "KAT DRBG initialization", error);
             goto close_reader;
         }
@@ -114,7 +114,7 @@ int crypto_test_run_kem_kat(
         error = api->keygen(
             actual_public_key, public_key_length,
             actual_private_key, private_key_length, alg);
-        if (error != CRYPTO_SUCCESS) {
+        if (error != LIBERAC_SUCCESS) {
             report_crypto_error(&reader, "key generation", error);
             goto close_reader;
         }
@@ -122,7 +122,7 @@ int crypto_test_run_kem_kat(
             actual_public_key, public_key_length,
             encapsulated_secret, actual_ciphertext,
             ciphertext_length, alg);
-        if (error != CRYPTO_SUCCESS) {
+        if (error != LIBERAC_SUCCESS) {
             report_crypto_error(&reader, "encapsulation", error);
             goto close_reader;
         }
@@ -149,7 +149,7 @@ int crypto_test_run_kem_kat(
             actual_private_key, private_key_length,
             actual_ciphertext, ciphertext_length,
             decapsulated_secret, alg);
-        if (error != CRYPTO_SUCCESS) {
+        if (error != LIBERAC_SUCCESS) {
             report_crypto_error(&reader, "decapsulation", error);
             goto close_reader;
         }

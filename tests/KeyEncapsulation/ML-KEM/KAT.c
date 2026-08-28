@@ -10,24 +10,24 @@
 
 typedef struct crypto_test_ml_kem_case {
     const char *name;
-    AlgID alg;
+    LiberaCAlgID alg;
 } CRYPTO_TEST_ML_KEM_CASE;
 
 static const CRYPTO_TEST_ML_KEM_CASE ml_kem_cases[] = {
-    { "ML-KEM-512", ALG_ML_KEM_512 },
-    { "ML-KEM-768", ALG_ML_KEM_768 },
-    { "ML-KEM-1024", ALG_ML_KEM_1024 }
+    { "ML-KEM-512", LIBERAC_ALG_ML_KEM_512 },
+    { "ML-KEM-768", LIBERAC_ALG_ML_KEM_768 },
+    { "ML-KEM-1024", LIBERAC_ALG_ML_KEM_1024 }
 };
 
 int main(int argc, char **argv) {
     static const CRYPTO_TEST_KEM_API api = {
-        CRYPTO_ML_KEM_SHARED_SECRET_BYTES,
-        CRYPTO_ML_KEM_PUBLIC_KEY_SIZE,
-        CRYPTO_ML_KEM_PRIVATE_KEY_SIZE,
-        CRYPTO_ML_KEM_CIPHERTEXT_SIZE,
-        CRYPTO_ML_KEM_KEYGEN,
-        CRYPTO_ML_KEM_ENCAPS,
-        CRYPTO_ML_KEM_DECAPS
+        LIBERAC_ML_KEM_SHARED_SECRET_BYTES,
+        LIBERAC_ML_KEM_PUBLIC_KEY_SIZE,
+        LIBERAC_ML_KEM_PRIVATE_KEY_SIZE,
+        LIBERAC_ML_KEM_CIPHERTEXT_SIZE,
+        LIBERAC_ML_KEM_KEYGEN,
+        LIBERAC_ML_KEM_ENCAPS,
+        LIBERAC_ML_KEM_DECAPS
     };
     size_t index;
 

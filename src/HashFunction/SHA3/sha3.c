@@ -95,36 +95,36 @@ static uint8_t get_byte(
     return (uint8_t)(context->state[lane] >> shift);
 }
 
-CryptoError crypto_sha3_init(
+LiberaCError crypto_sha3_init(
     crypto_sha3_context *CONTEXT,
-    AlgID ALG) {
+    LiberaCAlgID ALG) {
     if (CONTEXT == NULL) {
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
     switch (ALG) {
-        case ALG_HASH_SHA3_224:
+        case LIBERAC_ALG_HASH_SHA3_224:
             sha3_context_init(CONTEXT, 144u, 0x06u);
             break;
-        case ALG_HASH_SHA3_256:
+        case LIBERAC_ALG_HASH_SHA3_256:
             sha3_context_init(CONTEXT, 136u, 0x06u);
             break;
-        case ALG_HASH_SHA3_384:
+        case LIBERAC_ALG_HASH_SHA3_384:
             sha3_context_init(CONTEXT, 104u, 0x06u);
             break;
-        case ALG_HASH_SHA3_512:
+        case LIBERAC_ALG_HASH_SHA3_512:
             sha3_context_init(CONTEXT, 72u, 0x06u);
             break;
-        case ALG_HASH_SHAKE128:
+        case LIBERAC_ALG_HASH_SHAKE128:
             sha3_context_init(CONTEXT, 168u, 0x1fu);
             break;
-        case ALG_HASH_SHAKE256:
+        case LIBERAC_ALG_HASH_SHAKE256:
             sha3_context_init(CONTEXT, 136u, 0x1fu);
             break;
         default:
             crypto_zeroize(CONTEXT, sizeof(*CONTEXT));
-            return CRYPTO_ERROR_INVALID_ALG_ID;
+            return LIBERAC_ERROR_INVALID_ALG_ID;
     }
-    return CRYPTO_SUCCESS;
+    return LIBERAC_SUCCESS;
 }
 
 void crypto_shake128_init(crypto_sha3_context *CONTEXT) {

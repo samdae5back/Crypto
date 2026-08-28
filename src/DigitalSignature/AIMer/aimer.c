@@ -24,7 +24,7 @@ static const crypto_aimer_params crypto_aimer_parameter_table[] = {
 
 #undef CRYPTO_AIMER_PARAMETER_ENTRY
 
-static const crypto_aimer_params *crypto_aimer_get_params(AlgID alg) {
+static const crypto_aimer_params *crypto_aimer_get_params(LiberaCAlgID alg) {
     size_t i;
     for (i = 0u;
          i < sizeof(crypto_aimer_parameter_table) /
@@ -37,70 +37,70 @@ static const crypto_aimer_params *crypto_aimer_get_params(AlgID alg) {
     return NULL;
 }
 
-static CryptoError crypto_aimer_validate_private_key(
+static LiberaCError crypto_aimer_validate_private_key(
     const uint8_t *private_key, const crypto_aimer_params *params) {
     uint8_t expected_ciphertext[CRYPTO_AIMER_MAX_FIELD_BYTES];
     const uint8_t *iv = private_key + params->field_bytes;
     const uint8_t *stored_ciphertext = iv + params->iv_bytes;
-    CryptoError result;
+    LiberaCError result;
 
     result = crypto_aimer_aim2(
         expected_ciphertext, private_key, iv, params);
-    if (result == CRYPTO_SUCCESS &&
+    if (result == LIBERAC_SUCCESS &&
         !crypto_constant_time_equal(
             expected_ciphertext, stored_ciphertext, params->field_bytes)) {
-        result = CRYPTO_ERROR_INVALID_KEY;
+        result = LIBERAC_ERROR_INVALID_KEY;
     }
     crypto_zeroize(expected_ciphertext, sizeof(expected_ciphertext));
     return result;
 }
 
-size_t crypto_aimer_public_key_size_internal(AlgID alg) {
+size_t crypto_aimer_public_key_size_internal(LiberaCAlgID alg) {
     const crypto_aimer_params *params = crypto_aimer_get_params(alg);
     return params ? params->public_key_bytes : 0u;
 }
 
-size_t crypto_aimer_private_key_size_internal(AlgID alg) {
+size_t crypto_aimer_private_key_size_internal(LiberaCAlgID alg) {
     const crypto_aimer_params *params = crypto_aimer_get_params(alg);
     return params ? params->private_key_bytes : 0u;
 }
 
-size_t crypto_aimer_signature_size_internal(AlgID alg) {
+size_t crypto_aimer_signature_size_internal(LiberaCAlgID alg) {
     const crypto_aimer_params *params = crypto_aimer_get_params(alg);
     return params ? params->signature_bytes : 0u;
 }
 
-CryptoError crypto_aimer_keygen_internal(
-    AlgID alg,
+LiberaCError crypto_aimer_keygen_internal(
+    LiberaCAlgID alg,
     uint8_t *public_key, size_t public_key_length,
     uint8_t *private_key, size_t private_key_length) {
     const crypto_aimer_params *params = crypto_aimer_get_params(alg);
     uint8_t plaintext[CRYPTO_AIMER_MAX_FIELD_BYTES];
     uint8_t iv[CRYPTO_AIMER_MAX_FIELD_BYTES];
-    CryptoError error;
+    LiberaCError error;
 
-    if (!params) return CRYPTO_ERROR_INVALID_ALG_ID;
-    if (!public_key || !private_key) return CRYPTO_ERROR_INVALID_ARGUMENT;
+    if (!params) return LIBERAC_ERROR_INVALID_ALG_ID;
+    if (!public_key || !private_key) return LIBERAC_ERROR_INVALID_ARGUMENT;
     if (public_key_length < params->public_key_bytes ||
         private_key_length < params->private_key_bytes) {
-        return CRYPTO_ERROR_BUFFER_TOO_SMALL;
+        return LIBERAC_ERROR_BUFFER_TOO_SMALL;
     }
     if (crypto_ranges_overlap(
             public_key, params->public_key_bytes,
             private_key, params->private_key_bytes)) {
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
 
     error = crypto_pqc_random_bytes_internal(plaintext, params->field_bytes);
-    if (error == CRYPTO_SUCCESS) {
+    if (error == LIBERAC_SUCCESS) {
         /* This second request is intentionally separate for NIST KAT replay. */
         error = crypto_pqc_random_bytes_internal(iv, params->iv_bytes);
     }
-    if (error == CRYPTO_SUCCESS) {
+    if (error == LIBERAC_SUCCESS) {
         error = crypto_aimer_backend_keypair(
             public_key, private_key, plaintext, iv, params);
     }
-    if (error != CRYPTO_SUCCESS) {
+    if (error != LIBERAC_SUCCESS) {
         crypto_zeroize(public_key, params->public_key_bytes);
         crypto_zeroize(private_key, params->private_key_bytes);
     }
@@ -109,30 +109,30 @@ CryptoError crypto_aimer_keygen_internal(
     return error;
 }
 
-CryptoError crypto_aimer_sign_internal(
-    AlgID alg,
+LiberaCError crypto_aimer_sign_internal(
+    LiberaCAlgID alg,
     const uint8_t *private_key, size_t private_key_length,
     const uint8_t *message, size_t message_length,
     const uint8_t *context, size_t context_length,
     uint8_t *signature, size_t signature_length) {
     const crypto_aimer_params *params = crypto_aimer_get_params(alg);
-    uint8_t prefix[CRYPTO_SIGNATURE_CONTEXT_MAX_BYTES + 1u];
+    uint8_t prefix[LIBERAC_SIGNATURE_CONTEXT_MAX_BYTES + 1u];
     uint8_t randomness[CRYPTO_AIMER_MAX_SECURITY_BYTES];
-    CryptoError error;
+    LiberaCError error;
 
-    if (!params) return CRYPTO_ERROR_INVALID_ALG_ID;
+    if (!params) return LIBERAC_ERROR_INVALID_ALG_ID;
     if (!private_key || (!message && message_length != 0u) ||
         (!context && context_length != 0u) || !signature) {
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
-    if (context_length > CRYPTO_SIGNATURE_CONTEXT_MAX_BYTES) {
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+    if (context_length > LIBERAC_SIGNATURE_CONTEXT_MAX_BYTES) {
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
     if (private_key_length != params->private_key_bytes) {
-        return CRYPTO_ERROR_INVALID_KEY;
+        return LIBERAC_ERROR_INVALID_KEY;
     }
     if (signature_length < params->signature_bytes) {
-        return CRYPTO_ERROR_BUFFER_TOO_SMALL;
+        return LIBERAC_ERROR_BUFFER_TOO_SMALL;
     }
     if (crypto_ranges_overlap(
             signature, params->signature_bytes,
@@ -143,10 +143,10 @@ CryptoError crypto_aimer_sign_internal(
         crypto_ranges_overlap(
             signature, params->signature_bytes,
             context, context_length)) {
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
     error = crypto_aimer_validate_private_key(private_key, params);
-    if (error != CRYPTO_SUCCESS) {
+    if (error != LIBERAC_SUCCESS) {
         crypto_zeroize(signature, params->signature_bytes);
         return error;
     }
@@ -158,12 +158,12 @@ CryptoError crypto_aimer_sign_internal(
 
     error = crypto_pqc_random_bytes_internal(
         randomness, params->security_bytes);
-    if (error == CRYPTO_SUCCESS) {
+    if (error == LIBERAC_SUCCESS) {
         error = crypto_aimer_backend_sign(
             signature, message, message_length, prefix, context_length + 1u,
             randomness, private_key, params);
     }
-    if (error != CRYPTO_SUCCESS) {
+    if (error != LIBERAC_SUCCESS) {
         crypto_zeroize(signature, params->signature_bytes);
     }
     crypto_zeroize(prefix, sizeof(prefix));
@@ -171,29 +171,29 @@ CryptoError crypto_aimer_sign_internal(
     return error;
 }
 
-CryptoError crypto_aimer_verify_internal(
-    AlgID alg,
+LiberaCError crypto_aimer_verify_internal(
+    LiberaCAlgID alg,
     const uint8_t *public_key, size_t public_key_length,
     const uint8_t *message, size_t message_length,
     const uint8_t *context, size_t context_length,
     const uint8_t *signature, size_t signature_length) {
     const crypto_aimer_params *params = crypto_aimer_get_params(alg);
-    uint8_t prefix[CRYPTO_SIGNATURE_CONTEXT_MAX_BYTES + 1u];
-    CryptoError error;
+    uint8_t prefix[LIBERAC_SIGNATURE_CONTEXT_MAX_BYTES + 1u];
+    LiberaCError error;
 
-    if (!params) return CRYPTO_ERROR_INVALID_ALG_ID;
+    if (!params) return LIBERAC_ERROR_INVALID_ALG_ID;
     if (!public_key || (!message && message_length != 0u) ||
         (!context && context_length != 0u) || !signature) {
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
-    if (context_length > CRYPTO_SIGNATURE_CONTEXT_MAX_BYTES) {
-        return CRYPTO_ERROR_INVALID_ARGUMENT;
+    if (context_length > LIBERAC_SIGNATURE_CONTEXT_MAX_BYTES) {
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
     if (public_key_length != params->public_key_bytes) {
-        return CRYPTO_ERROR_INVALID_KEY;
+        return LIBERAC_ERROR_INVALID_KEY;
     }
     if (signature_length != params->signature_bytes) {
-        return CRYPTO_ERROR_SIGNATURE_INVALID;
+        return LIBERAC_ERROR_SIGNATURE_INVALID;
     }
 
     prefix[0] = (uint8_t)context_length;

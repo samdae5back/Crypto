@@ -8,21 +8,21 @@
 
 #include "Def.h"
 
-size_t crypto_ntru_plus_public_key_size_internal(AlgID alg);
-size_t crypto_ntru_plus_private_key_size_internal(AlgID alg);
-size_t crypto_ntru_plus_ciphertext_size_internal(AlgID alg);
+size_t crypto_ntru_plus_public_key_size_internal(LiberaCAlgID alg);
+size_t crypto_ntru_plus_private_key_size_internal(LiberaCAlgID alg);
+size_t crypto_ntru_plus_ciphertext_size_internal(LiberaCAlgID alg);
 
-CryptoError crypto_ntru_plus_keygen_internal(
-    AlgID alg,
+LiberaCError crypto_ntru_plus_keygen_internal(
+    LiberaCAlgID alg,
     uint8_t *public_key, size_t public_key_length,
     uint8_t *private_key, size_t private_key_length);
-CryptoError crypto_ntru_plus_encaps_internal(
-    AlgID alg,
+LiberaCError crypto_ntru_plus_encaps_internal(
+    LiberaCAlgID alg,
     const uint8_t *public_key, size_t public_key_length,
     uint8_t shared_secret[32],
     uint8_t *ciphertext, size_t ciphertext_length);
-CryptoError crypto_ntru_plus_decaps_internal(
-    AlgID alg,
+LiberaCError crypto_ntru_plus_decaps_internal(
+    LiberaCAlgID alg,
     const uint8_t *private_key, size_t private_key_length,
     const uint8_t *ciphertext, size_t ciphertext_length,
     uint8_t shared_secret[32]);

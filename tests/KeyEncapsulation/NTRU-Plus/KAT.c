@@ -10,24 +10,24 @@
 
 typedef struct crypto_test_ntru_plus_case {
     const char *name;
-    AlgID alg;
+    LiberaCAlgID alg;
 } CRYPTO_TEST_NTRU_PLUS_CASE;
 
 static const CRYPTO_TEST_NTRU_PLUS_CASE ntru_plus_cases[] = {
-    { "NTRU+768", ALG_NTRU_PLUS_768 },
-    { "NTRU+864", ALG_NTRU_PLUS_864 },
-    { "NTRU+1152", ALG_NTRU_PLUS_1152 }
+    { "NTRU+768", LIBERAC_ALG_NTRU_PLUS_768 },
+    { "NTRU+864", LIBERAC_ALG_NTRU_PLUS_864 },
+    { "NTRU+1152", LIBERAC_ALG_NTRU_PLUS_1152 }
 };
 
 int main(int argc, char **argv) {
     static const CRYPTO_TEST_KEM_API api = {
-        CRYPTO_NTRU_PLUS_SHARED_SECRET_BYTES,
-        CRYPTO_NTRU_PLUS_PUBLIC_KEY_SIZE,
-        CRYPTO_NTRU_PLUS_PRIVATE_KEY_SIZE,
-        CRYPTO_NTRU_PLUS_CIPHERTEXT_SIZE,
-        CRYPTO_NTRU_PLUS_KEYGEN,
-        CRYPTO_NTRU_PLUS_ENCAPS,
-        CRYPTO_NTRU_PLUS_DECAPS
+        LIBERAC_NTRU_PLUS_SHARED_SECRET_BYTES,
+        LIBERAC_NTRU_PLUS_PUBLIC_KEY_SIZE,
+        LIBERAC_NTRU_PLUS_PRIVATE_KEY_SIZE,
+        LIBERAC_NTRU_PLUS_CIPHERTEXT_SIZE,
+        LIBERAC_NTRU_PLUS_KEYGEN,
+        LIBERAC_NTRU_PLUS_ENCAPS,
+        LIBERAC_NTRU_PLUS_DECAPS
     };
     size_t index;
 

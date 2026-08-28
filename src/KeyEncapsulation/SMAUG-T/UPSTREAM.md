@@ -15,7 +15,7 @@ implementation errors in version 1.1.1 and directs users to version 1.2.0.
 
 The upstream mode1, mode3, and mode5 build-time configurations are
 consolidated into one runtime-parameter implementation for the
-`ALG_SMAUG_T_128`, `ALG_SMAUG_T_192`, and `ALG_SMAUG_T_256` identifiers.
+`LIBERAC_ALG_SMAUG_T_128`, `LIBERAC_ALG_SMAUG_T_192`, and `LIBERAC_ALG_SMAUG_T_256` identifiers.
 Upstream Keccak and random-byte implementations are not included. The port
 uses Crypto's private shared SHA3/SHAKE, random-byte, endian, constant-time,
 and secure-zeroization utilities instead. Internal non-static symbols use the

@@ -19,28 +19,28 @@ typedef enum crypto_test_haetae_kat_format {
 
 typedef struct crypto_test_haetae_case {
     const char *name;
-    AlgID alg;
+    LiberaCAlgID alg;
     CRYPTO_TEST_HAETAE_KAT_FORMAT format;
 } CRYPTO_TEST_HAETAE_CASE;
 
 static const CRYPTO_TEST_HAETAE_CASE haetae_cases[] = {
-    { "HAETAE-120", ALG_HAETAE_120,
+    { "HAETAE-120", LIBERAC_ALG_HAETAE_120,
       CRYPTO_TEST_HAETAE_KAT_OFFICIAL_1_2 },
-    { "HAETAE-180", ALG_HAETAE_180,
+    { "HAETAE-180", LIBERAC_ALG_HAETAE_180,
       CRYPTO_TEST_HAETAE_KAT_OFFICIAL_1_2 },
-    { "HAETAE-260", ALG_HAETAE_260,
+    { "HAETAE-260", LIBERAC_ALG_HAETAE_260,
       CRYPTO_TEST_HAETAE_KAT_OFFICIAL_1_2 },
-    { "HAETAE-120-legacy", ALG_HAETAE_120,
+    { "HAETAE-120-legacy", LIBERAC_ALG_HAETAE_120,
       CRYPTO_TEST_HAETAE_KAT_LEGACY_CONTEXT },
-    { "HAETAE-180-legacy", ALG_HAETAE_180,
+    { "HAETAE-180-legacy", LIBERAC_ALG_HAETAE_180,
       CRYPTO_TEST_HAETAE_KAT_LEGACY_CONTEXT },
-    { "HAETAE-260-legacy", ALG_HAETAE_260,
+    { "HAETAE-260-legacy", LIBERAC_ALG_HAETAE_260,
       CRYPTO_TEST_HAETAE_KAT_LEGACY_CONTEXT }
 };
 
 static int report_crypto_error(
     const CRYPTO_TEST_KAT_READER *reader, const char *operation,
-    CryptoError error) {
+    LiberaCError error) {
     fprintf(stderr, "%s: record %zu: %s failed (%d)\n",
             reader->path, reader->record, operation, (int)error);
     return -1;
@@ -49,9 +49,9 @@ static int report_crypto_error(
 static int initialize_kat(
     const CRYPTO_TEST_KAT_READER *reader,
     const uint8_t seed[CRYPTO_PQC_KAT_SEED_BYTES], int *kat_active) {
-    const CryptoError error = crypto_pqc_kat_initialize_internal(seed);
+    const LiberaCError error = crypto_pqc_kat_initialize_internal(seed);
 
-    if (error != CRYPTO_SUCCESS) {
+    if (error != LIBERAC_SUCCESS) {
         return report_crypto_error(
             reader, "KAT DRBG initialization", error);
     }
@@ -71,20 +71,20 @@ static int derive_official_context(
     size_t *context_length) {
     uint8_t signature_randomness[32] = { 0 };
     uint8_t encoded_context_length = 0u;
-    CryptoError error;
+    LiberaCError error;
 
     error = crypto_pqc_random_bytes_internal(
         signature_randomness, sizeof(signature_randomness));
-    if (error == CRYPTO_SUCCESS) {
+    if (error == LIBERAC_SUCCESS) {
         error = crypto_pqc_random_bytes_internal(
             &encoded_context_length, sizeof(encoded_context_length));
     }
-    if (error == CRYPTO_SUCCESS && encoded_context_length != 0u) {
+    if (error == LIBERAC_SUCCESS && encoded_context_length != 0u) {
         error = crypto_pqc_random_bytes_internal(
             context, (size_t)encoded_context_length);
     }
     crypto_zeroize(signature_randomness, sizeof(signature_randomness));
-    if (error != CRYPTO_SUCCESS) {
+    if (error != LIBERAC_SUCCESS) {
         return report_crypto_error(reader, "KAT context replay", error);
     }
     *context_length = (size_t)encoded_context_length;
@@ -95,14 +95,14 @@ static int rewind_to_signature_randomness(
     const CRYPTO_TEST_KAT_READER *reader,
     const uint8_t seed[CRYPTO_PQC_KAT_SEED_BYTES], int *kat_active) {
     uint8_t key_generation_seed[32] = { 0 };
-    CryptoError error;
+    LiberaCError error;
 
     finalize_kat(kat_active);
     if (initialize_kat(reader, seed, kat_active) != 0) return -1;
     error = crypto_pqc_random_bytes_internal(
         key_generation_seed, sizeof(key_generation_seed));
     crypto_zeroize(key_generation_seed, sizeof(key_generation_seed));
-    if (error != CRYPTO_SUCCESS) {
+    if (error != LIBERAC_SUCCESS) {
         return report_crypto_error(reader, "KAT DRBG rewind", error);
     }
     return 0;
@@ -112,7 +112,7 @@ static int run_kat(
     const char *path, const CRYPTO_TEST_HAETAE_CASE *test_case) {
     CRYPTO_TEST_KAT_READER reader = { NULL, NULL, 0u };
     uint8_t seed[CRYPTO_PQC_KAT_SEED_BYTES] = { 0 };
-    uint8_t context[CRYPTO_SIGNATURE_CONTEXT_MAX_BYTES] = { 0 };
+    uint8_t context[LIBERAC_SIGNATURE_CONTEXT_MAX_BYTES] = { 0 };
     uint8_t *message = NULL;
     uint8_t *expected_public_key = NULL;
     uint8_t *expected_private_key = NULL;
@@ -121,11 +121,11 @@ static int run_kat(
     uint8_t *actual_private_key = NULL;
     uint8_t *actual_signature = NULL;
     const size_t public_key_length =
-        CRYPTO_HAETAE_PUBLIC_KEY_SIZE(test_case->alg);
+        LIBERAC_HAETAE_PUBLIC_KEY_SIZE(test_case->alg);
     const size_t private_key_length =
-        CRYPTO_HAETAE_PRIVATE_KEY_SIZE(test_case->alg);
+        LIBERAC_HAETAE_PRIVATE_KEY_SIZE(test_case->alg);
     const size_t signature_length =
-        CRYPTO_HAETAE_SIGNATURE_SIZE(test_case->alg);
+        LIBERAC_HAETAE_SIGNATURE_SIZE(test_case->alg);
     size_t message_length = 0u;
     size_t message_capacity = 0u;
     size_t context_length = 0u;
@@ -156,7 +156,7 @@ static int run_kat(
     for (index = 0u; index < 100u; ++index) {
         size_t count;
         size_t encoded_signature_length;
-        CryptoError error;
+        LiberaCError error;
 
         reader.record = index;
         if (crypto_test_kat_read_size(&reader, "count", &count) != 0)
@@ -213,10 +213,10 @@ static int run_kat(
 
         if (initialize_kat(&reader, seed, &kat_active) != 0)
             goto close_reader;
-        error = CRYPTO_HAETAE_KEYGEN(
+        error = LIBERAC_HAETAE_KEYGEN(
             actual_public_key, public_key_length,
             actual_private_key, private_key_length, test_case->alg);
-        if (error != CRYPTO_SUCCESS) {
+        if (error != LIBERAC_SUCCESS) {
             report_crypto_error(&reader, "key generation", error);
             goto close_reader;
         }
@@ -239,11 +239,11 @@ static int run_kat(
                     &reader, seed, &kat_active) != 0) {
                 goto close_reader;
             }
-            error = CRYPTO_HAETAE_SIGN(
+            error = LIBERAC_HAETAE_SIGN(
                 actual_private_key, private_key_length,
                 message, message_length, context, context_length,
                 actual_signature, signature_length, test_case->alg);
-            if (error != CRYPTO_SUCCESS) {
+            if (error != LIBERAC_SUCCESS) {
                 report_crypto_error(&reader, "signature generation", error);
                 goto close_reader;
             }
@@ -255,11 +255,11 @@ static int run_kat(
         }
         finalize_kat(&kat_active);
 
-        error = CRYPTO_HAETAE_VERIFY(
+        error = LIBERAC_HAETAE_VERIFY(
             expected_public_key, public_key_length,
             message, message_length, context, context_length,
             expected_signature, signature_length, test_case->alg);
-        if (error != CRYPTO_SUCCESS) {
+        if (error != LIBERAC_SUCCESS) {
             report_crypto_error(&reader, "signature verification", error);
             goto close_reader;
         }

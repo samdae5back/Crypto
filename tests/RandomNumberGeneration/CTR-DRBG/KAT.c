@@ -34,24 +34,24 @@ static int test_nist_aes256_no_df(void) {
     static const uint8_t final_v[16] = {
         0x53,0xc7,0x8a,0xc6,0x1a,0x0b,0xac,0x9d,0x7d,0x2e,0x92,0xb1,0xe7,0x3e,0x33,0x92
     };
-    CRYPTO_CTR_DRBG_CONTEXT ctx;
+    LiberaCCtrDrbgContext ctx;
     uint8_t output[64];
 
-    if (CRYPTO_CTR_DRBG_SEED_SIZE(ALG_CTR_DRBG_AES_256_NO_DF) != 48u) return 1;
-    if (CRYPTO_CTR_DRBG_INSTANTIATE(&ctx, entropy, sizeof(entropy), NULL, 0u,
-                                     NULL, 0u, ALG_CTR_DRBG_AES_256_NO_DF) != CRYPTO_SUCCESS) return 1;
+    if (LIBERAC_CTR_DRBG_SEED_SIZE(LIBERAC_ALG_CTR_DRBG_AES_256_NO_DF) != 48u) return 1;
+    if (LIBERAC_CTR_DRBG_INSTANTIATE(&ctx, entropy, sizeof(entropy), NULL, 0u,
+                                     NULL, 0u, LIBERAC_ALG_CTR_DRBG_AES_256_NO_DF) != LIBERAC_SUCCESS) return 1;
     if (memcmp(ctx.KEY, key_after_instantiate, sizeof(key_after_instantiate)) != 0) return 1;
     if (memcmp(ctx.V, v_after_instantiate, sizeof(v_after_instantiate)) != 0) return 1;
     if (ctx.RESEED_COUNTER != 1u) return 1;
 
-    if (CRYPTO_CTR_DRBG_GENERATE(&ctx, output, sizeof(output), NULL, 0u, 0) != CRYPTO_SUCCESS) return 1;
-    if (CRYPTO_CTR_DRBG_GENERATE(&ctx, output, sizeof(output), NULL, 0u, 0) != CRYPTO_SUCCESS) return 1;
+    if (LIBERAC_CTR_DRBG_GENERATE(&ctx, output, sizeof(output), NULL, 0u, 0) != LIBERAC_SUCCESS) return 1;
+    if (LIBERAC_CTR_DRBG_GENERATE(&ctx, output, sizeof(output), NULL, 0u, 0) != LIBERAC_SUCCESS) return 1;
     if (memcmp(output, returned_bits, sizeof(returned_bits)) != 0) return 1;
     if (memcmp(ctx.KEY, final_key, sizeof(final_key)) != 0) return 1;
     if (memcmp(ctx.V, final_v, sizeof(final_v)) != 0) return 1;
     if (ctx.RESEED_COUNTER != 3u) return 1;
 
-    CRYPTO_CTR_DRBG_CLEAR(&ctx);
+    LIBERAC_CTR_DRBG_CLEAR(&ctx);
     return 0;
 }
 

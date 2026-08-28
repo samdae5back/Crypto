@@ -13,30 +13,30 @@
 #define STREAM_OUTPUT_BYTES (STREAM_XOF_BYTES + 8u)
 
 typedef struct hash_stream_case {
-    AlgID algorithm;
+    LiberaCAlgID algorithm;
     size_t output_length;
     size_t rate;
 } hash_stream_case;
 
 static const hash_stream_case HASH_STREAM_CASES[] = {
-    {ALG_HASH_SHA2_224, CRYPTO_SHA2_224_DIGEST_BYTES, 0u},
-    {ALG_HASH_SHA2_256, CRYPTO_SHA2_256_DIGEST_BYTES, 0u},
-    {ALG_HASH_SHA2_384, CRYPTO_SHA2_384_DIGEST_BYTES, 0u},
-    {ALG_HASH_SHA2_512, CRYPTO_SHA2_512_DIGEST_BYTES, 0u},
-    {ALG_HASH_SHA2_512_224, CRYPTO_SHA2_512_224_DIGEST_BYTES, 0u},
-    {ALG_HASH_SHA2_512_256, CRYPTO_SHA2_512_256_DIGEST_BYTES, 0u},
-    {ALG_HASH_SHA3_224, CRYPTO_SHA3_224_DIGEST_BYTES, 0u},
-    {ALG_HASH_SHA3_256, CRYPTO_SHA3_256_DIGEST_BYTES, 0u},
-    {ALG_HASH_SHA3_384, CRYPTO_SHA3_384_DIGEST_BYTES, 0u},
-    {ALG_HASH_SHA3_512, CRYPTO_SHA3_512_DIGEST_BYTES, 0u},
-    {ALG_HASH_SHAKE128, STREAM_XOF_BYTES, 168u},
-    {ALG_HASH_SHAKE256, STREAM_XOF_BYTES, 136u},
-    {ALG_HASH_LSH_256_224, CRYPTO_LSH_256_224_DIGEST_BYTES, 0u},
-    {ALG_HASH_LSH_256_256, CRYPTO_LSH_256_256_DIGEST_BYTES, 0u},
-    {ALG_HASH_LSH_512_224, CRYPTO_LSH_512_224_DIGEST_BYTES, 0u},
-    {ALG_HASH_LSH_512_256, CRYPTO_LSH_512_256_DIGEST_BYTES, 0u},
-    {ALG_HASH_LSH_512_384, CRYPTO_LSH_512_384_DIGEST_BYTES, 0u},
-    {ALG_HASH_LSH_512_512, CRYPTO_LSH_512_512_DIGEST_BYTES, 0u}
+    {LIBERAC_ALG_HASH_SHA2_224, LIBERAC_SHA2_224_DIGEST_BYTES, 0u},
+    {LIBERAC_ALG_HASH_SHA2_256, LIBERAC_SHA2_256_DIGEST_BYTES, 0u},
+    {LIBERAC_ALG_HASH_SHA2_384, LIBERAC_SHA2_384_DIGEST_BYTES, 0u},
+    {LIBERAC_ALG_HASH_SHA2_512, LIBERAC_SHA2_512_DIGEST_BYTES, 0u},
+    {LIBERAC_ALG_HASH_SHA2_512_224, LIBERAC_SHA2_512_224_DIGEST_BYTES, 0u},
+    {LIBERAC_ALG_HASH_SHA2_512_256, LIBERAC_SHA2_512_256_DIGEST_BYTES, 0u},
+    {LIBERAC_ALG_HASH_SHA3_224, LIBERAC_SHA3_224_DIGEST_BYTES, 0u},
+    {LIBERAC_ALG_HASH_SHA3_256, LIBERAC_SHA3_256_DIGEST_BYTES, 0u},
+    {LIBERAC_ALG_HASH_SHA3_384, LIBERAC_SHA3_384_DIGEST_BYTES, 0u},
+    {LIBERAC_ALG_HASH_SHA3_512, LIBERAC_SHA3_512_DIGEST_BYTES, 0u},
+    {LIBERAC_ALG_HASH_SHAKE128, STREAM_XOF_BYTES, 168u},
+    {LIBERAC_ALG_HASH_SHAKE256, STREAM_XOF_BYTES, 136u},
+    {LIBERAC_ALG_HASH_LSH_256_224, LIBERAC_LSH_256_224_DIGEST_BYTES, 0u},
+    {LIBERAC_ALG_HASH_LSH_256_256, LIBERAC_LSH_256_256_DIGEST_BYTES, 0u},
+    {LIBERAC_ALG_HASH_LSH_512_224, LIBERAC_LSH_512_224_DIGEST_BYTES, 0u},
+    {LIBERAC_ALG_HASH_LSH_512_256, LIBERAC_LSH_512_256_DIGEST_BYTES, 0u},
+    {LIBERAC_ALG_HASH_LSH_512_384, LIBERAC_LSH_512_384_DIGEST_BYTES, 0u},
+    {LIBERAC_ALG_HASH_LSH_512_512, LIBERAC_LSH_512_512_DIGEST_BYTES, 0u}
 };
 
 static int bytes_are(
@@ -51,19 +51,19 @@ static int bytes_are(
     return 1;
 }
 
-static int context_is_clear(const CRYPTO_HASH_CONTEXT *context) {
+static int context_is_clear(const LiberaCHashContext *context) {
     return bytes_are((const uint8_t *)context, sizeof(*context), 0u);
 }
 
 static int report_failure(
-    AlgID algorithm, unsigned int chunk_mode, const char *operation) {
+    LiberaCAlgID algorithm, unsigned int chunk_mode, const char *operation) {
     fprintf(stderr, "hash 0x%08lx mode %u: %s failed\n",
             (unsigned long)(uint32_t)algorithm, chunk_mode, operation);
     return 1;
 }
 
-static CryptoError update_in_chunks(
-    CRYPTO_HASH_CONTEXT *context,
+static LiberaCError update_in_chunks(
+    LiberaCHashContext *context,
     const uint8_t *message, size_t message_length,
     unsigned int chunk_mode) {
     static const size_t irregular_chunks[] = {
@@ -71,23 +71,23 @@ static CryptoError update_in_chunks(
     };
     size_t offset = 0u;
     size_t index;
-    CryptoError error;
+    LiberaCError error;
 
     if (chunk_mode == 0u) {
-        return CRYPTO_HASH_UPDATE(context, message, message_length);
+        return LIBERAC_HASH_UPDATE(context, message, message_length);
     }
     if (chunk_mode == 1u) {
         for (offset = 0u; offset < message_length; ++offset) {
-            error = CRYPTO_HASH_UPDATE(context, message + offset, 1u);
-            if (error != CRYPTO_SUCCESS) {
+            error = LIBERAC_HASH_UPDATE(context, message + offset, 1u);
+            if (error != LIBERAC_SUCCESS) {
                 return error;
             }
         }
-        return CRYPTO_SUCCESS;
+        return LIBERAC_SUCCESS;
     }
 
-    error = CRYPTO_HASH_UPDATE(context, NULL, 0u);
-    if (error != CRYPTO_SUCCESS) {
+    error = LIBERAC_HASH_UPDATE(context, NULL, 0u);
+    if (error != LIBERAC_SUCCESS) {
         return error;
     }
     for (index = 0u;
@@ -96,73 +96,73 @@ static CryptoError update_in_chunks(
         const size_t chunk = irregular_chunks[index];
 
         if (chunk > message_length - offset) {
-            return CRYPTO_ERROR_INTERNAL;
+            return LIBERAC_ERROR_INTERNAL;
         }
-        error = CRYPTO_HASH_UPDATE(context, message + offset, chunk);
-        if (error != CRYPTO_SUCCESS) {
+        error = LIBERAC_HASH_UPDATE(context, message + offset, chunk);
+        if (error != LIBERAC_SUCCESS) {
             return error;
         }
         offset += chunk;
     }
     return offset == message_length
-               ? CRYPTO_SUCCESS : CRYPTO_ERROR_INTERNAL;
+               ? LIBERAC_SUCCESS : LIBERAC_ERROR_INTERNAL;
 }
 
 static int squeeze_fixed(
-    CRYPTO_HASH_CONTEXT *context,
+    LiberaCHashContext *context,
     const uint8_t *expected, size_t digest_length,
-    AlgID algorithm, unsigned int chunk_mode) {
+    LiberaCAlgID algorithm, unsigned int chunk_mode) {
     uint8_t output[STREAM_OUTPUT_BYTES];
 
     memset(output, 0xa5, sizeof(output));
-    if (CRYPTO_HASH_SQUEEZE(context, output, digest_length - 1u) !=
-            CRYPTO_ERROR_BUFFER_TOO_SMALL ||
+    if (LIBERAC_HASH_SQUEEZE(context, output, digest_length - 1u) !=
+            LIBERAC_ERROR_BUFFER_TOO_SMALL ||
         !bytes_are(output, sizeof(output), 0xa5u)) {
         return report_failure(algorithm, chunk_mode, "short-buffer retry");
     }
-    if (CRYPTO_HASH_SQUEEZE(context, output, sizeof(output)) !=
-            CRYPTO_SUCCESS ||
+    if (LIBERAC_HASH_SQUEEZE(context, output, sizeof(output)) !=
+            LIBERAC_SUCCESS ||
         memcmp(output, expected, digest_length) != 0 ||
         !bytes_are(output + digest_length,
                    sizeof(output) - digest_length, 0xa5u)) {
         return report_failure(algorithm, chunk_mode, "fixed squeeze/tail");
     }
-    if (CRYPTO_HASH_SQUEEZE(context, output, sizeof(output)) !=
-            CRYPTO_ERROR_INVALID_ARGUMENT) {
+    if (LIBERAC_HASH_SQUEEZE(context, output, sizeof(output)) !=
+            LIBERAC_ERROR_INVALID_ARGUMENT) {
         return report_failure(algorithm, chunk_mode, "second fixed squeeze");
     }
     return 0;
 }
 
 static int squeeze_xof(
-    CRYPTO_HASH_CONTEXT *context,
+    LiberaCHashContext *context,
     const uint8_t *expected, size_t output_length, size_t rate,
-    AlgID algorithm, unsigned int chunk_mode) {
+    LiberaCAlgID algorithm, unsigned int chunk_mode) {
     uint8_t output[STREAM_OUTPUT_BYTES];
     size_t offset = 0u;
     size_t first;
 
     memset(output, 0xa5, sizeof(output));
-    if (CRYPTO_HASH_SQUEEZE(context, NULL, 0u) != CRYPTO_SUCCESS ||
-        CRYPTO_HASH_SQUEEZE(context, NULL, 1u) !=
-            CRYPTO_ERROR_INVALID_ARGUMENT) {
+    if (LIBERAC_HASH_SQUEEZE(context, NULL, 0u) != LIBERAC_SUCCESS ||
+        LIBERAC_HASH_SQUEEZE(context, NULL, 1u) !=
+            LIBERAC_ERROR_INVALID_ARGUMENT) {
         return report_failure(algorithm, chunk_mode, "zero/invalid XOF squeeze");
     }
 
     first = rate - 1u;
-    if (CRYPTO_HASH_SQUEEZE(context, output + offset, first) !=
-            CRYPTO_SUCCESS) {
+    if (LIBERAC_HASH_SQUEEZE(context, output + offset, first) !=
+            LIBERAC_SUCCESS) {
         return report_failure(algorithm, chunk_mode, "first XOF segment");
     }
     offset += first;
-    if (CRYPTO_HASH_SQUEEZE(context, output + offset, 2u) !=
-            CRYPTO_SUCCESS) {
+    if (LIBERAC_HASH_SQUEEZE(context, output + offset, 2u) !=
+            LIBERAC_SUCCESS) {
         return report_failure(algorithm, chunk_mode, "rate-boundary XOF segment");
     }
     offset += 2u;
-    if (CRYPTO_HASH_SQUEEZE(
+    if (LIBERAC_HASH_SQUEEZE(
             context, output + offset, output_length - offset) !=
-            CRYPTO_SUCCESS ||
+            LIBERAC_SUCCESS ||
         memcmp(output, expected, output_length) != 0 ||
         !bytes_are(output + output_length,
                    sizeof(output) - output_length, 0xa5u)) {
@@ -175,29 +175,29 @@ static int test_stream_case(
     const hash_stream_case *test_case,
     const uint8_t *message, size_t message_length,
     unsigned int chunk_mode) {
-    CRYPTO_HASH_CONTEXT context;
+    LiberaCHashContext context;
     uint8_t expected[STREAM_XOF_BYTES];
-    uint8_t scratch[CRYPTO_HASH_MAX_DIGEST_BYTES];
+    uint8_t scratch[LIBERAC_HASH_MAX_DIGEST_BYTES];
     int failed;
 
-    if (CRYPTO_HASH(expected, test_case->output_length,
+    if (LIBERAC_HASH(expected, test_case->output_length,
                     message, message_length, test_case->algorithm) !=
-            CRYPTO_SUCCESS ||
-        CRYPTO_HASH_INIT(&context, test_case->algorithm) != CRYPTO_SUCCESS) {
+            LIBERAC_SUCCESS ||
+        LIBERAC_HASH_INIT(&context, test_case->algorithm) != LIBERAC_SUCCESS) {
         return report_failure(test_case->algorithm, chunk_mode,
                               "one-shot/init");
     }
-    if (CRYPTO_HASH_SQUEEZE(&context, scratch, sizeof(scratch)) !=
-            CRYPTO_ERROR_INVALID_ARGUMENT ||
-        CRYPTO_HASH_UPDATE(&context, NULL, 1u) !=
-            CRYPTO_ERROR_INVALID_ARGUMENT ||
+    if (LIBERAC_HASH_SQUEEZE(&context, scratch, sizeof(scratch)) !=
+            LIBERAC_ERROR_INVALID_ARGUMENT ||
+        LIBERAC_HASH_UPDATE(&context, NULL, 1u) !=
+            LIBERAC_ERROR_INVALID_ARGUMENT ||
         update_in_chunks(&context, message, message_length, chunk_mode) !=
-            CRYPTO_SUCCESS ||
-        CRYPTO_HASH_FINALIZE(&context) != CRYPTO_SUCCESS ||
-        CRYPTO_HASH_UPDATE(&context, NULL, 0u) !=
-            CRYPTO_ERROR_INVALID_ARGUMENT ||
-        CRYPTO_HASH_FINALIZE(&context) != CRYPTO_ERROR_INVALID_ARGUMENT) {
-        CRYPTO_HASH_CLEAR(&context);
+            LIBERAC_SUCCESS ||
+        LIBERAC_HASH_FINALIZE(&context) != LIBERAC_SUCCESS ||
+        LIBERAC_HASH_UPDATE(&context, NULL, 0u) !=
+            LIBERAC_ERROR_INVALID_ARGUMENT ||
+        LIBERAC_HASH_FINALIZE(&context) != LIBERAC_ERROR_INVALID_ARGUMENT) {
+        LIBERAC_HASH_CLEAR(&context);
         return report_failure(test_case->algorithm, chunk_mode, "lifecycle");
     }
 
@@ -209,36 +209,36 @@ static int test_stream_case(
                              test_case->rate,
                              test_case->algorithm, chunk_mode);
     }
-    CRYPTO_HASH_CLEAR(&context);
+    LIBERAC_HASH_CLEAR(&context);
     if (failed != 0) {
         return failed;
     }
     if (!context_is_clear(&context) ||
-        CRYPTO_HASH_UPDATE(&context, NULL, 0u) !=
-            CRYPTO_ERROR_INVALID_ARGUMENT) {
+        LIBERAC_HASH_UPDATE(&context, NULL, 0u) !=
+            LIBERAC_ERROR_INVALID_ARGUMENT) {
         return report_failure(test_case->algorithm, chunk_mode, "clear");
     }
     return 0;
 }
 
 static int test_invalid_contexts(void) {
-    CRYPTO_HASH_CONTEXT context;
-    uint8_t output[CRYPTO_HASH_MAX_DIGEST_BYTES];
+    LiberaCHashContext context;
+    uint8_t output[LIBERAC_HASH_MAX_DIGEST_BYTES];
 
     memset(&context, 0xa5, sizeof(context));
-    if (CRYPTO_HASH_INIT(NULL, ALG_HASH_SHA2_256) !=
-            CRYPTO_ERROR_INVALID_ARGUMENT ||
-        CRYPTO_HASH_INIT(&context, (AlgID)0x7fffffff) !=
-            CRYPTO_ERROR_INVALID_ALG_ID ||
+    if (LIBERAC_HASH_INIT(NULL, LIBERAC_ALG_HASH_SHA2_256) !=
+            LIBERAC_ERROR_INVALID_ARGUMENT ||
+        LIBERAC_HASH_INIT(&context, (LiberaCAlgID)0x7fffffff) !=
+            LIBERAC_ERROR_INVALID_ALG_ID ||
         !context_is_clear(&context) ||
-        CRYPTO_HASH_UPDATE(NULL, NULL, 0u) !=
-            CRYPTO_ERROR_INVALID_ARGUMENT ||
-        CRYPTO_HASH_FINALIZE(NULL) != CRYPTO_ERROR_INVALID_ARGUMENT ||
-        CRYPTO_HASH_SQUEEZE(NULL, output, sizeof(output)) !=
-            CRYPTO_ERROR_INVALID_ARGUMENT) {
+        LIBERAC_HASH_UPDATE(NULL, NULL, 0u) !=
+            LIBERAC_ERROR_INVALID_ARGUMENT ||
+        LIBERAC_HASH_FINALIZE(NULL) != LIBERAC_ERROR_INVALID_ARGUMENT ||
+        LIBERAC_HASH_SQUEEZE(NULL, output, sizeof(output)) !=
+            LIBERAC_ERROR_INVALID_ARGUMENT) {
         return 1;
     }
-    CRYPTO_HASH_CLEAR(NULL);
+    LIBERAC_HASH_CLEAR(NULL);
     return 0;
 }
 
