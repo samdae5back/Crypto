@@ -39,6 +39,16 @@ static int test_elgamal(void) {
             &recovered, decoded, sizeof(decoded)) != LIBERAC_SUCCESS ||
         memcmp(encoded, decoded, sizeof(encoded)) != 0)
         goto done;
+
+    /* c1 = 0 is not an element of the multiplicative group and has no inverse. */
+    LIBERAC_BIGNUM_FREE(&ciphertext.C1);
+    LIBERAC_BIGNUM_INIT(&ciphertext.C1);
+    if (LIBERAC_ELGAMAL_DECRYPT(&recovered, &ciphertext, &public_key,
+                               &private_key,
+                               LIBERAC_ALG_ELGAMAL_SAFE_PRIME) !=
+        LIBERAC_ERROR_INVALID_ARGUMENT)
+        goto done;
+
     failed = 0;
 
 done:
