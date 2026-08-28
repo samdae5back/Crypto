@@ -13,6 +13,23 @@ by LiberaCrypt. A Git repository listed as the vendored implementation source
 should not be read as replacing the algorithm's official specification or
 project provenance.
 
+## ML-KEM provenance (not a third-party backend)
+
+LiberaCrypt's ML-KEM implementation is original project source rather than a
+vendored backend. Its primary implementation source is NIST FIPS 203,
+*Module-Lattice-Based Key-Encapsulation Mechanism Standard*:
+<https://csrc.nist.gov/pubs/fips/203/final>.
+
+For comparison and background, reference implementations are linked in
+`src/KeyEncapsulation/ML-KEM/PROVENANCE.md`, including the official
+CRYSTALS-Kyber reference implementation and the maintained `mlkem-native`
+FIPS 203 implementation. Those repositories are reference links only: the
+LiberaCrypt ML-KEM source was implemented independently from FIPS 203 and was
+not copied, ported, or adapted from those implementations.
+
+Because this code is LiberaCrypt original source, it is covered by the
+project's `AGPL-3.0-only` license rather than an upstream third-party license.
+
 ## mldsa-native
 
 - Algorithm standard: NIST FIPS 204, Module-Lattice-Based Digital Signature
