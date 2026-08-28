@@ -16,7 +16,7 @@ static unsigned int mlkem_bit_at(const unsigned char *input,
 }
 
 static int mlkem_power_of_two(int exponent) {
-    return 1 << exponent;
+    return (int)(UINT32_C(1) << (unsigned int)exponent);
 }
 
 int ByteEncode(const int *input, size_t bit_width, unsigned char *output) {
