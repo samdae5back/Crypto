@@ -11,6 +11,9 @@
 void crypto_bignum_init(LiberaCBignum *value);
 void crypto_bignum_free(LiberaCBignum *value);
 LiberaCError crypto_bignum_copy(LiberaCBignum *out, const LiberaCBignum *in);
+LiberaCError crypto_bignum_copy_secret_fixed(LiberaCBignum *out,
+                                             const LiberaCBignum *in,
+                                             size_t fixed_limbs);
 LiberaCError crypto_bignum_set_u64(LiberaCBignum *out, uint64_t value);
 LiberaCError crypto_bignum_from_bytes_be(LiberaCBignum *out, const uint8_t *bytes, size_t length);
 LiberaCError crypto_bignum_from_bytes_le(LiberaCBignum *out, const uint8_t *bytes, size_t length);
@@ -23,20 +26,45 @@ int crypto_bignum_is_zero(const LiberaCBignum *value);
 LiberaCError crypto_bignum_add(LiberaCBignum *out, const LiberaCBignum *a, const LiberaCBignum *b);
 LiberaCError crypto_bignum_sub(LiberaCBignum *out, const LiberaCBignum *a, const LiberaCBignum *b);
 LiberaCError crypto_bignum_mul(LiberaCBignum *out, const LiberaCBignum *a, const LiberaCBignum *b);
+LiberaCError crypto_bignum_square(LiberaCBignum *out, const LiberaCBignum *a);
 LiberaCError crypto_bignum_mod(LiberaCBignum *out, const LiberaCBignum *a, const LiberaCBignum *modulus);
 LiberaCError crypto_bignum_mod_mul(LiberaCBignum *out, const LiberaCBignum *a,
                                    const LiberaCBignum *b, const LiberaCBignum *modulus);
+LiberaCError crypto_bignum_mod_square(LiberaCBignum *out,
+                                      const LiberaCBignum *a,
+                                      const LiberaCBignum *modulus);
 
-/* Shared helper for the common a^2 mod m case; avoids routing a fixed
- * exponent through the generic modular-exponentiation setup. */
-static inline LiberaCError crypto_bignum_mod_square(
-    LiberaCBignum *out, const LiberaCBignum *a,
-    const LiberaCBignum *modulus) {
-    return crypto_bignum_mod_mul(out, a, a, modulus);
-}
-
+/* Variable-time high-performance path.  The exponent controls conditional
+ * multiplies, so this helper is for public/non-secret exponents only. */
 LiberaCError crypto_bignum_mod_exp(LiberaCBignum *out, const LiberaCBignum *base,
                                    const LiberaCBignum *exponent, const LiberaCBignum *modulus);
+static inline LiberaCError crypto_bignum_mod_exp_vartime(
+    LiberaCBignum *out, const LiberaCBignum *base,
+    const LiberaCBignum *exponent, const LiberaCBignum *modulus) {
+    return crypto_bignum_mod_exp(out, base, exponent, modulus);
+}
+
+/* Secret-exponent path.  It executes one Montgomery square and one Montgomery
+ * multiply for every modulus limb bit, then selects with a mask rather than a
+ * secret-dependent branch or table index.  The exponent storage must have at
+ * least modulus->LENGTH limbs so leading-zero limb count is not exposed by the
+ * scan.  This is a software constant-schedule property; C cannot promise equal
+ * physical timing on every possible processor. */
+LiberaCError crypto_bignum_mod_exp_ct(LiberaCBignum *out,
+                                      const LiberaCBignum *base,
+                                      const LiberaCBignum *exponent,
+                                      const LiberaCBignum *modulus);
+
+/* Same secret exponent and modulus for two public bases.  Sharing Montgomery
+ * setup avoids duplicated context/R^2 preparation in protocols such as
+ * ElGamal encryption. */
+LiberaCError crypto_bignum_mod_exp2_ct(LiberaCBignum *out1,
+                                       const LiberaCBignum *base1,
+                                       LiberaCBignum *out2,
+                                       const LiberaCBignum *base2,
+                                       const LiberaCBignum *exponent,
+                                       const LiberaCBignum *modulus);
+
 LiberaCError crypto_bignum_random_bits(LiberaCBignum *out, size_t bits, int set_top_bit, int set_odd);
 LiberaCError crypto_bignum_random_range(LiberaCBignum *out, const LiberaCBignum *upper_exclusive);
 
