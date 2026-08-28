@@ -260,6 +260,63 @@ build or runtime dependency. In-place CBC, invalid-argument behavior, strict
 C11 `-O0`/`-O2`/`-O3` warning builds, and AddressSanitizer/
 UndefinedBehaviorSanitizer runs were also exercised.
 
+### ElGamal
+
+| Area | Previous implementation | LiberaCrypt optimization | Effect |
+| --- | --- | --- | --- |
+| Safe-prime subgroup generator candidate | Form the fixed exponent `2` as a bignum and route `hseed^2 mod p` through generic modular exponentiation. | Use the shared square-specific bignum path. Symmetric cross products are computed once and accumulated twice before reduction. | Avoids generic exponentiation setup and reduces the number of wide limb multiplications for squaring. Safe-prime generation still dominates total key-generation cost. |
+| Secret exponentiation | Binary square-and-multiply skipped the multiply when a secret exponent bit was zero and stopped at the secret exponent bit length. | RSA private operations and ElGamal `x`/`y` exponentiation use a fixed-width Montgomery path that always computes square and multiply candidates for every modulus-width bit and mask-selects the result. | Removes secret-bit-dependent multiply branches and secret-bit-dependent table/index selection from the exponentiation schedule. |
+| Encryption twin powers | Compute `g^y mod p` and `h^y mod p` as independent exponentiations. | Use the shared `crypto_bignum_mod_exp2_ct` path for both bases with one Montgomery/R^2 setup and one fixed-width exponent scan. | Avoids duplicated Montgomery context preparation while preserving the same two exponentiation results. |
+| Decryption factor | Compute `shared = c1^x mod p`, then invert it with a second full exponentiation `shared^(p-2) mod p`. | For nonzero `c1`, use Fermat's theorem to compute the inverse factor directly as `c1^(p-1-x) mod p`, then multiply by `c2`; both the derived subtraction and exponentiation use fixed-width secret paths. | Reduces the decryption path from two full modular exponentiations to one full modular exponentiation plus one modular multiplication. Invalid `c1 = 0` ciphertexts are rejected because zero has no multiplicative inverse. |
+
+The ElGamal changes preserve the generated subgroup and valid-ciphertext
+semantics. No exact speedup is claimed here until a reproducible benchmark is
+retained in the repository. The decryption transformation removes one complete
+modular exponentiation, while encryption shares context setup across its two
+powers.
+
+The secret exponentiation path is described as **constant-schedule** rather than
+as a universal physical constant-time guarantee. Its loop count, multiplication
+count, and memory indices do not depend on secret exponent bits, and stored
+private exponents are padded to the public modulus limb width. ISO C, however,
+cannot guarantee identical instruction latency on every processor/compiler, so
+hardware-level timing claims require platform-specific validation.
+
+### Bignum timing and optimization policy
+
+LiberaCrypt intentionally does **not** duplicate every bignum primitive into
+`_ct` and `_vartime` variants. The default generic bignum layer is optimized for
+normal/public data. A separate fixed-width secret layer is used only where a
+value-dependent loop count, branch, table index, normalization step, or operand
+length could expose secret information. This keeps the performance path simple
+without creating two independent implementations of operations that do not need
+separate timing behavior.
+
+The current policy is:
+
+| Operation class | Default/public path | Secret path |
+| --- | --- | --- |
+| Exponentiation | `crypto_bignum_mod_exp_vartime`: adaptive sliding window, odd-power precomputation, direct table lookup, zero-bit skipping, and trivial-value early exits. | `crypto_bignum_mod_exp_ct` / `crypto_bignum_mod_exp2_ct`: full modulus-width scan, one square and one multiply candidate per bit, mask selection, no secret-indexed lookup. |
+| Copy / serialization | Normal `LiberaCBignum` copy and byte serialization retain variable-length behavior for ordinary data. | Secrets are first promoted once to a public fixed storage width. Subsequent fixed-width copies and BE/LE import/export use the `*_secret_fixed_ct` helpers, which traverse the complete caller-selected width and do not use secret `LENGTH` to control the loop. |
+| Add/subtract | Generic arithmetic remains variable-time and may normalize or stop according to significant length. | A fixed-width secret subtraction helper is used where required, currently for ElGamal's derived `p-1-x` exponent. More fixed-width add/sub helpers should be added only when a secret call site needs them. |
+| Modular multiply / reduction | Generic `crypto_bignum_mod_mul` and `crypto_bignum_mod` remain performance-oriented variable-time operations. | Secret exponentiation keeps residues in a dedicated fixed-width Montgomery layer. Montgomery multiplication, final conditional reduction, and result selection use fixed-count loops/masks rather than routing secret state through the generic division-style reduction path. |
+| Compare / normalization | Early exit and significant-length normalization are allowed for public values. | Secret Montgomery results use fixed-count normalization; secret equality/compare helpers should be introduced only for call sites whose result or first-difference position is sensitive. |
+| Prime testing/generation | Miller–Rabin and trial division are deliberately variable-time because candidate values and witness decisions are not treated as long-lived secret exponents. | No duplicate constant-time prime-generation stack is maintained. |
+
+The variable-length-to-fixed-width **promotion boundary is not claimed to be
+constant-schedule**: it necessarily starts from an ordinary `LiberaCBignum`
+whose significant length is already represented in `LENGTH`. RSA `D` and
+ElGamal `X` are promoted once during key generation; subsequent persistent-key
+copies use the fixed-width CT copy helper. This distinction prevents a helper
+from being labelled constant-time while still copying only `LENGTH` limbs.
+
+For secret modular arithmetic, the preferred design is to keep values reduced
+inside the fixed-width Montgomery domain rather than create a second general
+purpose arbitrary-size division/remainder implementation. A standalone CT
+modular inverse, GCD, or arbitrary reduction routine should be added when a
+protocol actually needs it; until then, avoiding duplicate complex arithmetic
+reduces maintenance and validation risk.
+
 ### Other algorithms and shared paths
 
 Not every optimization is a throughput optimization. The following verified
@@ -272,6 +329,12 @@ reproducible benchmark.
 | AES-128/192/256 | Common compact implementations index an S-box or T-table with secret-derived bytes. | Compute the S-box and inverse S-box algebraically over GF(2^8) with a fixed operation sequence; round keys and temporary state are explicitly cleared. | Cache-timing hardening and secret-data hygiene, with portability favored over table-driven throughput. |
 | SHA-2 and LSH streaming | A simple update path copies every block into context storage before compression. | After completing a partial block, pass complete input blocks directly to the compression function and copy only the remainder. | Lower memory traffic for large or block-aligned updates. |
 | Generic hash API | Separate one-shot and incremental implementations can duplicate padding and state-transition logic. | Build the one-shot operation on the runtime-selected init/update/finalize/squeeze path; SHAKE retains repeated-squeeze streaming. | One validated state machine and less duplicate code across SHA-1, SHA-2, SHA-3/SHAKE, and LSH. |
+| Bignum exponentiation policy | One binary exponentiation helper served both public and secret exponents. | Route public/non-secret values such as Miller–Rabin and RSA `e` through an explicitly variable-time path, and private/random exponents through the separate fixed-schedule path. | Allows aggressive public-data optimization without silently weakening secret-exponent timing behavior. |
+| Public bignum exponentiation | Binary square-and-multiply processed one exponent bit at a time and performed one conditional multiply for each set bit. | Use an adaptive sliding window, precompute odd Montgomery powers, index that table directly from the public window value, skip public zero-bit work, and return early for trivial modulus/base/exponent cases. | Reduces Montgomery multiplication count for larger public exponents while confining table lookup and early-exit behavior to non-secret inputs. |
+| Bignum squaring | Route `a^2` through generic schoolbook multiplication, computing both `a[i]a[j]` and `a[j]a[i]`. | Use one shared square-specific helper that computes each symmetric cross product once; ElGamal generator selection and Miller–Rabin both use it. | Roughly halves wide cross-product multiplications before modular reduction, while centralizing future square-specific tuning. |
+| Bignum Montgomery exponentiation | Allocate and free the `n + 2`-limb Montgomery scratch array for every Montgomery multiplication. | Allocate one scratch array in the per-exponentiation Montgomery context, clear and reuse it for every multiply, then securely clear it when the context is released. | Removes one heap allocation/free pair from every variable-time Montgomery multiplication used by RSA and Miller–Rabin while also reducing residual intermediate data. |
+| Secret bignum copy / serialization | Variable-length copies and serialization naturally follow significant length. | Fixed-width secret copy and BE/LE import/export traverse the full caller-selected public width after the secret has crossed the fixed-storage boundary. | Prevents subsequent secret copies/codecs from exposing significant limb/byte length through loop count or memory extent. |
+| Secret temporary storage | Secret exponent state used ordinary variable-length bignums and generic temporaries. | Use modulus-width limb buffers for secret Montgomery state, mask-select candidate results, fixed-count output normalization, fixed-width secret subtraction for derived exponents, and explicit zeroization before release. | Reduce secret-dependent control flow, operand-length leakage in secret subtraction, and residual secret intermediates. |
 | ML-KEM | Build parameter-specialized copies for ML-KEM-512/768/1024. | Compile the implementation once, select a complete FIPS 203 parameter record at the API boundary, and use maximum-sized portable work arrays. | Lower build/code duplication and one runtime-dispatched implementation; this is not a claimed cryptographic-operation speedup. |
 | ML-DSA and SLH-DSA integration | Independently compile all shared support for every parameter set. | Use the pinned mldsa-native multilevel mode so shared code is emitted once, and expose all 12 SLH-DSA parameter objects from one portable backend build. | Reduce duplicated backend code and keep one library artifact for all levels. Native assembly is deliberately disabled in the current ML-DSA adapter for consistent portable builds. |
 | HAETAE | The upstream-oriented arithmetic relied in places on signed right shifts, plain-`char` behavior, and implicit fixed-point widths. | Use explicit floor division and unsigned sign extraction, define signed-byte serialization, prove FFT widths, evaluate Q16 intermediates in `int64_t`, and accumulate magnitudes in `uint64_t`. | Defined behavior across compilers and architectures while preserving current and legacy KAT output. |

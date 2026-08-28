@@ -74,6 +74,10 @@ set(LIBERAC_SOURCES
     src/RandomNumberGeneration/CTR_DRBG/ctr_drbg.c
     src/RandomNumberGeneration/KAT/pqc_kat_rng.c
     src/Util/Bignum/bignum.c
+    src/Util/Bignum/bignum_secure.c
+    src/Util/Bignum/bignum_secret_arith.c
+    src/Util/Bignum/bignum_secret_io.c
+    src/Util/Bignum/bignum_vartime.c
     src/Util/Prime/prime.c
     src/AsymmetricCipher/RSA/rsa.c
     src/AsymmetricCipher/ElGamal/elgamal.c

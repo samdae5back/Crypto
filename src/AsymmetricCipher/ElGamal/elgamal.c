@@ -63,28 +63,20 @@ LiberaCError crypto_elgamal_keygen_internal(LiberaCAlgID alg, LiberaCElgamalPubl
     }
 
     for (tries = 0; tries < 128u; ++tries) {
-        LiberaCBignum two;
-        crypto_bignum_init(&two);
         crypto_bignum_free(&hseed); crypto_bignum_init(&hseed);
         crypto_bignum_free(&g); crypto_bignum_init(&g);
         err = crypto_bignum_random_range(&hseed, &p_minus_3);
-        if (err != LIBERAC_SUCCESS) {
-            crypto_bignum_free(&two);
-            goto fail;
-        }
-        if (bignum_add_u32(&hseed, 2u) != 0 ||
-            crypto_bignum_set_u64(&two, 2u) != LIBERAC_SUCCESS) {
+        if (err != LIBERAC_SUCCESS) goto fail;
+        if (bignum_add_u32(&hseed, 2u) != 0) {
             err = LIBERAC_ERROR_ALLOCATION_FAILED;
-            crypto_bignum_free(&two);
             goto fail;
         }
-        if (crypto_bignum_mod_exp(&g, &hseed, &two, &p) !=
-            LIBERAC_SUCCESS) {
+        /* The subgroup generator candidate is exactly hseed^2 mod p.  Use the
+         * shared square-specific path rather than generic exponentiation. */
+        if (crypto_bignum_mod_square(&g, &hseed, &p) != LIBERAC_SUCCESS) {
             err = LIBERAC_ERROR_ARITHMETIC;
-            crypto_bignum_free(&two);
             goto fail;
         }
-        crypto_bignum_free(&two);
         if (!(g.LENGTH == 1u && g.LIMBS[0] == 1u)) break;
     }
     if (tries == 128u) {
@@ -93,7 +85,11 @@ LiberaCError crypto_elgamal_keygen_internal(LiberaCAlgID alg, LiberaCElgamalPubl
     }
     err = elgamal_random_nonzero(&x, &q);
     if (err != LIBERAC_SUCCESS) goto fail;
-    if (crypto_bignum_mod_exp(&h, &g, &x, &p) != LIBERAC_SUCCESS) {
+    /* Secret exponentiation scans the public modulus width.  Promote x once at
+     * the generation boundary; later copies use the complete fixed width. */
+    err = crypto_bignum_copy_secret_fixed(&x, &x, p.LENGTH);
+    if (err != LIBERAC_SUCCESS) goto fail;
+    if (crypto_bignum_mod_exp_ct(&h, &g, &x, &p) != LIBERAC_SUCCESS) {
         err = LIBERAC_ERROR_ARITHMETIC;
         goto fail;
     }
@@ -102,7 +98,7 @@ LiberaCError crypto_elgamal_keygen_internal(LiberaCAlgID alg, LiberaCElgamalPubl
     crypto_elgamal_private_key_free_internal(private_key); crypto_elgamal_private_key_init_internal(private_key);
     if (crypto_bignum_copy(&public_key->P, &p) != LIBERAC_SUCCESS || crypto_bignum_copy(&public_key->Q, &q) != LIBERAC_SUCCESS ||
         crypto_bignum_copy(&public_key->G, &g) != LIBERAC_SUCCESS || crypto_bignum_copy(&public_key->H, &h) != LIBERAC_SUCCESS ||
-        crypto_bignum_copy(&private_key->X, &x) != LIBERAC_SUCCESS) {
+        crypto_bignum_copy_secret_fixed_ct(&private_key->X, &x, p.LENGTH) != LIBERAC_SUCCESS) {
         err = LIBERAC_ERROR_ALLOCATION_FAILED;
         goto fail;
     }
@@ -125,8 +121,14 @@ LiberaCError crypto_elgamal_encrypt_internal(LiberaCAlgID alg, LiberaCElgamalCip
     crypto_bignum_init(&y); crypto_bignum_init(&shared); crypto_bignum_init(&c1); crypto_bignum_init(&c2);
     err = elgamal_random_nonzero(&y, &public_key->Q);
     if (err != LIBERAC_SUCCESS) goto done;
-    if (crypto_bignum_mod_exp(&c1, &public_key->G, &y, &public_key->P) != LIBERAC_SUCCESS ||
-        crypto_bignum_mod_exp(&shared, &public_key->H, &y, &public_key->P) != LIBERAC_SUCCESS ||
+    err = crypto_bignum_copy_secret_fixed(&y, &y, public_key->P.LENGTH);
+    if (err != LIBERAC_SUCCESS) goto done;
+
+    /* Both powers use the same secret y and public modulus p.  A shared CT
+     * Montgomery context avoids preparing R^2 and the exponent scan twice. */
+    if (crypto_bignum_mod_exp2_ct(&c1, &public_key->G,
+                                  &shared, &public_key->H,
+                                  &y, &public_key->P) != LIBERAC_SUCCESS ||
         crypto_bignum_mod_mul(&c2, message, &shared, &public_key->P) != LIBERAC_SUCCESS) {
         err = LIBERAC_ERROR_ARITHMETIC;
         goto done;
@@ -141,18 +143,28 @@ done:
 }
 
 LiberaCError crypto_elgamal_decrypt_internal(LiberaCAlgID alg, LiberaCBignum *message, const LiberaCElgamalCiphertext *ciphertext, const LiberaCElgamalPublicKey *public_key, const LiberaCElgamalPrivateKey *private_key) {
-    LiberaCBignum shared, exponent, inverse;
+    LiberaCBignum factor, p_minus_one, inverse_exponent;
     LiberaCError err = LIBERAC_ERROR_ARITHMETIC;
     if (alg != LIBERAC_ALG_ELGAMAL_SAFE_PRIME) return LIBERAC_ERROR_INVALID_ALG_ID;
     if (!message || !ciphertext || !public_key || !private_key) return LIBERAC_ERROR_INVALID_ARGUMENT;
-    if (crypto_bignum_compare(&ciphertext->C1, &public_key->P) >= 0 || crypto_bignum_compare(&ciphertext->C2, &public_key->P) >= 0) return LIBERAC_ERROR_INVALID_ARGUMENT;
-    crypto_bignum_init(&shared); crypto_bignum_init(&exponent); crypto_bignum_init(&inverse);
-    if (crypto_bignum_mod_exp(&shared, &ciphertext->C1, &private_key->X, &public_key->P) != LIBERAC_SUCCESS ||
-        bignum_sub_u32(&exponent, &public_key->P, 2u) != 0 ||
-        crypto_bignum_mod_exp(&inverse, &shared, &exponent, &public_key->P) != LIBERAC_SUCCESS ||
-        crypto_bignum_mod_mul(message, &ciphertext->C2, &inverse, &public_key->P) != LIBERAC_SUCCESS) goto done;
+    if (crypto_bignum_is_zero(&ciphertext->C1) ||
+        crypto_bignum_compare(&ciphertext->C1, &public_key->P) >= 0 ||
+        crypto_bignum_compare(&ciphertext->C2, &public_key->P) >= 0)
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
+
+    crypto_bignum_init(&factor); crypto_bignum_init(&p_minus_one); crypto_bignum_init(&inverse_exponent);
+    /* For prime p and nonzero c1, Fermat gives c1^(-x) = c1^(p-1-x).
+     * Both the derived subtraction and the exponentiation stay on fixed-width
+     * secret paths. */
+    if (bignum_sub_u32(&p_minus_one, &public_key->P, 1u) != 0 ||
+        crypto_bignum_sub_secret_fixed(&inverse_exponent, &p_minus_one,
+                                       &private_key->X,
+                                       public_key->P.LENGTH) != LIBERAC_SUCCESS ||
+        crypto_bignum_mod_exp_ct(&factor, &ciphertext->C1, &inverse_exponent, &public_key->P) != LIBERAC_SUCCESS ||
+        crypto_bignum_mod_mul(message, &ciphertext->C2, &factor, &public_key->P) != LIBERAC_SUCCESS)
+        goto done;
     err = LIBERAC_SUCCESS;
 done:
-    crypto_bignum_free(&shared); crypto_bignum_free(&exponent); crypto_bignum_free(&inverse);
+    crypto_bignum_free(&factor); crypto_bignum_free(&p_minus_one); crypto_bignum_free(&inverse_exponent);
     return err;
 }

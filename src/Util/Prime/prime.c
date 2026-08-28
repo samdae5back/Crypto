@@ -79,13 +79,13 @@ static LiberaCError prime_is_probable_checked(const LiberaCBignum *value,
         err = crypto_bignum_random_range(&a, &n_minus_3);
         if (err != LIBERAC_SUCCESS) goto done;
         if (bignum_add_u32(&a, 2u) != 0 ||
-            crypto_bignum_mod_exp(&x, &a, &d, value) != LIBERAC_SUCCESS) {
+            crypto_bignum_mod_exp_vartime(&x, &a, &d, value) != LIBERAC_SUCCESS) {
             err = LIBERAC_ERROR_ALLOCATION_FAILED;
             goto done;
         }
         if ((x.LENGTH == 1u && x.LIMBS[0] == 1u) || crypto_bignum_compare(&x, &n_minus_1) == 0) continue;
         for (j = 1u; j < s; ++j) {
-            if (crypto_bignum_mod_mul(&tmp, &x, &x, value) !=
+            if (crypto_bignum_mod_square(&tmp, &x, value) !=
                 LIBERAC_SUCCESS) {
                 err = LIBERAC_ERROR_ALLOCATION_FAILED;
                 goto done;
