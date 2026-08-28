@@ -26,9 +26,15 @@ LiberaCError crypto_bignum_mul(LiberaCBignum *out, const LiberaCBignum *a, const
 LiberaCError crypto_bignum_mod(LiberaCBignum *out, const LiberaCBignum *a, const LiberaCBignum *modulus);
 LiberaCError crypto_bignum_mod_mul(LiberaCBignum *out, const LiberaCBignum *a,
                                    const LiberaCBignum *b, const LiberaCBignum *modulus);
-LiberaCError crypto_bignum_mod_square(LiberaCBignum *out,
-                                      const LiberaCBignum *a,
-                                      const LiberaCBignum *modulus);
+
+/* Shared helper for the common a^2 mod m case; avoids routing a fixed
+ * exponent through the generic modular-exponentiation setup. */
+static inline LiberaCError crypto_bignum_mod_square(
+    LiberaCBignum *out, const LiberaCBignum *a,
+    const LiberaCBignum *modulus) {
+    return crypto_bignum_mod_mul(out, a, a, modulus);
+}
+
 LiberaCError crypto_bignum_mod_exp(LiberaCBignum *out, const LiberaCBignum *base,
                                    const LiberaCBignum *exponent, const LiberaCBignum *modulus);
 LiberaCError crypto_bignum_random_bits(LiberaCBignum *out, size_t bits, int set_top_bit, int set_odd);
