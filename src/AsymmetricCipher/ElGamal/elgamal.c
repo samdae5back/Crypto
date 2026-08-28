@@ -154,10 +154,12 @@ LiberaCError crypto_elgamal_decrypt_internal(LiberaCAlgID alg, LiberaCBignum *me
 
     crypto_bignum_init(&factor); crypto_bignum_init(&p_minus_one); crypto_bignum_init(&inverse_exponent);
     /* For prime p and nonzero c1, Fermat gives c1^(-x) = c1^(p-1-x).
-     * The derived exponent remains secret and therefore uses the fixed-schedule
-     * exponentiation path. */
+     * Both the derived subtraction and the exponentiation stay on fixed-width
+     * secret paths. */
     if (bignum_sub_u32(&p_minus_one, &public_key->P, 1u) != 0 ||
-        crypto_bignum_sub(&inverse_exponent, &p_minus_one, &private_key->X) != LIBERAC_SUCCESS ||
+        crypto_bignum_sub_secret_fixed(&inverse_exponent, &p_minus_one,
+                                       &private_key->X,
+                                       public_key->P.LENGTH) != LIBERAC_SUCCESS ||
         crypto_bignum_mod_exp_ct(&factor, &ciphertext->C1, &inverse_exponent, &public_key->P) != LIBERAC_SUCCESS ||
         crypto_bignum_mod_mul(message, &ciphertext->C2, &factor, &public_key->P) != LIBERAC_SUCCESS)
         goto done;
