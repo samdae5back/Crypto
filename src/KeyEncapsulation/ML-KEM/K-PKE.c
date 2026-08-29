@@ -11,6 +11,7 @@
 #include "auxiliary.h"
 #include "hash.h"
 #include "parameter.h"
+#include "reduce.h"
 #include "Util/Core/secure_zero.h"
 
 enum { MLKEM_MAX_PRF_BYTES = 64 * 3 };
@@ -94,6 +95,8 @@ LiberaCError K_PKE_KeyGen(const unsigned char *seed, unsigned char *public_key,
             if (SampleNTT(workspace->byte_buffer, workspace->matrix[i][j],
                           34u) != 0)
                 goto cleanup;
+            /* SampleNTT emits ordinary NTT coefficients; internal products use aR. */
+            mlkem_poly_to_montgomery(workspace->matrix[i][j], MLKEM_N);
         }
     }
 
@@ -124,14 +127,17 @@ LiberaCError K_PKE_KeyGen(const unsigned char *seed, unsigned char *public_key,
             Multiply_NTT(workspace->matrix[i][j], workspace->secret_ntt[j],
                          workspace->polynomial, zetas);
             for (coefficient = 0; coefficient < MLKEM_N; ++coefficient) {
-                workspace->public_ntt[i][coefficient] =
-                    (workspace->public_ntt[i][coefficient] +
-                     workspace->polynomial[coefficient]) % MLKEM_Q;
+                workspace->public_ntt[i][coefficient] = mlkem_add_mod_q(
+                    workspace->public_ntt[i][coefficient],
+                    workspace->polynomial[coefficient]);
             }
         }
     }
 
+    /* Wire-format 12-bit coefficients are ordinary representatives, not aR. */
     for (i = 0; i < k; ++i) {
+        mlkem_poly_from_montgomery(workspace->public_ntt[i], MLKEM_N);
+        mlkem_poly_from_montgomery(workspace->secret_ntt[i], MLKEM_N);
         if (ByteEncode(workspace->public_ntt[i], 12u,
                        public_key + (size_t)i * 384u) != 0 ||
             ByteEncode(workspace->secret_ntt[i], 12u,
@@ -172,6 +178,7 @@ LiberaCError K_PKE_Enc(const unsigned char *public_key,
         if (ByteDecode(public_key + (size_t)i * 384u, 12u,
                        workspace->public_ntt[i]) != 0)
             goto cleanup;
+        mlkem_poly_to_montgomery(workspace->public_ntt[i], MLKEM_N);
     }
     memcpy(rho, public_key + (size_t)k * 384u, sizeof(rho));
 
@@ -183,6 +190,7 @@ LiberaCError K_PKE_Enc(const unsigned char *public_key,
             if (SampleNTT(workspace->byte_buffer, workspace->matrix[i][j],
                           34u) != 0)
                 goto cleanup;
+            mlkem_poly_to_montgomery(workspace->matrix[i][j], MLKEM_N);
         }
     }
 
@@ -213,17 +221,17 @@ LiberaCError K_PKE_Enc(const unsigned char *public_key,
             Multiply_NTT(workspace->matrix[j][i], workspace->secret_ntt[j],
                          workspace->polynomial, zetas);
             for (coefficient = 0; coefficient < MLKEM_N; ++coefficient) {
-                workspace->ciphertext_vector_ntt[i][coefficient] =
-                    (workspace->ciphertext_vector_ntt[i][coefficient] +
-                     workspace->polynomial[coefficient]) % MLKEM_Q;
+                workspace->ciphertext_vector_ntt[i][coefficient] = mlkem_add_mod_q(
+                    workspace->ciphertext_vector_ntt[i][coefficient],
+                    workspace->polynomial[coefficient]);
             }
         }
         NTT_inv(workspace->ciphertext_vector_ntt[i],
                 workspace->ciphertext_vector[i], zetas);
         for (coefficient = 0; coefficient < MLKEM_N; ++coefficient) {
-            workspace->ciphertext_vector[i][coefficient] =
-                (workspace->ciphertext_vector[i][coefficient] +
-                 workspace->error[i][coefficient]) % MLKEM_Q;
+            workspace->ciphertext_vector[i][coefficient] = mlkem_add_mod_q(
+                workspace->ciphertext_vector[i][coefficient],
+                workspace->error[i][coefficient]);
         }
     }
 
@@ -236,18 +244,18 @@ LiberaCError K_PKE_Enc(const unsigned char *public_key,
         Multiply_NTT(workspace->public_ntt[i], workspace->secret_ntt[i],
                      workspace->polynomial, zetas);
         for (coefficient = 0; coefficient < MLKEM_N; ++coefficient) {
-            workspace->ciphertext_scalar_ntt[coefficient] =
-                (workspace->ciphertext_scalar_ntt[coefficient] +
-                 workspace->polynomial[coefficient]) % MLKEM_Q;
+            workspace->ciphertext_scalar_ntt[coefficient] = mlkem_add_mod_q(
+                workspace->ciphertext_scalar_ntt[coefficient],
+                workspace->polynomial[coefficient]);
         }
     }
     NTT_inv(workspace->ciphertext_scalar_ntt,
             workspace->ciphertext_scalar, zetas);
     for (coefficient = 0; coefficient < MLKEM_N; ++coefficient) {
+        int value = mlkem_add_mod_q(workspace->ciphertext_scalar[coefficient],
+                                    workspace->scalar_error[coefficient]);
         workspace->ciphertext_scalar[coefficient] =
-            (workspace->ciphertext_scalar[coefficient] +
-             workspace->scalar_error[coefficient] +
-             workspace->message_polynomial[coefficient]) % MLKEM_Q;
+            mlkem_add_mod_q(value, workspace->message_polynomial[coefficient]);
     }
 
     for (i = 0; i < k; ++i) {
@@ -302,6 +310,7 @@ LiberaCError K_PKE_Dec(const unsigned char *private_key,
         if (ByteDecode(private_key + (size_t)i * 384u, 12u,
                        workspace->private_ntt[i]) != 0)
             goto cleanup;
+        mlkem_poly_to_montgomery(workspace->private_ntt[i], MLKEM_N);
     }
 
     zetas = GenZeta();
@@ -311,26 +320,24 @@ LiberaCError K_PKE_Dec(const unsigned char *private_key,
             workspace->ciphertext_vector_ntt[i], zetas);
 
     /*
-     * Inverse NTT is linear over R_q.  Accumulate the k pointwise products in
-     * the NTT domain, then transform their sum once instead of transforming
-     * every product separately.  This removes k-1 inverse transforms from the
-     * PKE decryption path without changing the resulting polynomial.
+     * Every product and accumulator below stays in the Montgomery NTT domain;
+     * the single inverse NTT removes R and returns ordinary coefficients.
      */
     for (i = 0; i < k; ++i) {
         Multiply_NTT(workspace->private_ntt[i],
                      workspace->ciphertext_vector_ntt[i],
                      workspace->polynomial_ntt, zetas);
         for (coefficient = 0; coefficient < MLKEM_N; ++coefficient) {
-            workspace->message_polynomial[coefficient] =
-                (workspace->message_polynomial[coefficient] +
-                 workspace->polynomial_ntt[coefficient]) % MLKEM_Q;
+            workspace->message_polynomial[coefficient] = mlkem_add_mod_q(
+                workspace->message_polynomial[coefficient],
+                workspace->polynomial_ntt[coefficient]);
         }
     }
     NTT_inv(workspace->message_polynomial, workspace->polynomial, zetas);
     for (coefficient = 0; coefficient < MLKEM_N; ++coefficient) {
-        workspace->message_polynomial[coefficient] =
-            (workspace->ciphertext_scalar[coefficient] -
-             workspace->polynomial[coefficient] + MLKEM_Q) % MLKEM_Q;
+        workspace->message_polynomial[coefficient] = mlkem_sub_mod_q(
+            workspace->ciphertext_scalar[coefficient],
+            workspace->polynomial[coefficient]);
     }
 
     if (Comp(workspace->message_polynomial, 1, workspace->polynomial,
