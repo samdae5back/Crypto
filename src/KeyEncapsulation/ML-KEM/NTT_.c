@@ -58,6 +58,8 @@ static inline void mlkem_multiply_basic(int a0, int a1, int b0, int b1,
         (uint32_t)a1 * (uint32_t)b0;
 
     /*
+     * Both operands vary here, so keep the ordinary-domain Barrett path rather
+     * than paying to convert one operand to Montgomery form for every product.
      * All inputs are canonical coefficients below q.  first_product and
      * second_product are each at most (q-1)^2, so their sum is below 2q^2
      * (= 22,151,168 for q = 3329), comfortably inside uint32_t.
@@ -92,12 +94,17 @@ void NTT(int* f, int* g, const int* zetas) {//input, output, zeta
     for (int len = n / 2;len >= 2;len = len / 2) {
         for (int start = 0;start < n;start = start + (2 * len)) {
             int z = zetas[mlkem_bit_reverse_7((unsigned int)i)];
+            int z_montgomery = mlkem_to_montgomery(z);
             i++;
             for (int j = start;j < start + len;j++) {
                 int first = g[j];
-                int product = mlkem_mul_mod_q(z, g[j + len]);
+                int product = mlkem_mul_montgomery_constant(
+                    g[j + len], z_montgomery);
 
-                /* Keep every butterfly output canonical in [0, q). */
+                /*
+                 * z_montgomery represents zR, but REDC removes R again, so
+                 * every butterfly output remains ordinary and canonical.
+                 */
                 g[j + len] = mlkem_sub_mod_q(first, product);
                 g[j] = mlkem_add_mod_q(first, product);
             }
@@ -113,6 +120,7 @@ void NTT_inv(int* f, int* g, const int* zetas) {
     for (int len = 2;len <= 128;len = len * 2) {
         for (int start = 0;start < n;start = start + (2 * len)) {
             int z = zetas[mlkem_bit_reverse_7((unsigned int)i)];
+            int z_montgomery = mlkem_to_montgomery(z);
             i--;
             for (int j = start;j < start + len;j++) {
                 int first = g[j];
@@ -120,12 +128,17 @@ void NTT_inv(int* f, int* g, const int* zetas) {
                 int difference = mlkem_sub_mod_q(second, first);
 
                 g[j] = mlkem_add_mod_q(first, second);
-                g[j + len] = mlkem_mul_mod_q(z, difference);
+                g[j + len] = mlkem_mul_montgomery_constant(
+                    difference, z_montgomery);
             }
         }
     }
-    for (int index = 0;index < n;index++) {
-        g[index] = mlkem_mul_mod_q(g[index], 3303);
+    {
+        int scale_montgomery = mlkem_to_montgomery(3303);
+        for (int index = 0;index < n;index++) {
+            g[index] = mlkem_mul_montgomery_constant(
+                g[index], scale_montgomery);
+        }
     }
     return;
 }
