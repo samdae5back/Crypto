@@ -1,0 +1,125 @@
+name: ML-KEM Reduction Benchmark
+
+on:
+  push:
+    branches:
+      - feature/mlkem-barrett-reduction
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Preserve benchmark source and refs
+        shell: bash
+        run: |
+          cp benchmarks/ML-KEM.c "$RUNNER_TEMP/mlkem-benchmark.c"
+          echo "HEAD_SHA=$GITHUB_SHA" >> "$GITHUB_ENV"
+          echo "BASELINE_SHA=e931f90debf742df4c3f16b4b7a0c7c955943bd5" >> "$GITHUB_ENV"
+
+      - name: Build and benchmark Barrett-only baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout --force "$BASELINE_SHA"
+          cmake -S . -B build-benchmark \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DLIBERAC_BUILD_TESTS=OFF
+          cmake --build build-benchmark --config Release --parallel 2
+          LIBRARY="$(find build-benchmark -name 'libliberacrypt.a' -print -quit)"
+          test -n "$LIBRARY"
+          cc -std=c11 -O3 \
+            -Iinc -Isrc -Isrc/KeyEncapsulation/ML-KEM \
+            "$RUNNER_TEMP/mlkem-benchmark.c" "$LIBRARY" -lm \
+            -o "$RUNNER_TEMP/mlkem-benchmark-baseline"
+          "$RUNNER_TEMP/mlkem-benchmark-baseline" \
+            > "$RUNNER_TEMP/baseline.csv"
+          cat "$RUNNER_TEMP/baseline.csv"
+
+      - name: Build and benchmark Barrett plus Montgomery
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf build-benchmark
+          git checkout --force "$HEAD_SHA"
+          cmake -S . -B build-benchmark \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DLIBERAC_BUILD_TESTS=OFF
+          cmake --build build-benchmark --config Release --parallel 2
+          LIBRARY="$(find build-benchmark -name 'libliberacrypt.a' -print -quit)"
+          test -n "$LIBRARY"
+          cc -std=c11 -O3 \
+            -Iinc -Isrc -Isrc/KeyEncapsulation/ML-KEM \
+            "$RUNNER_TEMP/mlkem-benchmark.c" "$LIBRARY" -lm \
+            -o "$RUNNER_TEMP/mlkem-benchmark-current"
+          "$RUNNER_TEMP/mlkem-benchmark-current" \
+            > "$RUNNER_TEMP/current.csv"
+          cat "$RUNNER_TEMP/current.csv"
+
+      - name: Compare medians
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import csv
+          import os
+          from pathlib import Path
+
+          root = Path(os.environ['RUNNER_TEMP'])
+
+          def read(path):
+              with path.open(newline='') as f:
+                  return {
+                      (row['algorithm'], row['operation']): int(row['median_ns'])
+                      for row in csv.DictReader(f)
+                  }
+
+          baseline = read(root / 'baseline.csv')
+          current = read(root / 'current.csv')
+          rows = []
+          for key in baseline:
+              before = baseline[key]
+              after = current[key]
+              improvement = (before - after) * 100.0 / before
+              rows.append((key[0], key[1], before, after, improvement))
+
+          with (root / 'comparison.csv').open('w', newline='') as f:
+              writer = csv.writer(f)
+              writer.writerow(['algorithm', 'operation', 'barrett_ns',
+                               'barrett_montgomery_ns', 'improvement_percent'])
+              for row in rows:
+                  writer.writerow([row[0], row[1], row[2], row[3],
+                                   f'{row[4]:.3f}'])
+
+          summary = Path(os.environ['GITHUB_STEP_SUMMARY'])
+          with summary.open('a') as f:
+              f.write('## ML-KEM Barrett vs Barrett + Montgomery\n\n')
+              f.write('Both revisions were built and measured sequentially '
+                      'on this single GitHub Actions runner. Values are median '
+                      'nanoseconds per deterministic operation across 7 samples '
+                      'of 100 iterations. Positive change means Montgomery is faster.\n\n')
+              f.write('| Parameter set | Operation | Barrett only (ns) | '
+                      'Barrett + Montgomery (ns) | Change |\n')
+              f.write('| --- | --- | ---: | ---: | ---: |\n')
+              for alg, op, before, after, improvement in rows:
+                  f.write(f'| {alg} | {op} | {before:,} | {after:,} | '
+                          f'{improvement:+.2f}% |\n')
+          PY
+          cat "$RUNNER_TEMP/comparison.csv"
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlkem-reduction-benchmark
+          path: |
+            ${{ runner.temp }}/baseline.csv
+            ${{ runner.temp }}/current.csv
+            ${{ runner.temp }}/comparison.csv
