@@ -282,6 +282,61 @@ private exponents are padded to the public modulus limb width. ISO C, however,
 cannot guarantee identical instruction latency on every processor/compiler, so
 hardware-level timing claims require platform-specific validation.
 
+### ML-KEM modular reduction selection
+
+The portable ML-KEM NTT keeps coefficients canonical in `[0, q)` for
+`q = 3329`. The selected implementation uses fixed-width unsigned Barrett
+reduction for multiplication and one-step canonical correction for bounded
+addition/subtraction. The range and correctness argument is recorded in
+`docs/optimization/ML-KEM-Barrett.md`.
+
+Montgomery reduction was also implemented in two forms and validated before the
+final selection:
+
+- **Barrett-only**: commit `e931f90debf742df4c3f16b4b7a0c7c955943bd5`.
+- **Hybrid Montgomery**: commit `c5e0ff5e6371b4c7a2553d0c3e2c08292b9f8faf`,
+  keeping ordinary NTT coefficients while using Montgomery REDC for fixed
+  twiddle/scaling products.
+- **Full Montgomery domain**: commit
+  `ffabc6e708113f7ba486a8a050ed89bcd92aed8b`, keeping internal NTT-domain
+  polynomials as `aR mod q`, including pointwise base multiplication.
+
+All three approaches were correctness-tested before comparison; the full
+Montgomery experiment passed the complete repository Build + Test suite on
+Ubuntu, Windows, and macOS, including the ML-KEM KATs. The performance workflow
+then built all three fixed revisions independently on each GitHub Actions runner,
+ran them three times in rotated order, and compared the median of the per-run
+medians for ML-KEM-512/768/1024 KeyGen, Encaps, and Decaps. The numbers below are
+percentage changes relative to Barrett-only; positive would mean faster and
+negative means slower.
+
+| Runner | Parameter set | Hybrid KeyGen / Encaps / Decaps | Full Montgomery KeyGen / Encaps / Decaps |
+| --- | --- | ---: | ---: |
+| Ubuntu | ML-KEM-512 | -1.86% / -1.64% / -2.15% | -4.67% / -3.38% / -3.81% |
+| Ubuntu | ML-KEM-768 | -2.11% / -2.10% / -2.23% | -6.47% / -4.63% / -5.05% |
+| Ubuntu | ML-KEM-1024 | -1.97% / -1.74% / -2.03% | -7.12% / -5.77% / -6.24% |
+| Windows | ML-KEM-512 | -2.52% / -1.87% / -2.42% | -5.87% / -5.74% / -5.61% |
+| Windows | ML-KEM-768 | -2.48% / -1.45% / -2.09% | -7.10% / -7.25% / -6.92% |
+| Windows | ML-KEM-1024 | -2.58% / -1.74% / -1.66% | -8.17% / -7.29% / -7.28% |
+| macOS | ML-KEM-512 | -1.81% / -1.22% / -1.39% | -1.86% / -0.69% / -0.48% |
+| macOS | ML-KEM-768 | -1.74% / -1.68% / -2.03% | -2.65% / -1.43% / -2.21% |
+| macOS | ML-KEM-1024 | -0.82% / -1.23% / -1.63% | -2.31% / -1.83% / -1.30% |
+
+Across the nine operations on each runner, hybrid Montgomery averaged **1.98%
+slower on Ubuntu, 2.09% slower on Windows, and 1.50% slower on macOS** than
+Barrett-only. Full Montgomery averaged **5.24% slower on Ubuntu, 6.80% slower on
+Windows, and 1.64% slower on macOS**. Across all 27 measurements, hybrid and
+full Montgomery were respectively **1.86% and 4.56% slower** than Barrett-only.
+
+For that reason, Montgomery reduction is **not used in the default portable
+ML-KEM path**. Full Montgomery additionally requires a stronger representation
+invariant and more conversion/domain bookkeeping, so retaining it would increase
+implementation and validation complexity while regressing performance on all 27
+Barrett comparisons measured here. These are hosted-runner comparative results,
+not a claim that Barrett must win on every architecture; a future 32-bit or
+unusual target may justify reconsideration only if a same-target benchmark shows
+a material advantage.
+
 ### Bignum timing and optimization policy
 
 LiberaCrypt intentionally does **not** duplicate every bignum primitive into
