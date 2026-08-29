@@ -22,6 +22,7 @@ set(LIBERAC_PUBLIC_HEADER_NAMES
     Def.h
     DigitalSignature.h
     HashFunction.h
+    MessageAuthentication.h
     KeyEncapsulation.h
     RandomNumberGeneration.h
     Util.h
@@ -61,6 +62,7 @@ set(LIBERAC_SOURCES
     src/BlockCipher.c
     src/DigitalSignature.c
     src/HashFunction.c
+    src/MessageAuthentication.c
     src/KeyEncapsulation.c
     src/RandomNumberGeneration.c
     src/Util.c
@@ -316,4 +318,5 @@ endif()
 if(LIBERAC_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
+    add_subdirectory(tests/MessageAuthentication)
 endif()
