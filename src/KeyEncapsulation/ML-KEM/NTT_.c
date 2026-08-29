@@ -10,34 +10,38 @@
 #include "parameter.h"
 #include "reduce.h"
 
-
-static const int ZETA_TABLE[256] = {
-    1, 17, 289, 1584, 296, 1703, 2319, 2804, 1062, 1409,
-    650, 1063, 1426, 939, 2647, 1722, 2642, 1637, 1197, 375,
-    3046, 1847, 1438, 1143, 2786, 756, 2865, 2099, 2393, 733,
-    2474, 2110, 2580, 583, 3253, 2037, 1339, 2789, 807, 403,
-    193, 3281, 2513, 2773, 535, 2437, 1481, 1874, 1897, 2288,
-    2277, 2090, 2240, 1461, 1534, 2775, 569, 3015, 1320, 2466,
-    1974, 268, 1227, 885, 1729, 2761, 331, 2298, 2447, 1651,
-    1435, 1092, 1919, 2662, 1977, 319, 2094, 2308, 2617, 1212,
-    630, 723, 2304, 2549, 56, 952, 2868, 2150, 3260, 2156,
-    33, 561, 2879, 2337, 3110, 2935, 3289, 2649, 1756, 3220,
-    1476, 1789, 452, 1026, 797, 233, 632, 757, 2882, 2388,
-    648, 1029, 848, 1100, 2055, 1645, 1333, 2687, 2402, 886,
-    1746, 3050, 1915, 2594, 821, 641, 910, 2154, 3328, 3312,
-    3040, 1745, 3033, 1626, 1010, 525, 2267, 1920, 2679, 2266,
-    1903, 2390, 682, 1607, 687, 1692, 2132, 2954, 283, 1482,
-    1891, 2186, 543, 2573, 464, 1230, 936, 2596, 855, 1219,
-    749, 2746, 76, 1292, 1990, 540, 2522, 2926, 3136, 48, 816,
-    556, 2794, 892, 1848, 1455, 1432, 1041, 1052, 1239, 1089,
-    1868, 1795, 554, 2760, 314, 2009, 863, 1355, 3061, 2102,
-    2444, 1600, 568, 2998, 1031, 882, 1678, 1894, 2237, 1410,
-    667, 1352, 3010, 1235, 1021, 712, 2117, 2699, 2606, 1025,
-    780, 3273, 2377, 461, 1179, 69, 1173, 3296, 2768, 450,
-    992, 219, 394, 40, 680, 1573, 109, 1853, 1540, 2877,
-    2303, 2532, 3096, 2697, 2572, 447, 941, 2681, 2300, 2481,
-    2229, 1274, 1684, 1996, 642, 927, 2443, 1583, 279, 1414,
-    735, 2508, 2688, 2419, 1175
+/*
+ * FIPS 203 zeta values pre-scaled by R = 2^16 modulo q.  Keeping the table in
+ * Montgomery form removes per-butterfly twiddle conversions and lets every NTT
+ * multiplication stay in the same aR representation.
+ */
+static const int ZETA_MONTGOMERY_TABLE[256] = {
+    2285, 2226, 1223, 817, 573, 3083, 2476, 2144, 3158, 422,
+    516, 2114, 2648, 1739, 2931, 3221, 1493, 2078, 2036, 1322,
+    2500, 2552, 107, 1819, 962, 3038, 1711, 2455, 1787, 418,
+    448, 958, 2970, 555, 2777, 603, 264, 1159, 3058, 2051,
+    1577, 177, 3009, 1218, 732, 2457, 1821, 996, 287, 1550,
+    3047, 1864, 1727, 2727, 3082, 2459, 1855, 1574, 126, 2142,
+    3124, 3173, 677, 1522, 2571, 430, 652, 1097, 2004, 778,
+    3239, 1799, 622, 587, 3321, 3193, 1017, 644, 961, 3021,
+    1422, 871, 1491, 2044, 1458, 1483, 1908, 2475, 2127, 2869,
+    2167, 220, 411, 329, 2264, 1869, 1812, 843, 1015, 610,
+    383, 3182, 830, 794, 182, 3094, 2663, 1994, 608, 349,
+    2604, 991, 202, 105, 1785, 384, 3199, 1119, 2378, 478,
+    1468, 1653, 1469, 1670, 1758, 3254, 2054, 1628, 1044, 1103,
+    2106, 2512, 2756, 246, 853, 1185, 171, 2907, 2813, 1215,
+    681, 1590, 398, 108, 1836, 1251, 1293, 2007, 829, 777,
+    3222, 1510, 2367, 291, 1618, 874, 1542, 2911, 2881, 2371,
+    359, 2774, 552, 2726, 3065, 2170, 271, 1278, 1752, 3152,
+    320, 2111, 2597, 872, 1508, 2333, 3042, 1779, 282, 1465,
+    1602, 602, 247, 870, 1474, 1755, 3203, 1187, 205, 156,
+    2652, 1807, 758, 2899, 2677, 2232, 1325, 2551, 90, 1530,
+    2707, 2742, 8, 136, 2312, 2685, 2368, 308, 1907, 2458,
+    1838, 1285, 1871, 1846, 1421, 854, 1202, 460, 1162, 3109,
+    2918, 3000, 1065, 1460, 1517, 2486, 2314, 2719, 2946, 147,
+    2499, 2535, 3147, 235, 666, 1335, 2721, 2980, 725, 2338,
+    3127, 3224, 1544, 2945, 130, 2210, 951, 2851, 1861, 1676,
+    1860, 1659, 1571, 75, 1275, 1701
 };
 
 static unsigned int mlkem_bit_reverse_7(unsigned int value) {
@@ -48,28 +52,21 @@ static unsigned int mlkem_bit_reverse_7(unsigned int value) {
     return value >> 1u;
 }
 
+/* Inputs, r, and outputs are canonical Montgomery representatives aR mod q. */
 static inline void mlkem_multiply_basic(int a0, int a1, int b0, int b1,
                                         int *c0, int *c1, int r) {
-    uint32_t first_product = (uint32_t)a0 * (uint32_t)b0;
-    uint32_t second_product =
-        (uint32_t)mlkem_mul_mod_q(a1, b1) * (uint32_t)r;
-    uint32_t cross_products =
-        (uint32_t)a0 * (uint32_t)b1 +
-        (uint32_t)a1 * (uint32_t)b0;
+    int first_product = mlkem_montgomery_mul(a0, b0);
+    int second_product = mlkem_montgomery_mul(a1, b1);
+    int twisted_product = mlkem_montgomery_mul(second_product, r);
+    int first_cross = mlkem_montgomery_mul(a0, b1);
+    int second_cross = mlkem_montgomery_mul(a1, b0);
 
-    /*
-     * Both operands vary here, so keep the ordinary-domain Barrett path rather
-     * than paying to convert one operand to Montgomery form for every product.
-     * All inputs are canonical coefficients below q.  first_product and
-     * second_product are each at most (q-1)^2, so their sum is below 2q^2
-     * (= 22,151,168 for q = 3329), comfortably inside uint32_t.
-     */
-    *c0 = (int)mlkem_barrett_reduce_u32(first_product + second_product);
-    *c1 = (int)mlkem_barrett_reduce_u32(cross_products);
+    *c0 = mlkem_add_mod_q(first_product, twisted_product);
+    *c1 = mlkem_add_mod_q(first_cross, second_cross);
 }
 
 const int* GenZeta(void) {
-    return ZETA_TABLE;
+    return ZETA_MONTGOMERY_TABLE;
 }
 
 /* Reverse the low-order bits of an index. */
@@ -88,73 +85,78 @@ int bit_rev(int x) {
     return r;
 }
 
-void NTT(int* f, int* g, const int* zetas) {//input, output, zeta
-    memcpy(g, f, n * sizeof(int));
+/*
+ * Forward NTT boundary contract:
+ *   input  f: ordinary canonical coefficients
+ *   output g: Montgomery-domain NTT coefficients (aR mod q)
+ */
+void NTT(int* f, int* g, const int* zetas) {
     int i = 1;
-    for (int len = n / 2;len >= 2;len = len / 2) {
-        for (int start = 0;start < n;start = start + (2 * len)) {
-            int z = zetas[mlkem_bit_reverse_7((unsigned int)i)];
-            int z_montgomery = mlkem_to_montgomery(z);
-            i++;
-            for (int j = start;j < start + len;j++) {
-                int first = g[j];
-                int product = mlkem_mul_montgomery_constant(
-                    g[j + len], z_montgomery);
 
-                /*
-                 * z_montgomery represents zR, but REDC removes R again, so
-                 * every butterfly output remains ordinary and canonical.
-                 */
+    for (int index = 0; index < n; ++index)
+        g[index] = mlkem_to_montgomery(f[index]);
+
+    for (int len = n / 2; len >= 2; len = len / 2) {
+        for (int start = 0; start < n; start = start + (2 * len)) {
+            int z = zetas[mlkem_bit_reverse_7((unsigned int)i)];
+            i++;
+            for (int j = start; j < start + len; j++) {
+                int first = g[j];
+                int product = mlkem_montgomery_mul(z, g[j + len]);
+
                 g[j + len] = mlkem_sub_mod_q(first, product);
                 g[j] = mlkem_add_mod_q(first, product);
             }
         }
     }
-    return;
 }
 
-
+/*
+ * Inverse NTT boundary contract:
+ *   input  f: Montgomery-domain NTT coefficients
+ *   output g: ordinary canonical coefficients
+ */
 void NTT_inv(int* f, int* g, const int* zetas) {
-    memcpy(g, f, n * sizeof(int));
     int i = 127;
-    for (int len = 2;len <= 128;len = len * 2) {
-        for (int start = 0;start < n;start = start + (2 * len)) {
+
+    memcpy(g, f, n * sizeof(int));
+    for (int len = 2; len <= 128; len = len * 2) {
+        for (int start = 0; start < n; start = start + (2 * len)) {
             int z = zetas[mlkem_bit_reverse_7((unsigned int)i)];
-            int z_montgomery = mlkem_to_montgomery(z);
             i--;
-            for (int j = start;j < start + len;j++) {
+            for (int j = start; j < start + len; j++) {
                 int first = g[j];
                 int second = g[j + len];
                 int difference = mlkem_sub_mod_q(second, first);
 
                 g[j] = mlkem_add_mod_q(first, second);
-                g[j + len] = mlkem_mul_montgomery_constant(
-                    difference, z_montgomery);
+                g[j + len] = mlkem_montgomery_mul(z, difference);
             }
         }
     }
-    {
-        int scale_montgomery = mlkem_to_montgomery(3303);
-        for (int index = 0;index < n;index++) {
-            g[index] = mlkem_mul_montgomery_constant(
-                g[index], scale_montgomery);
-        }
+
+    /*
+     * g is still scaled by R. REDC((xR)*3303) simultaneously multiplies by
+     * 128^{-1} and removes R, yielding the ordinary inverse-NTT coefficient.
+     */
+    for (int index = 0; index < n; index++) {
+        uint32_t product = (uint32_t)g[index] * UINT32_C(3303);
+        g[index] = (int)mlkem_montgomery_reduce_u32(product);
     }
-    return;
 }
 
-void Multiply_basic(int a0, int a1, int  b0, int b1, int* c0, int* c1, int r) {
+void Multiply_basic(int a0, int a1, int b0, int b1,
+                    int* c0, int* c1, int r) {
     mlkem_multiply_basic(a0, a1, b0, b1, c0, c1, r);
-    return;
 }
 
+/* f, g, h, and zetas are all Montgomery-domain NTT representations. */
 void Multiply_NTT(int* f, int* g, int* h, const int* zetas) {
-    for (int i = 0;i < 128;i++) {
+    for (int i = 0; i < 128; i++) {
         unsigned int reversed = mlkem_bit_reverse_7((unsigned int)i);
         mlkem_multiply_basic(
             f[2 * i], f[2 * i + 1], g[2 * i], g[2 * i + 1],
             &h[2 * i], &h[2 * i + 1],
             zetas[(2u * reversed) + 1u]);
     }
-    return;
 }
