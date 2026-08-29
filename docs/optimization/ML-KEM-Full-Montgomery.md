@@ -64,14 +64,12 @@ REDC(a * R^2 mod q) = aR mod q.
 Because `R^2 mod q = 1353`, for `0 <= a < q` the REDC input is at most
 
 ```text
-(q-1) * 1353 = 4,502,?  (well below qR).
+(q-1) * 1353 = 4,502,784.
 ```
 
-More directly, `(q-1)*1353 = 4,502,?` remains far below the REDC precondition
+This remains far below the REDC precondition
 `qR = 218,169,344`; the implementation uses `uint32_t` throughout this product.
-
-The exact numeric bound is not performance-critical; the important invariant is
-`a < q` and `1353 < q`, hence the product is below `(q-1)^2`.
+More generally, `a < q` and `1353 < q`, so the product is below `(q-1)^2`.
 
 ## Montgomery to ordinary conversion
 
