@@ -23,6 +23,7 @@ set(LIBERAC_PUBLIC_HEADER_NAMES
     DigitalSignature.h
     HashFunction.h
     MessageAuthentication.h
+    KeyDerivation.h
     KeyEncapsulation.h
     RandomNumberGeneration.h
     Util.h
@@ -63,6 +64,7 @@ set(LIBERAC_SOURCES
     src/DigitalSignature.c
     src/HashFunction.c
     src/MessageAuthentication.c
+    src/KeyDerivation.c
     src/KeyEncapsulation.c
     src/RandomNumberGeneration.c
     src/Util.c
@@ -319,4 +321,5 @@ if(LIBERAC_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
     add_subdirectory(tests/MessageAuthentication)
+    add_subdirectory(tests/KeyDerivation)
 endif()
