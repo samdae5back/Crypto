@@ -40,6 +40,7 @@
 #include "BlockCipher.h"
 #include "HashFunction.h"
 #include "MessageAuthentication.h"
+#include "KeyDerivation.h"
 #include "RandomNumberGeneration.h"
 #include "Util.h"
 #include "AsymmetricCipher.h"
