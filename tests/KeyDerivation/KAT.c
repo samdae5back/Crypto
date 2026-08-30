@@ -48,7 +48,7 @@ static int decode_hex(
 
 static int hkdf_rfc5869_case1(void) {
     static const char *ikm_hex =
-        "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b";
+        "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b";
     static const char *salt_hex = "000102030405060708090a0b0c";
     static const char *info_hex = "f0f1f2f3f4f5f6f7f8f9";
     static const char *prk_hex =
@@ -101,7 +101,7 @@ static int hkdf_rfc5869_case1(void) {
 
 static int hkdf_rfc5869_case3(void) {
     static const char *ikm_hex =
-        "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b";
+        "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b";
     static const char *prk_hex =
         "19ef24a32c717b167f33a91d6f648bdf"
         "96596776afdb6377ac434c1c293ccb04";
