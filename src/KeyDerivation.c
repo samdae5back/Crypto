@@ -204,7 +204,7 @@ LiberaCError LIBERAC_PBKDF2_HMAC(
     size_t salt_block_length;
     size_t block_count;
     size_t produced = 0u;
-    size_t block_number;
+    size_t block_offset;
     const size_t digest_length = LIBERAC_HMAC_TAG_SIZE(ALG);
     LiberaCError error = LIBERAC_SUCCESS;
 
@@ -248,8 +248,9 @@ LiberaCError LIBERAC_PBKDF2_HMAC(
     crypto_zeroize(u_b, sizeof(u_b));
     crypto_zeroize(accumulator, sizeof(accumulator));
 
-    for (block_number = 1u; block_number <= block_count; ++block_number) {
-        const uint32_t encoded_block_number = (uint32_t)block_number;
+    for (block_offset = 0u; block_offset < block_count; ++block_offset) {
+        const uint32_t encoded_block_number =
+            (uint32_t)(block_offset + 1u);
         uint64_t iteration;
         size_t index;
         size_t copy_length;
