@@ -148,7 +148,7 @@ static const CryptoEcCurve CRYPTO_EC_P521 = {
     {
         UINT32_C(0x91386409), UINT32_C(0xbb6fb71e), UINT32_C(0x899c47ae),
         UINT32_C(0x3bb5c9b8), UINT32_C(0xf709a5d0), UINT32_C(0x7fcc0148),
-        UINT32_C(0xbf2f966b), UINT32_C(0x51868783), UINT32_C(0xfffffff a),
+        UINT32_C(0xbf2f966b), UINT32_C(0x51868783), UINT32_C(0xfffffffa),
         UINT32_C(0xffffffff), UINT32_C(0xffffffff), UINT32_C(0xffffffff),
         UINT32_C(0xffffffff), UINT32_C(0xffffffff), UINT32_C(0xffffffff),
         UINT32_C(0xffffffff), UINT32_C(0x000001ff)
