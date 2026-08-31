@@ -40,17 +40,23 @@ int crypto_ec_scalar_is_valid_ct(const CryptoEcCurve *curve,
     for (index = 0u; index < scalar_length; ++index) {
         nonzero |= scalar[index];
     }
+
+    /*
+     * Subtract n from the big-endian scalar from least-significant byte to
+     * most-significant byte.  Use a 64-bit unsigned subtraction so an
+     * underflow is represented by bit 63; testing bit 31 of a wrapped
+     * uint32_t is not a valid borrow test for arbitrary byte differences.
+     */
     index = scalar_length;
     while (index > 0u) {
-        uint32_t scalar_byte;
-        uint32_t order_byte;
-        uint32_t difference;
-        --index;
-        scalar_byte = scalar[index];
-        order_byte = scalar_encoded_byte(curve, curve->order, index);
-        difference = scalar_byte - order_byte - borrow;
-        borrow = (difference >> 31) & 1u;
+        const uint64_t scalar_byte = scalar[--index];
+        const uint64_t order_byte =
+            scalar_encoded_byte(curve, curve->order, index);
+        const uint64_t difference = scalar_byte - order_byte - borrow;
+        borrow = (uint32_t)(difference >> 63);
     }
+
+    /* valid iff scalar != 0 and scalar - n borrowed, i.e. scalar < n */
     return (int)((scalar_nonzero_mask(nonzero) &
                   (UINT32_C(0) - borrow)) >> 31);
 }
