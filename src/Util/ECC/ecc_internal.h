@@ -141,15 +141,12 @@ void crypto_ec_jacobian_cswap(const CryptoEcCurve *curve,
                               uint32_t swap_mask);
 
 /*
- * Scalar-multiplication policy:
- *   reference  - textbook affine double-and-add; variable-time, tests/benchmark
- *   vartime    - windowed Jacobian path for public scalars only
- *   ct         - fixed-width ladder for secret scalars
+ * Production scalar-multiplication policy:
+ *   vartime - windowed Jacobian path for public scalars only
+ *   ct      - fixed-width ladder for secret scalars
+ *
+ * The textbook affine reference oracle is test-only under tests/ECC.
  */
-LiberaCError crypto_ec_scalar_multiply_reference(
-    const CryptoEcCurve *curve, CryptoEcAffinePoint *out,
-    const CryptoEcAffinePoint *point, const uint8_t *scalar,
-    size_t scalar_length);
 LiberaCError crypto_ec_scalar_multiply_vartime(
     const CryptoEcCurve *curve, CryptoEcAffinePoint *out,
     const CryptoEcAffinePoint *point, const uint8_t *scalar,

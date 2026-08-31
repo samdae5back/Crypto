@@ -3,7 +3,7 @@ set(LIBERAC_ECC_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/src/Util/ECC/ecc_curves.c
     ${CMAKE_SOURCE_DIR}/src/Util/ECC/ecc_field.c
     ${CMAKE_SOURCE_DIR}/src/Util/ECC/ecc_projective.c
-    ${CMAKE_SOURCE_DIR}/src/Util/ECC/ecc_reference.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Reference.c
     ${CMAKE_SOURCE_DIR}/src/Util/ECC/ecc_scalar_vartime.c
     ${CMAKE_SOURCE_DIR}/src/Util/ECC/ecc_scalar_secret.c
     ${CMAKE_SOURCE_DIR}/src/Util/ECC/ecc_encoding.c
@@ -14,6 +14,7 @@ function(liberac_add_ecc_executable target source)
     target_include_directories(${target} PRIVATE
         ${CMAKE_SOURCE_DIR}/inc
         ${CMAKE_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}
     )
     if(MSVC)
         target_compile_definitions(${target} PRIVATE _CRT_SECURE_NO_WARNINGS)

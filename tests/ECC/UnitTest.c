@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "Util/ECC/ecc_internal.h"
+#include "Reference.h"
 
 static int hex_nibble(char c) {
     if (c >= '0' && c <= '9') return c - '0';
