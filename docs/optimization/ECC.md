@@ -98,19 +98,33 @@ trim leading zero bytes because its timing is explicitly not secret-safe.
 
 ## Validation
 
-The focused tests include:
+The focused tests currently cover:
 
-- field import/export and arithmetic checked against independently generated
-  Python big-integer results;
-- independent coordinates for `2G`, `3G`, and `7G` on all three curves;
-- equality, inverse, infinity, aliasing, and zero-scalar point cases;
-- `1`, `n - 1`, and `n` scalar boundaries;
-- cross-checks among affine reference, windowed Jacobian, and ladder paths;
-- SEC 1 compressed/uncompressed round trips and malformed encodings; and
-- independently generated full-width scalar and field differential vectors.
+- the standard generator being accepted as an on-curve finite point for
+  P-256, P-384, and P-521;
+- SEC 1 compressed and uncompressed generator round trips;
+- independent `2G` affine coordinates for all three curves, checked against
+  the textbook reference result;
+- scalar validity boundaries at zero, `n - 1`, and `n`;
+- agreement among affine reference, four-bit windowed Jacobian, and
+  fixed-schedule ladder multiplication for scalar 1 and scalar 2; and
+- deterministic differential comparisons of all three multiplication paths
+  over 96 non-zero scalar values per curve.
+
+The ECC validation workflow builds and runs those focused tests on hosted
+Ubuntu, macOS, and Windows runners and adds an Ubuntu ASan/UBSan run. The normal
+repository CI also includes the ECC tests after the ECC sources are integrated
+into the main library target.
+
+## Benchmarking
 
 The repository benchmark prints median CPU microseconds per multiplication for
-all three paths and curves. It is a comparative microbenchmark, not a promise
-for every processor. The hosted Ubuntu, macOS, and Windows results should be
-retained with the pull request before choosing any more aggressive field or
-window optimization.
+all three paths and curves. The scalar is deliberately full-width and close to
+the group order so the public implementation cannot look artificially fast
+from a tiny scalar. The affine reference path is sampled once per timing sample,
+while the faster Jacobian paths use repeated operations to reduce timer noise.
+
+The benchmark is comparative evidence, not a performance promise for every
+processor. Hosted-runner results should be retained with the pull request before
+choosing more aggressive field representations, larger windows, Karatsuba, or
+architecture-specific backends.
