@@ -7,17 +7,12 @@
 
 /*
  * NIST SP 800-186 domain parameters, represented as little-endian 32-bit
- * limbs. Field constants are already in the Montgomery domain used by the
- * portable field implementation.
+ * limbs. Field constants are preconverted to the Montgomery domain R mod p,
+ * where R = 2^(32 * limbs). The inverse and square-root exponents remain
+ * ordinary little-endian integers because they are scanned as public bits.
  */
 static const CryptoEcCurve CRYPTO_EC_P256 = {
-    CRYPTO_EC_CURVE_P256,
-    256u,
-    32u,
-    256u,
-    32u,
-    8u,
-    UINT32_C(0x00000001),
+    CRYPTO_EC_CURVE_P256, 256u, 32u, 256u, 32u, 8u, UINT32_C(0x00000001),
     {
         UINT32_C(0xffffffff), UINT32_C(0xffffffff), UINT32_C(0xffffffff),
         UINT32_C(0x00000000), UINT32_C(0x00000000), UINT32_C(0x00000000),
@@ -39,9 +34,9 @@ static const CryptoEcCurve CRYPTO_EC_P256 = {
         UINT32_C(0xfffffffd), UINT32_C(0x00000004)
     },
     {
-        UINT32_C(0xd89cdf62), UINT32_C(0x77037d81), UINT32_C(0xf9b08ee1),
-        UINT32_C(0x242a35bd), UINT32_C(0xcfe4f656), UINT32_C(0x8ee7eb4a),
-        UINT32_C(0xb3ebbd55), UINT32_C(0xdc30061d)
+        UINT32_C(0x29c4bddf), UINT32_C(0xd89cdf62), UINT32_C(0x78843090),
+        UINT32_C(0xacf005cd), UINT32_C(0xf7212ed6), UINT32_C(0xe5a220ab),
+        UINT32_C(0x04874834), UINT32_C(0xdc30061d)
     },
     {
         UINT32_C(0x18a9143c), UINT32_C(0x79e730d4), UINT32_C(0x5fedb601),
@@ -66,13 +61,7 @@ static const CryptoEcCurve CRYPTO_EC_P256 = {
 };
 
 static const CryptoEcCurve CRYPTO_EC_P384 = {
-    CRYPTO_EC_CURVE_P384,
-    384u,
-    48u,
-    384u,
-    48u,
-    12u,
-    UINT32_C(0x00000001),
+    CRYPTO_EC_CURVE_P384, 384u, 48u, 384u, 48u, 12u, UINT32_C(0x00000001),
     {
         UINT32_C(0xffffffff), UINT32_C(0x00000000), UINT32_C(0x00000000),
         UINT32_C(0xffffffff), UINT32_C(0xfffffffe), UINT32_C(0xffffffff),
@@ -98,22 +87,22 @@ static const CryptoEcCurve CRYPTO_EC_P384 = {
         UINT32_C(0x00000000), UINT32_C(0x00000000), UINT32_C(0x00000000)
     },
     {
-        UINT32_C(0x08118871), UINT32_C(0xe59c80e7), UINT32_C(0xb0b8f501),
-        UINT32_C(0xb62b21f4), UINT32_C(0x30f27082), UINT32_C(0x63fe9c9a),
-        UINT32_C(0x3617de4a), UINT32_C(0x1d7e819d), UINT32_C(0xa7f9b8ee),
-        UINT32_C(0x6cae4f37), UINT32_C(0xc5293a3a), UINT32_C(0x8dc9946f)
+        UINT32_C(0x9d412dcc), UINT32_C(0x08118871), UINT32_C(0x7a4c32ec),
+        UINT32_C(0xf729add8), UINT32_C(0x1920022e), UINT32_C(0x77f2209b),
+        UINT32_C(0x94938ae2), UINT32_C(0xe3374bee), UINT32_C(0x1f022094),
+        UINT32_C(0xb62b21f4), UINT32_C(0x604fbff9), UINT32_C(0xcd08114b)
     },
     {
-        UINT32_C(0x3a545e38), UINT32_C(0x5295df61), UINT32_C(0xf25dbf55),
-        UINT32_C(0x6e1d3b62), UINT32_C(0x8ba79b98), UINT32_C(0x59f741e0),
-        UINT32_C(0xf1d27103), UINT32_C(0x990e5ff0), UINT32_C(0x3344b51a),
-        UINT32_C(0xef0e1ca6), UINT32_C(0xb143ef91), UINT32_C(0xaa87ca22)
+        UINT32_C(0x49c0b528), UINT32_C(0x3dd07566), UINT32_C(0xa0d6ce38),
+        UINT32_C(0x20e378e2), UINT32_C(0x541b4d6e), UINT32_C(0x879c3afc),
+        UINT32_C(0x59a30eff), UINT32_C(0x64548684), UINT32_C(0x614ede2b),
+        UINT32_C(0x812ff723), UINT32_C(0x299e1513), UINT32_C(0x4d3aadc2)
     },
     {
-        UINT32_C(0x7a431d7c), UINT32_C(0x0a60b1ce), UINT32_C(0x1d7e819d),
-        UINT32_C(0xe9da3113), UINT32_C(0x289a147c), UINT32_C(0xf8f41dbd),
-        UINT32_C(0x9292dc29), UINT32_C(0x5d9e98bf), UINT32_C(0x96262c6f),
-        UINT32_C(0x62b70b29), UINT32_C(0xba7e387e), UINT32_C(0x3617de4a)
+        UINT32_C(0x4b03a4fe), UINT32_C(0x23043dad), UINT32_C(0x7bb4a9ac),
+        UINT32_C(0xa1bfa8bf), UINT32_C(0x2e83b050), UINT32_C(0x8bade756),
+        UINT32_C(0x68f4ffd9), UINT32_C(0xc6c35219), UINT32_C(0x3969a840),
+        UINT32_C(0xdd800226), UINT32_C(0x5a15c5e9), UINT32_C(0x2b78abc2)
     },
     {
         UINT32_C(0xfffffffd), UINT32_C(0x00000000), UINT32_C(0x00000000),
@@ -122,7 +111,7 @@ static const CryptoEcCurve CRYPTO_EC_P384 = {
         UINT32_C(0xffffffff), UINT32_C(0xffffffff), UINT32_C(0xffffffff)
     },
     {
-        UINT32_C(0x00000000), UINT32_C(0x00000000), UINT32_C(0xc0000000),
+        UINT32_C(0x40000000), UINT32_C(0x00000000), UINT32_C(0xc0000000),
         UINT32_C(0xbfffffff), UINT32_C(0xffffffff), UINT32_C(0xffffffff),
         UINT32_C(0xffffffff), UINT32_C(0xffffffff), UINT32_C(0xffffffff),
         UINT32_C(0xffffffff), UINT32_C(0xffffffff), UINT32_C(0x3fffffff)
@@ -130,13 +119,7 @@ static const CryptoEcCurve CRYPTO_EC_P384 = {
 };
 
 static const CryptoEcCurve CRYPTO_EC_P521 = {
-    CRYPTO_EC_CURVE_P521,
-    521u,
-    66u,
-    521u,
-    66u,
-    17u,
-    UINT32_C(0x00000001),
+    CRYPTO_EC_CURVE_P521, 521u, 66u, 521u, 66u, 17u, UINT32_C(0x00000001),
     {
         UINT32_C(0xffffffff), UINT32_C(0xffffffff), UINT32_C(0xffffffff),
         UINT32_C(0xffffffff), UINT32_C(0xffffffff), UINT32_C(0xffffffff),
@@ -170,28 +153,28 @@ static const CryptoEcCurve CRYPTO_EC_P521 = {
         UINT32_C(0x00000000), UINT32_C(0x00000000)
     },
     {
-        UINT32_C(0x8014654f), UINT32_C(0xb17e1d69), UINT32_C(0x09f0753c),
-        UINT32_C(0x4b0532f4), UINT32_C(0x522ca4a1), UINT32_C(0x6bb6bf9a),
-        UINT32_C(0x4f61c3e4), UINT32_C(0x8df50a19), UINT32_C(0xfbd17273),
-        UINT32_C(0x883d2c34), UINT32_C(0x251a1e1e), UINT32_C(0x9f3f5b82),
-        UINT32_C(0xe9dcacbc), UINT32_C(0xf307a54f), UINT32_C(0xffd1c0d6),
-        UINT32_C(0xbd3bb1bf), UINT32_C(0x00000005)
+        UINT32_C(0x8014654f), UINT32_C(0xea35a81f), UINT32_C(0x78f7a28f),
+        UINT32_C(0xc41e961a), UINT32_C(0x839ab9ef), UINT32_C(0x5e9dd8df),
+        UINT32_C(0xbd8b2960), UINT32_C(0xa8f63f49), UINT32_C(0xf0ab0c9c),
+        UINT32_C(0xc8c77884), UINT32_C(0xf9dc5a44), UINT32_C(0x2dccd98a),
+        UINT32_C(0x77516d39), UINT32_C(0xd05b42a0), UINT32_C(0x0fc94d10),
+        UINT32_C(0xb0c70e4d), UINT32_C(0x0000015c)
     },
     {
-        UINT32_C(0x2e5bd66c), UINT32_C(0x1e709ee4), UINT32_C(0xa85a429b),
-        UINT32_C(0xe7ef20f6), UINT32_C(0xc8a2ed6a), UINT32_C(0x01e47da9),
-        UINT32_C(0xbb5c9b88), UINT32_C(0xb6fafd99), UINT32_C(0xefae7291),
-        UINT32_C(0x08a7214f), UINT32_C(0xcb34f815), UINT32_C(0xe6aa05cc),
-        UINT32_C(0x2d5d8e94), UINT32_C(0xb10e3b9c), UINT32_C(0x8e396c83),
-        UINT32_C(0xbc76542d), UINT32_C(0x000000c6)
+        UINT32_C(0xb331a163), UINT32_C(0x18e172de), UINT32_C(0x4dfcbf3f),
+        UINT32_C(0xe0c2b521), UINT32_C(0x6f19a459), UINT32_C(0x93d17fd4),
+        UINT32_C(0x947f0ee0), UINT32_C(0x3bf7f3ac), UINT32_C(0xdd50a5af),
+        UINT32_C(0xb035a69e), UINT32_C(0x90fc1457), UINT32_C(0x9c829fda),
+        UINT32_C(0x214e3240), UINT32_C(0xb311cada), UINT32_C(0xe6cf1f65),
+        UINT32_C(0x5b820274), UINT32_C(0x00000103)
     },
     {
-        UINT32_C(0xfd16650e), UINT32_C(0x47c5b30d), UINT32_C(0xd3cc810d),
-        UINT32_C(0xe2a8c975), UINT32_C(0x3e662c97), UINT32_C(0xb48b3c18),
-        UINT32_C(0x3401e0ed), UINT32_C(0x90fc1457), UINT32_C(0x3c633c07),
-        UINT32_C(0x1616b5e4), UINT32_C(0x66487639), UINT32_C(0x9d2bd73a),
-        UINT32_C(0xc1b86188), UINT32_C(0x7ce5c92e), UINT32_C(0x856a429b),
-        UINT32_C(0x6b9e8e85), UINT32_C(0x00000118)
+        UINT32_C(0x28460e4a), UINT32_C(0x3b4fe8b3), UINT32_C(0x20445f4a),
+        UINT32_C(0x43513961), UINT32_C(0xb09a9e38), UINT32_C(0x809fd683),
+        UINT32_C(0x2062a85c), UINT32_C(0x4caf7a13), UINT32_C(0x164bf739),
+        UINT32_C(0x8b939f33), UINT32_C(0x340bd7de), UINT32_C(0x24abcda2),
+        UINT32_C(0xeccc7aa2), UINT32_C(0xda163e8d), UINT32_C(0x022e452f),
+        UINT32_C(0x3c4d1de0), UINT32_C(0x000000b5)
     },
     {
         UINT32_C(0xfffffffd), UINT32_C(0xffffffff), UINT32_C(0xffffffff),
@@ -207,7 +190,7 @@ static const CryptoEcCurve CRYPTO_EC_P521 = {
         UINT32_C(0x00000000), UINT32_C(0x00000000), UINT32_C(0x00000000),
         UINT32_C(0x00000000), UINT32_C(0x00000000), UINT32_C(0x00000000),
         UINT32_C(0x00000000), UINT32_C(0x00000000), UINT32_C(0x00000000),
-        UINT32_C(0xc0000000), UINT32_C(0x0000007f)
+        UINT32_C(0x00000000), UINT32_C(0x00000080)
     }
 };
 
