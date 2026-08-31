@@ -3,9 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-#include <string.h>
-
-#include "Util.h"
+#include "Util/Core/secure_zero.h"
 #include "ecc_internal.h"
 
 static uint32_t scalar_nonzero_mask(uint32_t value) {
