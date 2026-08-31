@@ -38,11 +38,17 @@ int crypto_ec_scalar_is_valid_ct(const CryptoEcCurve *curve,
         return 0;
     }
     for (index = 0u; index < scalar_length; ++index) {
-        const uint32_t scalar_byte = scalar[index];
-        const uint32_t order_byte =
-            scalar_encoded_byte(curve, curve->order, index);
-        const uint32_t difference = scalar_byte - order_byte - borrow;
-        nonzero |= scalar_byte;
+        nonzero |= scalar[index];
+    }
+    index = scalar_length;
+    while (index > 0u) {
+        uint32_t scalar_byte;
+        uint32_t order_byte;
+        uint32_t difference;
+        --index;
+        scalar_byte = scalar[index];
+        order_byte = scalar_encoded_byte(curve, curve->order, index);
+        difference = scalar_byte - order_byte - borrow;
         borrow = (difference >> 31) & 1u;
     }
     return (int)((scalar_nonzero_mask(nonzero) &
