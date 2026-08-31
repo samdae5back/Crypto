@@ -287,12 +287,16 @@ void crypto_ec_field_select(const CryptoEcCurve *curve,
                             const CryptoEcFieldElement *a,
                             const CryptoEcFieldElement *b,
                             uint32_t select_b_mask) {
+    CryptoEcFieldElement selected;
     size_t index;
-    crypto_ec_field_zero(out);
+
+    /* Build into a temporary so out may alias either input. */
+    crypto_ec_field_zero(&selected);
     for (index = 0u; index < curve->limbs; ++index) {
-        out->limb[index] = (a->limb[index] & ~select_b_mask) |
-                           (b->limb[index] & select_b_mask);
+        selected.limb[index] = (a->limb[index] & ~select_b_mask) |
+                               (b->limb[index] & select_b_mask);
     }
+    *out = selected;
 }
 
 LiberaCError crypto_ec_field_from_bytes(const CryptoEcCurve *curve,
