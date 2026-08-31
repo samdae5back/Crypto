@@ -14,6 +14,7 @@ endif()
 option(BUILD_SHARED_LIBS "Build LiberaCrypt as a shared library" ON)
 option(LIBERAC_BUILD_TESTS "Build LiberaCrypt tests" ${LIBERAC_IS_TOP_LEVEL})
 option(LIBERAC_BUILD_DOCS "Generate the public API reference with Doxygen" OFF)
+option(LIBERAC_BUILD_BENCHMARKS "Build non-gating microbenchmarks" OFF)
 
 set(LIBERAC_PUBLIC_HEADER_NAMES
     AsymmetricCipher.h
@@ -82,6 +83,11 @@ set(LIBERAC_SOURCES
     src/Util/Bignum/bignum_secret_arith.c
     src/Util/Bignum/bignum_secret_io.c
     src/Util/Bignum/bignum_vartime.c
+    src/Util/ECC/ecc_curves.c
+    src/Util/ECC/ecc_field.c
+    src/Util/ECC/ecc_projective.c
+    src/Util/ECC/ecc_reference.c
+    src/Util/ECC/ecc_encoding.c
     src/Util/Prime/prime.c
     src/AsymmetricCipher/RSA/rsa.c
     src/AsymmetricCipher/ElGamal/elgamal.c
@@ -322,4 +328,8 @@ if(LIBERAC_BUILD_TESTS)
     add_subdirectory(tests)
     add_subdirectory(tests/MessageAuthentication)
     add_subdirectory(tests/KeyDerivation)
+endif()
+
+if(LIBERAC_BUILD_TESTS OR LIBERAC_BUILD_BENCHMARKS)
+    add_subdirectory(tests/ECC)
 endif()
