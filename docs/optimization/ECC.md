@@ -4,6 +4,12 @@ This layer provides the common prime-field and point arithmetic needed by the
 planned ECDH and ECDSA implementations. It is internal-only in this change: no
 new public key-agreement or signature API is exported yet.
 
+The production arithmetic intentionally exposes only two scalar-multiplication
+policies: an optimized variable-time path for public scalars and a fixed-schedule
+path for secret scalars. The textbook affine implementation is retained only in
+the test tree as a correctness oracle and benchmark baseline; it is not linked
+into the LiberaCrypt library.
+
 ## Supported domain parameters
 
 The built-in parameter records cover the NIST P-256, P-384, and P-521 curves
@@ -39,13 +45,13 @@ win: its extra temporaries and carry handling may cost more than it saves for
 
 ## Point-operation paths
 
-### Textbook reference path
+### Test-only textbook reference oracle
 
-`ecc_reference.c` implements affine double-and-add using the direct formulas.
-It branches on scalar bits and exceptional cases, and each affine addition or
-doubling performs a field inversion. This path is intentionally simple and is
-used as an independent correctness oracle and benchmark baseline. It must not
-process secret scalars in production.
+`tests/ECC/Reference.c` implements affine double-and-add using the direct
+formulas. It branches on scalar bits and exceptional cases, and each affine
+addition or doubling performs a field inversion. This implementation exists
+only to provide an independent correctness oracle and benchmark baseline. It is
+not part of the production source API and is not linked into LiberaCrypt.
 
 ### Public, optimized variable-time path
 
@@ -93,8 +99,10 @@ The SEC 1 decoder rejects:
 
 Secret scalar validation scans the fixed encoded width and combines the checks
 for `1 <= k < n` without scalar-dependent early return after argument/length
-validation. Public/reference multiplication accepts shorter encodings and may
-trim leading zero bytes because its timing is explicitly not secret-safe.
+validation. The optimized public path accepts shorter encodings and may trim
+leading zero bytes because its timing is explicitly not secret-safe. The
+reference oracle follows similarly simple variable-time semantics, but only in
+tests.
 
 ## Validation
 
@@ -104,25 +112,26 @@ The focused tests currently cover:
   P-256, P-384, and P-521;
 - SEC 1 compressed and uncompressed generator round trips;
 - independent `2G` affine coordinates for all three curves, checked against
-  the textbook reference result;
+  the test-only textbook reference result;
 - scalar validity boundaries at zero, `n - 1`, and `n`;
-- agreement among affine reference, four-bit windowed Jacobian, and
+- agreement among the test-only affine oracle, four-bit windowed Jacobian, and
   fixed-schedule ladder multiplication for scalar 1 and scalar 2; and
-- deterministic differential comparisons of all three multiplication paths
-  over 96 non-zero scalar values per curve.
+- deterministic differential comparisons of the test oracle and both
+  production multiplication paths over 96 non-zero scalar values per curve.
 
 The ECC validation workflow builds and runs those focused tests on hosted
-Ubuntu, macOS, and Windows runners and adds an Ubuntu ASan/UBSan run. The normal
-repository CI also includes the ECC tests after the ECC sources are integrated
-into the main library target.
+Ubuntu, macOS, and Windows runners and adds an Ubuntu ASan/UBSan run.
 
 ## Benchmarking
 
-The repository benchmark prints median CPU microseconds per multiplication for
-all three paths and curves. The scalar is deliberately full-width and close to
-the group order so the public implementation cannot look artificially fast
-from a tiny scalar. The affine reference path is sampled once per timing sample,
-while the faster Jacobian paths use repeated operations to reduce timer noise.
+The repository benchmark is also a test/benchmark target, so it may link the
+textbook oracle without adding that code to the production library. It prints
+median CPU microseconds per multiplication for the test-only reference baseline
+and both production paths on all three curves. The scalar is deliberately
+full-width and close to the group order so the public implementation cannot
+look artificially fast from a tiny scalar. The affine reference path is sampled
+once per timing sample, while the faster Jacobian paths use repeated operations
+to reduce timer noise.
 
 The benchmark is comparative evidence, not a performance promise for every
 processor. Hosted-runner results should be retained with the pull request before
