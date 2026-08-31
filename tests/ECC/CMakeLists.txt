@@ -1,4 +1,5 @@
 set(LIBERAC_ECC_TEST_SOURCES
+    ${CMAKE_SOURCE_DIR}/src/Util/Core/secure_zero.c
     ${CMAKE_SOURCE_DIR}/src/Util/ECC/ecc_curves.c
     ${CMAKE_SOURCE_DIR}/src/Util/ECC/ecc_field.c
     ${CMAKE_SOURCE_DIR}/src/Util/ECC/ecc_projective.c
