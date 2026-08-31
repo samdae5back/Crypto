@@ -1,0 +1,73 @@
+name: ECC Validation
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'CMakeLists.txt'
+      - 'src/Util/ECC/**'
+      - 'tests/ECC/**'
+      - 'docs/optimization/ECC.md'
+      - '.github/workflows/ecc-benchmark.yml'
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    name: Benchmark (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: >-
+          cmake -S . -B build-bench
+          -DBUILD_SHARED_LIBS=OFF
+          -DLIBERAC_BUILD_TESTS=OFF
+          -DLIBERAC_BUILD_BENCHMARKS=ON
+          -DCMAKE_BUILD_TYPE=Release
+      - name: Build benchmark
+        run: cmake --build build-bench --config Release --target crypto_ecc_benchmark
+      - name: Run benchmark
+        shell: bash
+        run: |
+          if [[ -x build-bench/Release/crypto_ecc_benchmark.exe ]]; then
+            executable=build-bench/Release/crypto_ecc_benchmark.exe
+          elif [[ -x build-bench/crypto_ecc_benchmark.exe ]]; then
+            executable=build-bench/crypto_ecc_benchmark.exe
+          elif [[ -x build-bench/Release/crypto_ecc_benchmark ]]; then
+            executable=build-bench/Release/crypto_ecc_benchmark
+          else
+            executable=build-bench/crypto_ecc_benchmark
+          fi
+          "$executable" | tee "ecc-benchmark-${{ runner.os }}.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ecc-benchmark-${{ runner.os }}
+          path: ecc-benchmark-${{ runner.os }}.txt
+
+  sanitize:
+    name: ASan + UBSan (Ubuntu Clang)
+    runs-on: ubuntu-latest
+    env:
+      CC: clang
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: >-
+          cmake -S . -B build-sanitize
+          -DBUILD_SHARED_LIBS=OFF
+          -DLIBERAC_BUILD_TESTS=ON
+          -DLIBERAC_BUILD_BENCHMARKS=OFF
+          -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
+          -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+      - name: Build focused unit test
+        run: cmake --build build-sanitize --target crypto_ecc_internal_unit --parallel 2
+      - name: Run focused unit test
+        env:
+          ASAN_OPTIONS: detect_leaks=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: ./build-sanitize/crypto_ecc_internal_unit
