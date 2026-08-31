@@ -88,6 +88,11 @@ static const char *two_g_y(CryptoEcCurveId id) {
     }
 }
 
+static int fail_curve(CryptoEcCurveId id, const char *stage) {
+    fprintf(stderr, "ECC unit failure: curve=%d stage=%s\n", (int)id, stage);
+    return 0;
+}
+
 static int test_curve(CryptoEcCurveId id) {
     const CryptoEcCurve *curve = crypto_ec_curve_get(id);
     CryptoEcAffinePoint generator;
@@ -101,67 +106,84 @@ static int test_curve(CryptoEcCurveId id) {
     uint8_t encoded[1u + 2u * 66u];
     size_t encoded_length;
 
-    if (!curve) return 0;
+    if (!curve) return fail_curve(id, "curve lookup");
 
     crypto_ec_affine_generator(curve, &generator);
     if (!crypto_ec_affine_is_on_curve(curve, &generator) ||
-        crypto_ec_affine_is_infinity(&generator)) return 0;
+        crypto_ec_affine_is_infinity(&generator))
+        return fail_curve(id, "generator validation");
 
     encoded_length = sizeof(encoded);
     if (crypto_ec_point_encode(curve, &generator, 0, encoded, &encoded_length) !=
             LIBERAC_SUCCESS ||
         crypto_ec_point_decode(curve, &decoded, encoded, encoded_length, 0) !=
             LIBERAC_SUCCESS ||
-        !points_equal(curve, &generator, &decoded)) return 0;
+        !points_equal(curve, &generator, &decoded))
+        return fail_curve(id, "uncompressed roundtrip");
 
     encoded_length = sizeof(encoded);
     if (crypto_ec_point_encode(curve, &generator, 1, encoded, &encoded_length) !=
             LIBERAC_SUCCESS ||
         crypto_ec_point_decode(curve, &decoded, encoded, encoded_length, 0) !=
             LIBERAC_SUCCESS ||
-        !points_equal(curve, &generator, &decoded)) return 0;
+        !points_equal(curve, &generator, &decoded))
+        return fail_curve(id, "compressed roundtrip");
 
     scalar[curve->scalar_bytes - 1u] = 1u;
-    if (!crypto_ec_scalar_is_valid_ct(curve, scalar, curve->scalar_bytes) ||
-        crypto_ec_scalar_multiply_reference(curve, &reference, &generator,
-                                            scalar, curve->scalar_bytes) !=
-            LIBERAC_SUCCESS ||
-        crypto_ec_scalar_multiply_vartime(curve, &vartime, &generator, scalar,
-                                          curve->scalar_bytes) != LIBERAC_SUCCESS ||
-        crypto_ec_scalar_multiply_ct(curve, &secret, &generator, scalar,
-                                     curve->scalar_bytes) != LIBERAC_SUCCESS ||
-        !points_equal(curve, &generator, &reference) ||
+    if (!crypto_ec_scalar_is_valid_ct(curve, scalar, curve->scalar_bytes))
+        return fail_curve(id, "scalar one validity");
+    if (crypto_ec_scalar_multiply_reference(curve, &reference, &generator,
+                                            scalar, curve->scalar_bytes) != LIBERAC_SUCCESS)
+        return fail_curve(id, "scalar one reference");
+    if (crypto_ec_scalar_multiply_vartime(curve, &vartime, &generator, scalar,
+                                          curve->scalar_bytes) != LIBERAC_SUCCESS)
+        return fail_curve(id, "scalar one vartime");
+    if (crypto_ec_scalar_multiply_ct(curve, &secret, &generator, scalar,
+                                     curve->scalar_bytes) != LIBERAC_SUCCESS)
+        return fail_curve(id, "scalar one ct");
+    if (!points_equal(curve, &generator, &reference) ||
         !points_equal(curve, &reference, &vartime) ||
-        !points_equal(curve, &reference, &secret)) return 0;
+        !points_equal(curve, &reference, &secret))
+        return fail_curve(id, "scalar one equality");
 
     memset(scalar, 0, sizeof(scalar));
     scalar[curve->scalar_bytes - 1u] = 2u;
     if (crypto_ec_scalar_multiply_reference(curve, &reference, &generator,
-                                            scalar, curve->scalar_bytes) !=
-            LIBERAC_SUCCESS ||
+                                            scalar, curve->scalar_bytes) != LIBERAC_SUCCESS ||
         crypto_ec_scalar_multiply_vartime(curve, &vartime, &generator, scalar,
                                           curve->scalar_bytes) != LIBERAC_SUCCESS ||
         crypto_ec_scalar_multiply_ct(curve, &secret, &generator, scalar,
-                                     curve->scalar_bytes) != LIBERAC_SUCCESS ||
-        !points_equal(curve, &reference, &vartime) ||
-        !points_equal(curve, &reference, &secret)) return 0;
+                                     curve->scalar_bytes) != LIBERAC_SUCCESS)
+        return fail_curve(id, "scalar two multiplication");
+    if (!points_equal(curve, &reference, &vartime) ||
+        !points_equal(curve, &reference, &secret))
+        return fail_curve(id, "scalar two equality");
 
-    if (!decode_hex(two_g_x(id), coordinate, curve->field_bytes) ||
-        crypto_ec_field_from_bytes(curve, &expected_two_g.x, coordinate,
-                                   curve->field_bytes) != LIBERAC_SUCCESS ||
-        !decode_hex(two_g_y(id), coordinate, curve->field_bytes) ||
-        crypto_ec_field_from_bytes(curve, &expected_two_g.y, coordinate,
-                                   curve->field_bytes) != LIBERAC_SUCCESS) return 0;
+    if (!decode_hex(two_g_x(id), coordinate, curve->field_bytes))
+        return fail_curve(id, "2G x decode");
+    if (crypto_ec_field_from_bytes(curve, &expected_two_g.x, coordinate,
+                                   curve->field_bytes) != LIBERAC_SUCCESS)
+        return fail_curve(id, "2G x import");
+    if (!decode_hex(two_g_y(id), coordinate, curve->field_bytes))
+        return fail_curve(id, "2G y decode");
+    if (crypto_ec_field_from_bytes(curve, &expected_two_g.y, coordinate,
+                                   curve->field_bytes) != LIBERAC_SUCCESS)
+        return fail_curve(id, "2G y import");
     expected_two_g.infinity = 0u;
-    if (!points_equal(curve, &reference, &expected_two_g) ||
-        !crypto_ec_affine_is_on_curve(curve, &expected_two_g)) return 0;
+    if (!points_equal(curve, &reference, &expected_two_g))
+        return fail_curve(id, "2G KAT equality");
+    if (!crypto_ec_affine_is_on_curve(curve, &expected_two_g))
+        return fail_curve(id, "2G KAT curve check");
 
     memset(scalar, 0, sizeof(scalar));
-    if (crypto_ec_scalar_is_valid_ct(curve, scalar, curve->scalar_bytes)) return 0;
+    if (crypto_ec_scalar_is_valid_ct(curve, scalar, curve->scalar_bytes))
+        return fail_curve(id, "zero scalar rejected");
     scalar_from_order(curve, scalar, 1u);
-    if (!crypto_ec_scalar_is_valid_ct(curve, scalar, curve->scalar_bytes)) return 0;
+    if (!crypto_ec_scalar_is_valid_ct(curve, scalar, curve->scalar_bytes))
+        return fail_curve(id, "n-1 scalar accepted");
     scalar_from_order(curve, scalar, 0u);
-    if (crypto_ec_scalar_is_valid_ct(curve, scalar, curve->scalar_bytes)) return 0;
+    if (crypto_ec_scalar_is_valid_ct(curve, scalar, curve->scalar_bytes))
+        return fail_curve(id, "n scalar rejected");
 
     return 1;
 }
