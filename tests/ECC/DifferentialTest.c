@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "Util/ECC/ecc_internal.h"
+#include "Reference.h"
 
 static uint32_t prng_step(uint32_t *state) {
     uint32_t x = *state;
