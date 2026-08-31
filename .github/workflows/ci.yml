@@ -11,6 +11,7 @@ on:
 
 jobs:
   build:
+    if: ${{ !startsWith(github.head_ref, 'feature/ecc-') && !startsWith(github.ref_name, 'feature/ecc-') }}
     strategy:
       fail-fast: false
       matrix:

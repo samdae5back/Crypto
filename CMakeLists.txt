@@ -82,6 +82,13 @@ set(LIBERAC_SOURCES
     src/Util/Bignum/bignum_secret_arith.c
     src/Util/Bignum/bignum_secret_io.c
     src/Util/Bignum/bignum_vartime.c
+    src/Util/ECC/ecc_curves.c
+    src/Util/ECC/ecc_field.c
+    src/Util/ECC/ecc_projective.c
+    src/Util/ECC/ecc_reference.c
+    src/Util/ECC/ecc_scalar_vartime.c
+    src/Util/ECC/ecc_scalar_secret.c
+    src/Util/ECC/ecc_encoding.c
     src/Util/Prime/prime.c
     src/AsymmetricCipher/RSA/rsa.c
     src/AsymmetricCipher/ElGamal/elgamal.c
@@ -322,4 +329,5 @@ if(LIBERAC_BUILD_TESTS)
     add_subdirectory(tests)
     add_subdirectory(tests/MessageAuthentication)
     add_subdirectory(tests/KeyDerivation)
+    add_subdirectory(tests/ECC)
 endif()
