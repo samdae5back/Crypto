@@ -10,6 +10,7 @@
 #include <time.h>
 
 #include "Util/ECC/ecc_internal.h"
+#include "Reference.h"
 
 #define BENCHMARK_SAMPLES 5u
 
