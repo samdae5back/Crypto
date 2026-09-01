@@ -2,19 +2,25 @@
 
 **Free cryptography, everywhere.**
 
-LiberaCrypt is a free-software C11 cryptography library designed around three
-priorities: **simplicity, portability, and environment independence**. The goal
-is to make cryptographic primitives easy to build, integrate, and use across a
-wide range of systems without tying applications to a particular operating
-system, compiler, architecture, or external cryptographic runtime.
+LiberaCrypt is a **portability-first C11 cryptography library** providing classical and post-quantum cryptographic primitives through a consistent runtime-selected API.
 
-The library keeps one runtime-selected API per primitive family. Every supported
-parameter set is compiled into one library; callers select the algorithm and
-parameter set with the final `LiberaCAlgID` argument. Algorithm implementations
-use ISO C and project-local headers rather than an external cryptographic
-library. Platform-specific code is kept at narrow system boundaries where it is
-actually required, such as entropy acquisition (`BCryptGenRandom`, `getrandom`,
-or `/dev/urandom`).
+> **Portable by construction.** LiberaCrypt avoids relying on undefined, implementation-defined, or platform-specific behavior that merely happens to work on common systems.
+
+Portability is treated as a **correctness property**, not merely as a list of supported platforms. The implementation is written to avoid assumptions that may hold on mainstream systems but fail across different compilers, architectures, ABIs, or legacy and non-mainstream Unix environments. Code that depends on native integer or character representation, byte order, signed shifts, compiler extensions, or other hidden platform properties is avoided or rewritten explicitly.
+
+The cryptographic implementation remains independent of an external cryptographic runtime. Platform-specific behavior is isolated to narrow system boundaries such as entropy acquisition and shared-library symbol export.
+
+## Design goals
+
+- **Portability first** — ISO C11, fixed-width arithmetic, explicit range reasoning, byte-order handling, and well-defined integer behavior.
+- **Broad platform compatibility** — avoid assumptions that become problematic across different compilers, architectures, ABIs, and legacy or non-mainstream Unix systems.
+- **Minimal platform dependence** — keep OS-specific behavior at explicit boundaries rather than throughout cryptographic code.
+- **Consistent API** — compile supported parameter sets into one library and select algorithms at runtime through `LiberaCAlgID`.
+- **Free software** — original LiberaCrypt source is released under `AGPL-3.0-only`.
+
+## Cryptographic primitives
+
+LiberaCrypt includes classical and post-quantum cryptographic algorithms, including AES, Triple-DES, SHA-1/SHA-2/SHA-3/SHAKE, CTR_DRBG, RSA, ElGamal, ML-KEM, ML-DSA, SLH-DSA, NTRU+, SMAUG-T, AIMer, and HAETAE.
 
 ## Project principles
 
