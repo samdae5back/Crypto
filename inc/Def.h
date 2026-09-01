@@ -160,6 +160,15 @@ enum {
     /** ElGamal over a generated safe-prime group. */
     LIBERAC_ALG_ELGAMAL_SAFE_PRIME = 0x3001,
 
+    /** ECDH over the NIST P-256 curve. */
+    LIBERAC_ALG_ECDH_P256 = 0x4001,
+    /** ECDH over the NIST P-384 curve. */
+    LIBERAC_ALG_ECDH_P384 = 0x4002,
+    /** ECDH over the NIST P-521 curve. */
+    LIBERAC_ALG_ECDH_P521 = 0x4003,
+    /** X25519 key agreement as specified by RFC 7748. */
+    LIBERAC_ALG_X25519 = 0x4011,
+
     /** AES-128 in electronic codebook (ECB) mode. */
     LIBERAC_ALG_AES_128_ECB = 0x00500110,
     /** AES-192 in electronic codebook (ECB) mode. */
