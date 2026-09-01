@@ -2,6 +2,19 @@
 
 **Free cryptography, everywhere.**
 
+**Portable by construction.** LiberaCrypt treats portability as a correctness
+property, not merely as a list of platforms on which the library happens to
+build. The C11 implementation avoids or explicitly rewrites code whose behavior
+can depend on undefined or implementation-defined semantics, compiler and ABI
+conventions, native character signedness, byte order, signed shifts, integer
+width assumptions, or other hidden platform properties.
+
+This portability work is intended to keep the implementation viable across
+mainstream systems as well as legacy and non-mainstream Unix environments.
+Platform-specific behavior is isolated at narrow boundaries, while the core
+cryptographic code favors explicit widths, ranges, representations, and data
+formats over assumptions that are only safe on common toolchains.
+
 LiberaCrypt is a free-software C11 cryptography library designed around three
 priorities: **simplicity, portability, and environment independence**. The goal
 is to make cryptographic primitives easy to build, integrate, and use across a
