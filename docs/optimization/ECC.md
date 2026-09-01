@@ -1,8 +1,9 @@
 # Portable short-Weierstrass ECC arithmetic
 
-This layer provides the common prime-field and point arithmetic needed by the
-planned ECDH and ECDSA implementations. It is internal-only in this change: no
-new public key-agreement or signature API is exported yet.
+This layer provides the common prime-field and point arithmetic used by the
+public P-256, P-384, and P-521 ECDH implementation and planned ECDSA support.
+The key-agreement API is exposed through `KeyAgreement.h`; the lower-level
+field, point, and scalar-multiplication interfaces remain internal.
 
 The production arithmetic intentionally exposes only two scalar-multiplication
 policies: an optimized variable-time path for public scalars and a fixed-schedule
@@ -18,7 +19,7 @@ from NIST SP 800-186. They are short-Weierstrass curves over prime fields with
 accepted under the decoder's explicit infinity policy.
 
 X25519 is intentionally not represented by this structure. Its Montgomery
-curve, byte-order, clamping, and ladder rules need a separate backend rather
+curve, byte-order, clamping, and ladder rules use a separate backend rather
 than pretending it is another short-Weierstrass parameter choice.
 
 ## Arithmetic representation
@@ -87,6 +88,38 @@ force every compiler and processor to give identical instruction or arithmetic
 latency, nor does this change claim resistance to power, EM, speculative,
 fault, or compiler-introduced side channels.
 
+## ECDH integration
+
+`src/KeyAgreement/ecdh.c` uses only the fixed-schedule secret-scalar path for
+private-key operations. Private keys are fixed-width big-endian scalars in
+`1 <= d < n`; key generation obtains uniformly random candidates from the OS,
+masks unused high bits, and rejection-samples against the group order.
+
+Generated public keys are uncompressed SEC 1 points. Agreement accepts either
+compressed or uncompressed SEC 1 peer points, rejects infinity and invalid
+curve points through the common decoder, and returns the fixed-width big-endian
+x-coordinate of `dQ`. Because the supported NIST curves have cofactor one, an
+accepted finite on-curve peer point is in the prime-order group.
+
+The raw x-coordinate is deliberately not passed through a KDF inside ECDH. The
+public API documents it as key-agreement material that should be fed into a
+protocol-appropriate KDF such as HKDF.
+
+## X25519 backend
+
+`src/KeyAgreement/x25519.c` implements RFC 7748 separately with sixteen
+little-endian radix-2^16 limbs. Products accumulate in portable `uint64_t`
+values; reduction uses `2^256 = 38 (mod 2^255 - 19)`. This avoids
+`unsigned __int128` and target-specific intrinsics, keeping the same source
+usable with MSVC and the portability-oriented build matrix.
+
+Scalar inputs are copied and clamped internally. The Montgomery ladder scans
+all 255 scalar bits with masked conditional swaps, and inversion uses a fixed
+public exponent. Peer u-coordinates use RFC 7748 decoding rules, including
+masking the high input bit and reducing non-canonical encodings modulo the field
+prime. Shared-secret derivation rejects the all-zero result so callers do not
+silently accept a low-order peer input.
+
 ## Encoding and validation
 
 The SEC 1 decoder rejects:
@@ -106,7 +139,7 @@ tests.
 
 ## Validation
 
-The focused tests currently cover:
+The focused ECC arithmetic tests cover:
 
 - the standard generator being accepted as an on-curve finite point for
   P-256, P-384, and P-521;
@@ -119,8 +152,15 @@ The focused tests currently cover:
 - deterministic differential comparisons of the test oracle and both
   production multiplication paths over 96 non-zero scalar values per curve.
 
-The ECC validation workflow builds and runs those focused tests on hosted
-Ubuntu, macOS, and Windows runners and adds an Ubuntu ASan/UBSan run.
+The public key-agreement tests additionally cover RFC 7748 Alice/Bob X25519
+vectors, bilateral ECDH agreement on all three NIST curves, compressed SEC 1
+peer keys, invalid zero ECDH scalars, X25519 all-zero rejection, and OS-random
+key-generation round trips.
+
+The ECC validation workflow builds and runs the focused arithmetic tests on
+hosted Ubuntu, macOS, and Windows runners and adds an Ubuntu ASan/UBSan run. The
+normal repository CI builds the public key-agreement tests across the same three
+operating systems.
 
 ## Benchmarking
 

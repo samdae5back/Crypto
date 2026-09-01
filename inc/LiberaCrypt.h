@@ -44,6 +44,7 @@
 #include "RandomNumberGeneration.h"
 #include "Util.h"
 #include "AsymmetricCipher.h"
+#include "KeyAgreement.h"
 #include "KeyEncapsulation.h"
 #include "DigitalSignature.h"
 

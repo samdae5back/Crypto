@@ -23,6 +23,7 @@ set(LIBERAC_PUBLIC_HEADER_NAMES
     DigitalSignature.h
     HashFunction.h
     MessageAuthentication.h
+    KeyAgreement.h
     KeyDerivation.h
     KeyEncapsulation.h
     RandomNumberGeneration.h
@@ -64,6 +65,7 @@ set(LIBERAC_SOURCES
     src/DigitalSignature.c
     src/HashFunction.c
     src/MessageAuthentication.c
+    src/KeyAgreement.c
     src/KeyDerivation.c
     src/KeyEncapsulation.c
     src/RandomNumberGeneration.c
@@ -92,6 +94,8 @@ set(LIBERAC_SOURCES
     src/Util/Prime/prime.c
     src/AsymmetricCipher/RSA/rsa.c
     src/AsymmetricCipher/ElGamal/elgamal.c
+    src/KeyAgreement/ecdh.c
+    src/KeyAgreement/x25519.c
     src/HashFunction/SHA2/sha2.c
     src/HashFunction/SHA1/sha1.c
     src/HashFunction/SHA3/sha3.c
@@ -330,4 +334,5 @@ if(LIBERAC_BUILD_TESTS)
     add_subdirectory(tests/MessageAuthentication)
     add_subdirectory(tests/KeyDerivation)
     add_subdirectory(tests/ECC)
+    add_subdirectory(tests/KeyAgreement)
 endif()
