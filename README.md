@@ -22,20 +22,6 @@ The cryptographic implementation remains independent of an external cryptographi
 
 LiberaCrypt includes classical and post-quantum cryptographic algorithms, including AES, Triple-DES, SHA-1/SHA-2/SHA-3/SHAKE, CTR_DRBG, RSA, ElGamal, ML-KEM, ML-DSA, SLH-DSA, NTRU+, SMAUG-T, AIMer, and HAETAE.
 
-LiberaCrypt is a free-software C11 cryptography library designed around three
-priorities: **simplicity, portability, and environment independence**. The goal
-is to make cryptographic primitives easy to build, integrate, and use across a
-wide range of systems without tying applications to a particular operating
-system, compiler, architecture, or external cryptographic runtime.
-
-The library keeps one runtime-selected API per primitive family. Every supported
-parameter set is compiled into one library; callers select the algorithm and
-parameter set with the final `LiberaCAlgID` argument. Algorithm implementations
-use ISO C and project-local headers rather than an external cryptographic
-library. Platform-specific code is kept at narrow system boundaries where it is
-actually required, such as entropy acquisition (`BCryptGenRandom`, `getrandom`,
-or `/dev/urandom`).
-
 ## Project principles
 
 - **Simplicity** — keep public interfaces small and consistent, avoid needless
