@@ -46,6 +46,54 @@ umbrella header, and the `LiberaCrypt::LiberaCrypt` CMake target.
 > operation. It is useful for implementation tests, but applications must not
 > treat raw RSA as a secure encryption scheme.
 
+## Portability considerations
+
+Portability in LiberaCrypt is treated as a correctness property rather than only
+a list of supported platforms. Code that happens to work on one compiler or
+machine is not considered portable if its result depends on implementation-
+defined integer behavior, native character signedness, byte order, or linker
+conventions.
+
+Examples of portability work in the current codebase include:
+
+- **Fixed-width arithmetic and explicit range reasoning.** Internal arithmetic
+  uses `uint32_t`, `int32_t`, `uint64_t`, `int64_t`, and `size_t` where their
+  width or role matters. Narrowing conversions are made only where the value
+  range is known, with compile-time assertions used for important invariants.
+- **No dependency on plain `char` signedness.** AIX/Power environments may use
+  unsigned plain `char`. HAETAE's decomposed low-byte serialization therefore
+  defines the signed `[-128, 127]` to byte mapping and its inverse explicitly
+  instead of relying on a cast through implementation-defined `signed char`
+  behavior.
+- **Portable signed division and shifts.** Arithmetic that originally relied on
+  right-shifting negative signed integers was rewritten around explicit floor
+  division and unsigned sign-bit extraction. This removes assumptions about the
+  implementation's signed right-shift behavior in HAETAE Montgomery/Barrett
+  reduction and fixed-point FFT arithmetic.
+- **Range-proven fixed-point FFT widths.** HAETAE's key-generation FFT records a
+  conservative bound for every real and imaginary component. FFT storage stays
+  `int32_t`, Q16 products and butterfly expressions are evaluated in `int64_t`,
+  and squared magnitudes and singular-value accumulation use `uint64_t`. Static
+  assertions tie those choices to the algorithm parameters used by the proof.
+- **Explicit byte-order handling.** Serialization and low-level word handling
+  avoid assuming host endianness; endian-sensitive operations are isolated in
+  project utilities rather than leaking native representation into public
+  formats.
+- **Platform-specific behavior is kept at narrow boundaries.** Entropy
+  acquisition is adapted to the host OS, while cryptographic algorithms remain
+  independent of the operating system's cryptographic runtime.
+- **ABI/export policy follows each platform's native model.** The same public API
+  is exported through Windows DLL declarations, ELF version scripts, macOS
+  exported-symbol lists, Solaris mapfiles, AIX `.exp` files, and HP-UX linker
+  export options rather than assuming one linker model everywhere.
+- **Cross-toolchain validation.** CI builds the library on Windows/MSVC, Linux,
+  and macOS, while unit tests, KATs, warning-oriented builds, and sanitizers are
+  used to catch assumptions that a single compiler may otherwise tolerate.
+
+These constraints intentionally influence implementation style. A slightly more
+explicit expression is preferred over a shorter one when the explicit form
+makes integer width, representation, range, or platform behavior unambiguous.
+
 ## Layout
 
 ```text
@@ -404,54 +452,6 @@ reproducible benchmark.
 These notes distinguish security, portability, and code-footprint work from
 measured performance work. Algorithm outputs remain validated against the
 known-answer and compatibility tests described below.
-
-## Portability considerations
-
-Portability in LiberaCrypt is treated as a correctness property rather than only
-a list of supported platforms. Code that happens to work on one compiler or
-machine is not considered portable if its result depends on implementation-
-defined integer behavior, native character signedness, byte order, or linker
-conventions.
-
-Examples of portability work in the current codebase include:
-
-- **Fixed-width arithmetic and explicit range reasoning.** Internal arithmetic
-  uses `uint32_t`, `int32_t`, `uint64_t`, `int64_t`, and `size_t` where their
-  width or role matters. Narrowing conversions are made only where the value
-  range is known, with compile-time assertions used for important invariants.
-- **No dependency on plain `char` signedness.** AIX/Power environments may use
-  unsigned plain `char`. HAETAE's decomposed low-byte serialization therefore
-  defines the signed `[-128, 127]` to byte mapping and its inverse explicitly
-  instead of relying on a cast through implementation-defined `signed char`
-  behavior.
-- **Portable signed division and shifts.** Arithmetic that originally relied on
-  right-shifting negative signed integers was rewritten around explicit floor
-  division and unsigned sign-bit extraction. This removes assumptions about the
-  implementation's signed right-shift behavior in HAETAE Montgomery/Barrett
-  reduction and fixed-point FFT arithmetic.
-- **Range-proven fixed-point FFT widths.** HAETAE's key-generation FFT records a
-  conservative bound for every real and imaginary component. FFT storage stays
-  `int32_t`, Q16 products and butterfly expressions are evaluated in `int64_t`,
-  and squared magnitudes and singular-value accumulation use `uint64_t`. Static
-  assertions tie those choices to the algorithm parameters used by the proof.
-- **Explicit byte-order handling.** Serialization and low-level word handling
-  avoid assuming host endianness; endian-sensitive operations are isolated in
-  project utilities rather than leaking native representation into public
-  formats.
-- **Platform-specific behavior is kept at narrow boundaries.** Entropy
-  acquisition is adapted to the host OS, while cryptographic algorithms remain
-  independent of the operating system's cryptographic runtime.
-- **ABI/export policy follows each platform's native model.** The same public API
-  is exported through Windows DLL declarations, ELF version scripts, macOS
-  exported-symbol lists, Solaris mapfiles, AIX `.exp` files, and HP-UX linker
-  export options rather than assuming one linker model everywhere.
-- **Cross-toolchain validation.** CI builds the library on Windows/MSVC, Linux,
-  and macOS, while unit tests, KATs, warning-oriented builds, and sanitizers are
-  used to catch assumptions that a single compiler may otherwise tolerate.
-
-These constraints intentionally influence implementation style. A slightly more
-explicit expression is preferred over a shorter one when the explicit form
-makes integer width, representation, range, or platform behavior unambiguous.
 
 ## Public ABI and Unix exports
 
