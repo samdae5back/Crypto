@@ -222,12 +222,16 @@ enum {
     LIBERAC_ALG_CTR_DRBG_AES_192_DF = 0x6002,
     /** AES-256 CTR_DRBG using the derivation function. */
     LIBERAC_ALG_CTR_DRBG_AES_256_DF = 0x6003,
+    /** Legacy three-key TDEA CTR_DRBG using the derivation function. */
+    LIBERAC_ALG_CTR_DRBG_TDEA_DF = 0x6004,
     /** AES-128 CTR_DRBG without the derivation function. */
     LIBERAC_ALG_CTR_DRBG_AES_128_NO_DF = 0x6011,
     /** AES-192 CTR_DRBG without the derivation function. */
     LIBERAC_ALG_CTR_DRBG_AES_192_NO_DF = 0x6012,
     /** AES-256 CTR_DRBG without the derivation function. */
     LIBERAC_ALG_CTR_DRBG_AES_256_NO_DF = 0x6013,
+    /** Legacy three-key TDEA CTR_DRBG without the derivation function. */
+    LIBERAC_ALG_CTR_DRBG_TDEA_NO_DF = 0x6014,
 
     /** ML-DSA-44 digital-signature parameter set. */
     LIBERAC_ALG_ML_DSA_44 = 0x7001,

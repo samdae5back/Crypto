@@ -94,13 +94,13 @@ crypto_add_public_test(
     crypto_ctr_drbg_unit
     LiberaCrypt.RandomNumberGeneration.CTR-DRBG.Unit
     RandomNumberGeneration/CTR-DRBG/UnitTest.c
-    "unit;random-number-generation;ctr-drbg"
+    "unit;random-number-generation;ctr-drbg;tdea;legacy"
 )
 crypto_add_public_test(
     crypto_ctr_drbg_kat
     LiberaCrypt.RandomNumberGeneration.CTR-DRBG.KAT
     RandomNumberGeneration/CTR-DRBG/KAT.c
-    "kat;random-number-generation;ctr-drbg"
+    "kat;random-number-generation;ctr-drbg;tdea;legacy"
 )
 
 crypto_add_public_test(

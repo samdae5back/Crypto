@@ -8,6 +8,42 @@
 #include <stdio.h>
 #include <string.h>
 
+static int hex_value(char character, uint8_t *value) {
+    if (character >= '0' && character <= '9') {
+        *value = (uint8_t)(character - '0');
+        return 1;
+    }
+    if (character >= 'a' && character <= 'f') {
+        *value = (uint8_t)(character - 'a' + 10);
+        return 1;
+    }
+    if (character >= 'A' && character <= 'F') {
+        *value = (uint8_t)(character - 'A' + 10);
+        return 1;
+    }
+    return 0;
+}
+
+static int decode_hex(
+    uint8_t *output, size_t output_length, const char *hex) {
+    size_t index;
+
+    if (strlen(hex) != 2u * output_length) {
+        return 0;
+    }
+    for (index = 0u; index < output_length; ++index) {
+        uint8_t high;
+        uint8_t low;
+
+        if (!hex_value(hex[2u * index], &high) ||
+            !hex_value(hex[2u * index + 1u], &low)) {
+            return 0;
+        }
+        output[index] = (uint8_t)((uint8_t)(high << 4) | low);
+    }
+    return 1;
+}
+
 static int test_nist_aes256_no_df(void) {
     static const uint8_t entropy[48] = {
         0xdf,0x5d,0x73,0xfa,0xa4,0x68,0x64,0x9e,0xdd,0xa3,0x3b,0x5c,0xca,0x79,0xb0,0xb0,
@@ -55,9 +91,139 @@ static int test_nist_aes256_no_df(void) {
     return 0;
 }
 
+static int test_nist_tdea_df(void) {
+    uint8_t entropy[14];
+    uint8_t nonce[7];
+    uint8_t expected_key[LIBERAC_CTR_DRBG_TDEA_KEY_BYTES];
+    uint8_t expected_v[LIBERAC_CTR_DRBG_TDEA_BLOCK_BYTES];
+    uint8_t expected_output[32];
+    uint8_t expected_final_key[LIBERAC_CTR_DRBG_TDEA_KEY_BYTES];
+    uint8_t expected_final_v[LIBERAC_CTR_DRBG_TDEA_BLOCK_BYTES];
+    uint8_t output[32];
+    LiberaCCtrDrbgContext context;
+
+    if (!decode_hex(entropy, sizeof(entropy),
+                    "b54d0bbaa78adf0915d3dd83ed3f") ||
+        !decode_hex(nonce, sizeof(nonce), "11d849d2de4b58") ||
+        !decode_hex(expected_key, sizeof(expected_key),
+                    "3a86fb933eec93771449f825a509aa89c7177ee4b7") ||
+        !decode_hex(expected_v, sizeof(expected_v), "2f458a05e14989bb") ||
+        !decode_hex(expected_output, sizeof(expected_output),
+                    "88b166404866fd6b1168c4472163e3cb"
+                    "3d5c9cca2e5abfa2faf929025f21fed1") ||
+        !decode_hex(expected_final_key, sizeof(expected_final_key),
+                    "53bc8bbbf507acf02f8b0794ffc435019cc6c747fc") ||
+        !decode_hex(expected_final_v, sizeof(expected_final_v),
+                    "e392c943cfd7e99e")) {
+        return 1;
+    }
+    if (LIBERAC_CTR_DRBG_SEED_SIZE(LIBERAC_ALG_CTR_DRBG_TDEA_DF) !=
+            LIBERAC_CTR_DRBG_TDEA_SEED_BYTES ||
+        LIBERAC_CTR_DRBG_INSTANTIATE(
+            &context, entropy, sizeof(entropy), nonce, sizeof(nonce),
+            NULL, 0u, LIBERAC_ALG_CTR_DRBG_TDEA_DF) != LIBERAC_SUCCESS ||
+        context.KEY_LENGTH != LIBERAC_CTR_DRBG_TDEA_KEY_BYTES ||
+        context.USE_DF == 0u ||
+        memcmp(context.KEY, expected_key, sizeof(expected_key)) != 0 ||
+        memcmp(context.V, expected_v, sizeof(expected_v)) != 0) {
+        LIBERAC_CTR_DRBG_CLEAR(&context);
+        return 1;
+    }
+    if (LIBERAC_CTR_DRBG_GENERATE(
+            &context, output, sizeof(output), NULL, 0u, 0) !=
+            LIBERAC_SUCCESS ||
+        LIBERAC_CTR_DRBG_GENERATE(
+            &context, output, sizeof(output), NULL, 0u, 0) !=
+            LIBERAC_SUCCESS ||
+        memcmp(output, expected_output, sizeof(output)) != 0 ||
+        memcmp(context.KEY, expected_final_key,
+               sizeof(expected_final_key)) != 0 ||
+        memcmp(context.V, expected_final_v, sizeof(expected_final_v)) != 0 ||
+        context.RESEED_COUNTER != 3u) {
+        LIBERAC_CTR_DRBG_CLEAR(&context);
+        return 1;
+    }
+    LIBERAC_CTR_DRBG_CLEAR(&context);
+    return 0;
+}
+
+static int run_nist_tdea_vector(
+    LiberaCAlgID algorithm,
+    const char *entropy_hex, const char *nonce_hex,
+    const char *reseed_entropy_hex, const char *expected_hex) {
+    uint8_t entropy[LIBERAC_CTR_DRBG_TDEA_SEED_BYTES];
+    uint8_t nonce[7];
+    uint8_t reseed_entropy[LIBERAC_CTR_DRBG_TDEA_SEED_BYTES];
+    uint8_t expected[32];
+    uint8_t output[32];
+    size_t entropy_length = strlen(entropy_hex) / 2u;
+    size_t nonce_length = strlen(nonce_hex) / 2u;
+    size_t reseed_length = reseed_entropy_hex != NULL
+                               ? strlen(reseed_entropy_hex) / 2u
+                               : 0u;
+    LiberaCCtrDrbgContext context;
+
+    if (entropy_length > sizeof(entropy) || nonce_length > sizeof(nonce) ||
+        reseed_length > sizeof(reseed_entropy) ||
+        !decode_hex(entropy, entropy_length, entropy_hex) ||
+        !decode_hex(nonce, nonce_length, nonce_hex) ||
+        !decode_hex(expected, sizeof(expected), expected_hex) ||
+        (reseed_entropy_hex != NULL &&
+         !decode_hex(reseed_entropy, reseed_length, reseed_entropy_hex))) {
+        return 1;
+    }
+    if (LIBERAC_CTR_DRBG_INSTANTIATE(
+            &context, entropy, entropy_length,
+            nonce_length != 0u ? nonce : NULL, nonce_length,
+            NULL, 0u, algorithm) != LIBERAC_SUCCESS) {
+        return 1;
+    }
+    if (reseed_entropy_hex != NULL &&
+        LIBERAC_CTR_DRBG_RESEED(
+            &context, reseed_entropy, reseed_length,
+            NULL, 0u) != LIBERAC_SUCCESS) {
+        LIBERAC_CTR_DRBG_CLEAR(&context);
+        return 1;
+    }
+    if (LIBERAC_CTR_DRBG_GENERATE(
+            &context, output, sizeof(output), NULL, 0u, 0) !=
+            LIBERAC_SUCCESS ||
+        LIBERAC_CTR_DRBG_GENERATE(
+            &context, output, sizeof(output), NULL, 0u, 0) !=
+            LIBERAC_SUCCESS ||
+        memcmp(output, expected, sizeof(expected)) != 0) {
+        LIBERAC_CTR_DRBG_CLEAR(&context);
+        return 1;
+    }
+    LIBERAC_CTR_DRBG_CLEAR(&context);
+    return 0;
+}
+
+static int test_nist_tdea_additional_configurations(void) {
+    if (run_nist_tdea_vector(
+            LIBERAC_ALG_CTR_DRBG_TDEA_NO_DF,
+            "4cd97f1701716d1a22f90b55c569c8f2b91aa53322653dcae809abc5c6",
+            "", NULL,
+            "4353dd937ec55e6733cf7a5d2cea557c"
+            "e8e3fcc6cdb18e44395e4b1c4669c9d1")) {
+        return 1;
+    }
+    return run_nist_tdea_vector(
+        LIBERAC_ALG_CTR_DRBG_TDEA_DF,
+        "dedfcf34617ac04ff579b87ca18f", "40bce1b72deaea",
+        "876beead5bdf5c206ace3bfa05d9",
+        "f87cfa1529fdaf57ee1542844e556f00"
+        "ff7fc70e3267372b56dce6141e124f85");
+}
+
 int main(void) {
     if (test_nist_aes256_no_df()) {
         fprintf(stderr, "CTR_DRBG NIST KAT failed\n");
+        return 1;
+    }
+    if (test_nist_tdea_df() ||
+        test_nist_tdea_additional_configurations()) {
+        fprintf(stderr, "legacy TDEA CTR_DRBG NIST CAVP KAT failed\n");
         return 1;
     }
     puts("CTR_DRBG KAT passed");

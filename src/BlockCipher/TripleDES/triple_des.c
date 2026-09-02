@@ -246,6 +246,47 @@ static uint64_t triple_des_block(
     return final_permutation(state);
 }
 
+LiberaCError crypto_tdes_ede3_context_init(
+    CryptoTdesEde3Context *context,
+    const uint8_t *key, size_t key_length) {
+    if (context == NULL || key == NULL) {
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
+    }
+    crypto_zeroize(context, sizeof(*context));
+    if (key_length != LIBERAC_TDES_EDE3_KEY_BYTES) {
+        return LIBERAC_ERROR_INVALID_KEY;
+    }
+
+    des_key_schedule(key, context->ROUND_KEYS[0]);
+    des_key_schedule(key + 8u, context->ROUND_KEYS[1]);
+    des_key_schedule(key + 16u, context->ROUND_KEYS[2]);
+    return LIBERAC_SUCCESS;
+}
+
+LiberaCError crypto_tdes_ede3_encrypt_block(
+    CryptoTdesEde3Context *context,
+    const uint8_t input[LIBERAC_TDES_BLOCK_BYTES],
+    uint8_t output[LIBERAC_TDES_BLOCK_BYTES]) {
+    des_round_workspace workspace;
+    uint64_t block;
+
+    if (context == NULL || input == NULL || output == NULL) {
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
+    }
+    block = triple_des_block(
+        load64_be(input), context->ROUND_KEYS, 1, &workspace);
+    store64_be(output, block);
+    crypto_zeroize(&workspace, sizeof(workspace));
+    crypto_zeroize(&block, sizeof(block));
+    return LIBERAC_SUCCESS;
+}
+
+void crypto_tdes_ede3_context_clear(CryptoTdesEde3Context *context) {
+    if (context != NULL) {
+        crypto_zeroize(context, sizeof(*context));
+    }
+}
+
 LiberaCError crypto_tdes_ede3_crypt(
     uint8_t *output, size_t output_capacity,
     const uint8_t *input, size_t input_length,
