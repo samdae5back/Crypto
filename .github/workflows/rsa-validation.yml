@@ -25,6 +25,39 @@ jobs:
       - name: Run focused RSA test
         run: ctest --test-dir build -C Release -L rsa --output-on-failure
 
+  openssl-interop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DBUILD_SHARED_LIBS=OFF -DLIBERAC_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release
+      - name: Build interoperability driver
+        run: cmake --build build --target crypto_rsa_openssl_interop
+      - name: Generate OpenSSL key and components
+        shell: bash
+        run: |
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out key.pem
+          openssl pkey -in key.pem -pubout -out public.pem
+          RSA_N_HEX="$(openssl rsa -in key.pem -noout -modulus | cut -d= -f2)"
+          RSA_D_HEX="$(openssl pkey -in key.pem -text -noout | awk '
+            /^privateExponent:/{capture=1; next}
+            /^prime1:/{capture=0}
+            capture {gsub(/[:[:space:]]/, ""); printf "%s", $0}
+          ')"
+          echo "RSA_N_HEX=${RSA_N_HEX}" >> "${GITHUB_ENV}"
+          echo "RSA_D_HEX=${RSA_D_HEX}" >> "${GITHUB_ENV}"
+      - name: Cross-check both directions
+        shell: bash
+        run: |
+          printf '%s' 'LiberaCrypt dynamic OpenSSL OAEP interop' > oaep-message.bin
+          printf '%s' 'LiberaCrypt dynamic OpenSSL PSS interop' > pss-message.bin
+          openssl pkeyutl -encrypt -pubin -inkey public.pem             -pkeyopt rsa_padding_mode:oaep             -pkeyopt rsa_oaep_md:sha256             -pkeyopt rsa_mgf1_md:sha256             -in oaep-message.bin -out openssl-oaep.bin
+          openssl dgst -sha256 -sign key.pem             -sigopt rsa_padding_mode:pss             -sigopt rsa_pss_saltlen:32             -sigopt rsa_mgf1_md:sha256             -out openssl-pss.bin pss-message.bin
+          ./build/crypto_rsa_openssl_interop             "${RSA_N_HEX}" "${RSA_D_HEX}"             openssl-oaep.bin openssl-pss.bin             liberac-oaep.bin liberac-pss.bin
+          openssl pkeyutl -decrypt -inkey key.pem             -pkeyopt rsa_padding_mode:oaep             -pkeyopt rsa_oaep_md:sha256             -pkeyopt rsa_mgf1_md:sha256             -in liberac-oaep.bin -out recovered.bin
+          cmp oaep-message.bin recovered.bin
+          openssl dgst -sha256 -verify public.pem             -signature liberac-pss.bin             -sigopt rsa_padding_mode:pss             -sigopt rsa_pss_saltlen:32             -sigopt rsa_mgf1_md:sha256             pss-message.bin
+
   sanitizers:
     runs-on: ubuntu-latest
     env:

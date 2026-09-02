@@ -552,7 +552,9 @@ When `LIBERAC_BUILD_TESTS` is enabled, CMake generates:
   deterministic sign/verify round trips
 - OpenSSL-generated RSAES-OAEP/SHA-256 decryption and
   RSASSA-PSS/SHA-256 verification regressions, randomized OAEP/PSS round trips,
-  strict salt/label/length checks, malformed encodings, and output clearing
+  strict salt/label/length checks, malformed encodings, and output clearing;
+  focused CI also generates a fresh OpenSSL key and cross-checks OAEP/PSS in
+  both library-to-OpenSSL and OpenSSL-to-library directions
 - 100-record KATs for all 9 KEM parameter sets and all 24 current signature
   parameter sets
 - verification of 300 context-explicit HAETAE 1.1.2 signatures as a

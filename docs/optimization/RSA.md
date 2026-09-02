@@ -113,4 +113,8 @@ interoperability artifacts:
 
 The RSA workflow builds and runs this target on Ubuntu, macOS, and Windows and
 runs the same test with AddressSanitizer and UndefinedBehaviorSanitizer on
-Ubuntu. The normal full test matrix remains the final merge gate.
+Ubuntu. A separate Ubuntu job generates a fresh 2048-bit OpenSSL key, imports
+its modulus/private exponent into LiberaCrypt, and checks both directions:
+OpenSSL encrypt/sign to LiberaCrypt decrypt/verify, then LiberaCrypt
+encrypt/sign to OpenSSL decrypt/verify. The normal full test matrix remains the
+final merge gate.
