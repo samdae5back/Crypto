@@ -38,6 +38,8 @@
 
 #include "Def.h"
 #include "BlockCipher.h"
+#include "StreamCipher.h"
+#include "AuthenticatedEncryption.h"
 #include "HashFunction.h"
 #include "MessageAuthentication.h"
 #include "KeyDerivation.h"

@@ -16,6 +16,7 @@ option(LIBERAC_BUILD_TESTS "Build LiberaCrypt tests" ${LIBERAC_IS_TOP_LEVEL})
 option(LIBERAC_BUILD_DOCS "Generate the public API reference with Doxygen" OFF)
 
 set(LIBERAC_PUBLIC_HEADER_NAMES
+    AuthenticatedEncryption.h
     AsymmetricCipher.h
     BlockCipher.h
     LiberaCrypt.h
@@ -27,6 +28,7 @@ set(LIBERAC_PUBLIC_HEADER_NAMES
     KeyDerivation.h
     KeyEncapsulation.h
     RandomNumberGeneration.h
+    StreamCipher.h
     Util.h
 )
 set(LIBERAC_PUBLIC_HEADERS "")
@@ -60,6 +62,7 @@ endif()
 
 set(LIBERAC_SOURCES
     # Public ABI entry points: one translation unit per operational category.
+    src/AuthenticatedEncryption.c
     src/AsymmetricCipher.c
     src/BlockCipher.c
     src/DigitalSignature.c
@@ -69,11 +72,15 @@ set(LIBERAC_SOURCES
     src/KeyDerivation.c
     src/KeyEncapsulation.c
     src/RandomNumberGeneration.c
+    src/StreamCipher.c
     src/Util.c
 
     # Private implementations grouped by primitive family and algorithm.
     src/Util/Core/secure_zero.c
     src/Util/Core/memory.c
+    src/StreamCipher/ChaCha20/chacha20.c
+    src/MessageAuthentication/Poly1305/poly1305.c
+    src/AuthenticatedEncryption/ChaCha20Poly1305/chacha20_poly1305.c
     src/BlockCipher/AES/aes.c
     src/BlockCipher/AES/aes_aead.c
     src/BlockCipher/TripleDES/triple_des.c

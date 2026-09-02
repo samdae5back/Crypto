@@ -21,9 +21,10 @@ The cryptographic implementation remains independent of an external cryptographi
 ## Cryptographic primitives
 
 LiberaCrypt includes classical and post-quantum cryptographic algorithms,
-including AES, Triple-DES, SHA-1/SHA-2/SHA-3/SHAKE, HMAC, CMAC, GMAC, HKDF,
-PBKDF2-HMAC, CTR_DRBG, RSA, ElGamal, ECDH, X25519, ECDSA, Ed25519, ML-KEM,
-ML-DSA, SLH-DSA, NTRU+, SMAUG-T, AIMer, and HAETAE.
+including AES, Triple-DES, ChaCha20, Poly1305, ChaCha20-Poly1305,
+SHA-1/SHA-2/SHA-3/SHAKE, HMAC, CMAC, GMAC, HKDF, PBKDF2-HMAC, CTR_DRBG,
+RSA, ElGamal, ECDH, X25519, ECDSA, Ed25519, ML-KEM, ML-DSA, SLH-DSA,
+NTRU+, SMAUG-T, AIMer, and HAETAE.
 
 ## Project principles
 
@@ -83,6 +84,11 @@ Examples of portability work in the current codebase include:
   avoid assuming host endianness; endian-sensitive operations are isolated in
   project utilities rather than leaking native representation into public
   formats.
+- **Portable modern symmetric arithmetic.** ChaCha20 decodes all key, nonce,
+  counter, and output words explicitly in little-endian order and uses only
+  defined `uint32_t` addition, rotation, and XOR. Poly1305 uses five 26-bit
+  limbs with range-bounded `uint64_t` products; it needs neither native
+  128-bit integers nor a generic bignum implementation.
 - **Platform-specific behavior is kept at narrow boundaries.** Entropy
   acquisition is adapted to the host OS, while cryptographic algorithms remain
   independent of the operating system's cryptographic runtime.
@@ -104,13 +110,16 @@ makes integer width, representation, range, or platform behavior unambiguous.
 inc/                              public category API headers only
 src/*.c                           public category API entry points
 src/AsymmetricCipher/{RSA,ElGamal}
+src/AuthenticatedEncryption/ChaCha20Poly1305
 src/BlockCipher/{AES,TripleDES}
 src/DigitalSignature/{AIMer,ECDSA,Ed25519,HAETAE,ML-DSA,SLH-DSA}
 src/HashFunction/{SHA1,SHA2,SHA3,LSH}
 src/KeyAgreement/{ecdh,x25519}
 src/KeyEncapsulation/{ML-KEM,NTRU-Plus,SMAUG-T}
-src/{KeyDerivation,MessageAuthentication}.c
+src/MessageAuthentication/Poly1305
 src/RandomNumberGeneration/{CTR_DRBG,KAT,Noise}
+src/StreamCipher/ChaCha20
+src/{AuthenticatedEncryption,KeyDerivation,MessageAuthentication,StreamCipher}.c
 src/Util/{Bignum,Bit,Core,ECC,Endian,NTT,Prime}
 cmake/                            platform export policy
 tests/                            unit, KAT, and public-header tests
@@ -224,6 +233,45 @@ The same dispatcher supports three-key Triple-DES EDE in ECB and CBC modes with
 a 24-byte key and 8-byte block alignment. It does not support two-key TDEA or
 single DES. DES parity bits are ignored rather than corrected or validated.
 
+### ChaCha20, Poly1305, and ChaCha20-Poly1305
+
+The standalone stream-cipher API implements the
+[RFC 8439](https://www.rfc-editor.org/rfc/rfc8439.html) ChaCha20 variant with a
+32-byte key, a 32-bit initial counter, and a 12-byte nonce. It accepts
+arbitrary byte lengths and supports exact in-place XOR. Requests that would
+wrap the 32-bit counter are rejected before output is written. A key/nonce pair
+must never be reused, and counter ranges for the same pair must not overlap.
+
+Poly1305 is exposed through the message-authentication family for protocols
+that already define safe one-time-key generation. It always produces and
+verifies the complete 16-byte tag from an exactly 32-byte one-time key. Direct
+users must never authenticate two messages with the same Poly1305 key.
+
+For normal application use, the standardized composition is available through
+the separate AEAD dispatcher:
+
+```c
+uint8_t ciphertext[1024];
+uint8_t tag[LIBERAC_CHACHA20_POLY1305_TAG_BYTES];
+
+LiberaCError error = LIBERAC_AEAD_ENCRYPT(
+    ciphertext, sizeof(ciphertext),
+    tag, sizeof(tag),
+    plaintext, message_length,
+    key, LIBERAC_CHACHA20_POLY1305_KEY_BYTES,
+    nonce, LIBERAC_CHACHA20_POLY1305_NONCE_BYTES,
+    aad, aad_length,
+    LIBERAC_ALG_CHACHA20_POLY1305);
+```
+
+ChaCha20-Poly1305 reserves counter zero to derive the one-time Poly1305 key and
+starts payload encryption at counter one. Only the RFC 8439 12-byte nonce and
+complete 16-byte tag are accepted. Decryption authenticates AAD and ciphertext
+before transforming any ciphertext; a tag mismatch returns
+`LIBERAC_ERROR_AUTHENTICATION_FAILED` and clears the entire plaintext output.
+Exact input/output aliasing is supported, while partial overlaps and overlaps
+with key, nonce, AAD, or tag storage are rejected explicitly.
+
 ### Hashes and XOFs
 
 All fixed-output hashes and XOFs use the same hash API:
@@ -284,8 +332,10 @@ Message authentication uses separate one-shot generation and verification APIs:
 - GMAC accepts AES-128/192/256 GCM identifiers and GCM tag lengths of 4, 8, or
   12 through 16 bytes. Its IV must be non-empty; a 12-byte IV follows GCM's
   direct counter construction.
-- `LIBERAC_HMAC_VERIFY`, `LIBERAC_CMAC_VERIFY`, and
-  `LIBERAC_GMAC_VERIFY` compare tag contents through the shared
+- Poly1305 accepts only `LIBERAC_ALG_POLY1305`, an exactly 32-byte one-time key,
+  and the complete 16-byte tag. Tag truncation is intentionally unavailable.
+- `LIBERAC_HMAC_VERIFY`, `LIBERAC_CMAC_VERIFY`, `LIBERAC_GMAC_VERIFY`, and
+  `LIBERAC_POLY1305_VERIFY` compare tag contents through the shared
   constant-time equality helper and return
   `LIBERAC_ERROR_AUTHENTICATION_FAILED` on mismatch.
 
@@ -318,6 +368,7 @@ limits, and vectors are also recorded in `docs/key-derivation.md`.
 ## Other supported families
 
 - ECDH and ECDSA over NIST P-256, P-384, and P-521; X25519; and Ed25519
+- ChaCha20, Poly1305, and RFC 8439 ChaCha20-Poly1305 AEAD
 - HMAC with fixed-output SHA-1/SHA-2/SHA-3, AES/Triple-DES CMAC, and AES-GMAC
 - HKDF and PBKDF2-HMAC with fixed-output SHA-1/SHA-2/SHA-3
 - CTR_DRBG with AES-128/192/256, with and without `Block_Cipher_df`
@@ -512,7 +563,10 @@ evidence is recorded in `docs/optimization/Ed25519.md`.
 | --- | --- | --- | --- |
 | HMAC | Duplicate each supported hash inside the MAC layer or materialize whole-message concatenations. | Reuse the runtime incremental hash API for inner and outer hashing. Long-key normalization, pads, hash contexts, inner digest, and full tag are cleared on every exit. | Keeps one validated hash state machine and bounds secret temporary lifetime. |
 | CMAC and GMAC | Re-expand an AES key for every authenticated block or maintain an independent GMAC implementation. | AES-CMAC prepares one AES context for the complete MAC. GMAC invokes the AES-GCM authentication path with an empty plaintext. | Reuses block-cipher and AEAD logic instead of duplicating schedules and tag rules. |
-| Tag verification | Family-specific early-exit byte comparisons. | HMAC, CMAC, GMAC, GCM, CCM, and authenticated PQC paths share the constant-time byte-equality helper. | Avoids first-difference exits and reduces duplicate security-sensitive comparison code. |
+| ChaCha20 state setup | Recreate and decode the complete 16-word state for every 64-byte block. | Decode the constants, key, and nonce once per request, retain that base state, and change only the public counter between blocks. The 20 rounds are expressed as fixed `uint32_t` ARX operations. | Removes repeated byte decoding and provides a compiler-friendly scalar path without tables, intrinsics, assembly, or host-endian loads. |
+| Poly1305 arithmetic | Translate the RFC pseudocode through a dynamically allocated generic bignum. | Clamp `r` while decoding five 26-bit limbs, accumulate products in `uint64_t`, reduce with fixed carries, and mask-select the final canonical residue. | Avoids allocation, secret-indexed memory, native 128-bit types, and a data-dependent final subtraction; the largest multiplication sum stays below the documented 64-bit bound. |
+| ChaCha20-Poly1305 composition | Allocate and concatenate `AAD || pad || ciphertext || pad || lengths` before authenticating. | Feed each component directly into the internal incremental Poly1305 state, derive the one-time key from counter zero, and use counter one for payload. | Keeps temporary storage fixed-size regardless of message length and follows the RFC byte encoding explicitly. |
+| Tag verification | Family-specific early-exit byte comparisons. | HMAC, CMAC, GMAC, Poly1305, GCM, CCM, ChaCha20-Poly1305, and authenticated PQC paths share the constant-time byte-equality helper. | Avoids first-difference exits and reduces duplicate security-sensitive comparison code. |
 | HKDF and PBKDF2 | Hash-specific KDF copies and unchecked concatenation sizes. | Compose runtime HMAC, encode counters explicitly in big-endian bytes, check `size_t` and standard output bounds, reject unsafe overlap at each component boundary, clear intermediate secrets, and clear partial output after internal failure. | One portable KDF implementation across accepted hashes with explicit failure and memory rules. |
 | GCM authentication | A GHASH lookup table indexed by intermediate data. | Multiply in GF(2^128) with a fixed 128-bit serial loop, masks, and no secret-indexed table. GCM verifies the tag before releasing plaintext. | Favors portable cache behaviour and authentication-before-decryption over table-driven throughput. |
 | CCM authentication | Release decrypted plaintext before CBC-MAC validation. | Decrypt to the caller buffer, compute and compare the expected CBC-MAC tag, then erase the complete plaintext region on any failure. | Prevents unauthenticated plaintext from remaining available after the API returns an error. |
@@ -524,6 +578,26 @@ AES-CCM enforces nonce lengths from 7 through 13 bytes, even tag lengths from 4
 through 16 bytes, and the message bound implied by its encoded `q` value.
 Both modes reuse a single AES key schedule for the complete operation and clear
 authentication state and keystream blocks before returning.
+
+The ChaCha20 and Poly1305 paths use only fixed-width unsigned arithmetic and
+explicit little-endian serialization. For Poly1305, clamped `r` limbs are below
+`2^26`; after adding an input limb, each accumulator limb is below `2^27 + 1`.
+The five-term products, including the limbs multiplied by five for reduction,
+therefore remain below `2^59`, leaving margin in `uint64_t`. Secret base state,
+keystream blocks, one-time keys, accumulators, tags, and failed plaintext are
+explicitly erased when their lifetime ends. These are source-level fixed-
+schedule and memory-access properties, not a universal hardware timing claim.
+
+Validation includes the RFC 8439 ChaCha20 block and multi-block cipher vectors,
+the primary Poly1305 vector, Appendix A.3 carry/final-reduction boundary cases,
+and the complete ChaCha20-Poly1305 AEAD vector. Unit coverage exercises empty,
+partial-block, multi-block, in-place, counter-exhaustion, invalid-size,
+overlap, and authentication-failure behavior. During development, 250
+randomized Poly1305 cases and 250 randomized ChaCha20-Poly1305 cases were also
+checked against `cryptography` 46.0.0 backed by OpenSSL 3.5.3. The focused
+tests pass strict C11 conversion/sign/shadow warnings and ASan/UBSan. No
+throughput ratio is claimed until a reproducible cross-platform benchmark is
+retained in the repository.
 
 CTR_DRBG supports AES-128/192/256 with and without `Block_Cipher_df`, explicit
 instantiate/reseed/generate state transitions, per-request and reseed-counter
