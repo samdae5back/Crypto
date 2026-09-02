@@ -365,13 +365,44 @@ one-shot HMAC path for every PRF call; a reusable prepared-HMAC state remains a
 future measured optimization, not a claimed current speedup. The standards,
 limits, and vectors are also recorded in `docs/key-derivation.md`.
 
+### Random bytes and CTR_DRBG
+
+`LIBERAC_RANDOM_BYTES` reads directly from the operating-system entropy source.
+The stateful CTR_DRBG API follows
+[NIST SP 800-90A Rev. 1](https://csrc.nist.gov/pubs/sp/800/90/a/r1/final)
+and supports instantiate, reseed, generate, prediction-resistance requests,
+OS-entropy helpers, and explicit state clearing. AES remains the modern default:
+
+| Configuration | Effective key state | V | Seed | Request maximum | Reseed interval |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| AES-128 | 16 bytes | 16 bytes | 32 bytes | 65,536 bytes | `2^48` requests |
+| AES-192 | 24 bytes | 16 bytes | 40 bytes | 65,536 bytes | `2^48` requests |
+| AES-256 | 32 bytes | 16 bytes | 48 bytes | 65,536 bytes | `2^48` requests |
+| Three-key TDEA (**legacy compatibility**) | 21 bytes | 8 bytes | 29 bytes | 1,024 bytes | `2^32` requests |
+
+Every configuration has `*_DF` and `*_NO_DF` identifiers. A no-DF
+instantiation requires exactly the listed seed size and no nonce; DF variants
+accept variable-length inputs under the standard entropy and nonce rules.
+TDEA's 168-bit effective key state is stored as 21 bytes, then expanded into
+three 64-bit DES engine keys with odd parity before encryption. Counter
+increments always traverse the complete active V, and all block-cipher
+schedules, derived seed material, temporary blocks, and failed output are
+erased.
+
+The TDEA selectors exist only to reproduce standards-era systems and
+[NIST CAVP reference vectors](https://csrc.nist.gov/projects/cryptographic-algorithm-validation-program/random-number-generators).
+They are not a recommendation for a new random-bit generator. NIST has
+[withdrawn the TDEA recommendation for new protection](https://csrc.nist.gov/news/2023/nist-to-withdraw-sp-800-67-rev-2),
+so new applications should use an AES CTR_DRBG configuration.
+
 ## Other supported families
 
 - ECDH and ECDSA over NIST P-256, P-384, and P-521; X25519; and Ed25519
 - ChaCha20, Poly1305, and RFC 8439 ChaCha20-Poly1305 AEAD
 - HMAC with fixed-output SHA-1/SHA-2/SHA-3, AES/Triple-DES CMAC, and AES-GMAC
 - HKDF and PBKDF2-HMAC with fixed-output SHA-1/SHA-2/SHA-3
-- CTR_DRBG with AES-128/192/256, with and without `Block_Cipher_df`
+- CTR_DRBG with AES-128/192/256 and legacy three-key TDEA, with and without
+  `Block_Cipher_df`
 - ML-KEM-512, ML-KEM-768, and ML-KEM-1024
 - NTRU+768, NTRU+864, and NTRU+1152
 - SMAUG-T-128, SMAUG-T-192, and SMAUG-T-256
@@ -570,7 +601,7 @@ evidence is recorded in `docs/optimization/Ed25519.md`.
 | HKDF and PBKDF2 | Hash-specific KDF copies and unchecked concatenation sizes. | Compose runtime HMAC, encode counters explicitly in big-endian bytes, check `size_t` and standard output bounds, reject unsafe overlap at each component boundary, clear intermediate secrets, and clear partial output after internal failure. | One portable KDF implementation across accepted hashes with explicit failure and memory rules. |
 | GCM authentication | A GHASH lookup table indexed by intermediate data. | Multiply in GF(2^128) with a fixed 128-bit serial loop, masks, and no secret-indexed table. GCM verifies the tag before releasing plaintext. | Favors portable cache behaviour and authentication-before-decryption over table-driven throughput. |
 | CCM authentication | Release decrypted plaintext before CBC-MAC validation. | Decrypt to the caller buffer, compute and compare the expected CBC-MAC tag, then erase the complete plaintext region on any failure. | Prevents unauthenticated plaintext from remaining available after the API returns an error. |
-| CTR_DRBG AES work | Expand the AES key for every generated block. | Reuse one expanded AES context across each update, generate, BCC, or derivation-function pass; erase AES contexts, seed material, temporary blocks, and failed output. | Removes repeated per-block key setup while preserving SP 800-90A state transitions. |
+| CTR_DRBG block-cipher work | Expand the AES or TDEA key for every generated block. | Reuse one expanded block-cipher context across each update, generate, BCC, or derivation-function pass. TDEA's 21-byte effective key is expanded to a parity-bearing 24-byte engine key only at this boundary. | Removes repeated per-block key setup, keeps parity representation outside DRBG state, and preserves SP 800-90A state transitions. |
 
 AES-GCM accepts the standard 96-bit-IV fast path and hashes other non-empty IV
 lengths. Its tag and counter length bounds are checked before processing.
@@ -599,12 +630,16 @@ tests pass strict C11 conversion/sign/shadow warnings and ASan/UBSan. No
 throughput ratio is claimed until a reproducible cross-platform benchmark is
 retained in the repository.
 
-CTR_DRBG supports AES-128/192/256 with and without `Block_Cipher_df`, explicit
-instantiate/reseed/generate state transitions, per-request and reseed-counter
-limits, optional additional input, OS-entropy instantiation/reseed helpers, and
-an explicit context clear operation. NIST known-answer and derivation-function
-tests validate the construction. No speed ratio is claimed for the reuse and
-table-free choices.
+CTR_DRBG supports AES-128/192/256 and legacy three-key TDEA with and without
+`Block_Cipher_df`, explicit instantiate/reseed/generate state transitions,
+algorithm-specific request and reseed limits, optional additional input,
+OS-entropy instantiation/reseed helpers, and an explicit context clear
+operation. TDEA's 8-byte counter and 29-byte seed share the same bounded
+implementation as AES without assuming a 16-byte block. NIST CAVP vectors cover
+TDEA DF, no-DF, reseed, internal state, and returned bits; the existing AES KAT
+remains unchanged. Development additionally cross-checked randomized TDEA
+state transitions against an independent Python/TripleDES reference. No speed
+ratio is claimed for the schedule reuse or other table-free choices.
 
 ### ML-KEM portable hot paths
 
@@ -781,8 +816,8 @@ When `LIBERAC_BUILD_TESTS` is enabled, CMake generates:
   PBKDF2-HMAC-SHA256, and SHA3-256 runtime-dispatch cases, plus KDF boundary,
   overlap, output-clearing, and invalid-argument tests; the retained vectors and
   SHA3 dispatch case were independently cross-checked through OpenSSL HMAC
-- CTR_DRBG known-answer, derivation-function, reseed-limit, and clear-state
-  tests
+- AES and legacy TDEA CTR_DRBG known-answer, derivation-function, no-DF,
+  reseed, request/reseed-limit, parity-expansion, and clear-state tests
 - operation tests for every supported post-quantum KEM and signature family
 - RFC 8032 Ed25519 known-answer tests, strict-encoding negative tests, and
   deterministic sign/verify round trips

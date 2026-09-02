@@ -8,42 +8,52 @@
 
 /**
  * @file RandomNumberGeneration.h
- * @brief Operating-system random bytes and runtime-selected AES CTR-DRBG APIs.
+ * @brief Operating-system random bytes and runtime-selected CTR-DRBG APIs.
  *
  * LIBERAC_RANDOM_BYTES() reads directly from the operating system. The
  * CTR-DRBG interface supports AES-128, AES-192, and AES-256, each with or
- * without the SP 800-90A derivation function (DF). A CTR-DRBG context contains
- * secret mutable state: do not inspect, modify, serialize, or duplicate it.
+ * without the SP 800-90A derivation function (DF). Three-key TDEA is also
+ * available strictly for legacy standards and interoperability coverage; it
+ * is not recommended for new designs. A CTR-DRBG context contains secret
+ * mutable state: do not inspect, modify, serialize, or duplicate it.
  *
  * @defgroup crypto_random Random-number generation API
- * @brief Direct operating-system random bytes and AES CTR-DRBG state.
+ * @brief Direct operating-system random bytes and CTR-DRBG state.
  * @{
  */
 
 #include "Def.h"
 
-/** @brief AES block and CTR-DRBG V-state length in bytes. */
+/** @brief Maximum block and CTR-DRBG V-state storage in bytes. */
 #define LIBERAC_CTR_DRBG_BLOCK_BYTES 16u
-/** @brief Maximum AES key storage required by a CTR-DRBG context. */
+/** @brief Maximum effective key-state storage required by a context. */
 #define LIBERAC_CTR_DRBG_MAX_KEY_BYTES 32u
 /** @brief Maximum Key || V seed length among the supported parameter sets. */
 #define LIBERAC_CTR_DRBG_MAX_SEED_BYTES 48u
-/** @brief Maximum bytes produced by one LIBERAC_CTR_DRBG_GENERATE() request. */
+/** @brief Effective three-key TDEA key-state length, excluding parity bits. */
+#define LIBERAC_CTR_DRBG_TDEA_KEY_BYTES 21u
+/** @brief Three-key TDEA CTR-DRBG counter-state length. */
+#define LIBERAC_CTR_DRBG_TDEA_BLOCK_BYTES 8u
+/** @brief Three-key TDEA Key || V seed length. */
+#define LIBERAC_CTR_DRBG_TDEA_SEED_BYTES 29u
+/** @brief Maximum bytes in one legacy TDEA CTR-DRBG request. */
+#define LIBERAC_CTR_DRBG_TDEA_MAX_REQUEST_BYTES 1024u
+/** @brief Maximum bytes in one AES CTR-DRBG request. */
 #define LIBERAC_CTR_DRBG_MAX_REQUEST_BYTES 65536u
 
 /**
- * @brief Mutable AES CTR-DRBG state.
+ * @brief Mutable CTR-DRBG state.
  *
  * Treat all members as private implementation state. Create the state with a
  * LIBERAC_CTR_DRBG_INSTANTIATE* function and erase it with
  * LIBERAC_CTR_DRBG_CLEAR(). A single context must not be used concurrently.
  */
 typedef struct {
-    LiberaCAlgID ALG; /**< Selected LIBERAC_ALG_CTR_DRBG_AES_* identifier. */
-    uint8_t KEY[LIBERAC_CTR_DRBG_MAX_KEY_BYTES]; /**< Secret AES key state. */
-    uint8_t V[LIBERAC_CTR_DRBG_BLOCK_BYTES]; /**< Secret counter state. */
+    LiberaCAlgID ALG; /**< Selected LIBERAC_ALG_CTR_DRBG_* identifier. */
+    uint8_t KEY[LIBERAC_CTR_DRBG_MAX_KEY_BYTES]; /**< Secret effective key state. */
+    uint8_t V[LIBERAC_CTR_DRBG_BLOCK_BYTES]; /**< Secret counter-state storage. */
     uint64_t RESEED_COUNTER; /**< Requests since instantiation or reseeding. */
-    uint8_t KEY_LENGTH; /**< Active bytes in KEY: 16, 24, or 32. */
+    uint8_t KEY_LENGTH; /**< Active bytes in KEY: 16, 21, 24, or 32. */
     uint8_t USE_DF; /**< Nonzero when the derivation-function variant is active. */
     uint8_t INSTANTIATED; /**< Nonzero only for an instantiated context. */
 } LiberaCCtrDrbgContext;
@@ -64,10 +74,9 @@ LIBERAC_API LiberaCError LIBERAC_RANDOM_BYTES(uint8_t *OUTPUT, size_t OUTPUT_LEN
 
 /**
  * @brief Return the Key || V seed-state length for a CTR-DRBG algorithm.
- * @param[in] ALG Any LIBERAC_ALG_CTR_DRBG_AES_*_DF or LIBERAC_ALG_CTR_DRBG_AES_*_NO_DF
- *                identifier.
- * @return 32, 40, or 48 bytes for AES-128, AES-192, or AES-256 respectively;
- *         zero if ALG is unsupported.
+ * @param[in] ALG Any supported LIBERAC_ALG_CTR_DRBG_* identifier.
+ * @return 29 bytes for legacy three-key TDEA, or 32, 40, or 48 bytes for
+ *         AES-128, AES-192, or AES-256 respectively; zero if unsupported.
  * @note For NO_DF instantiation and reseeding, this is the exact required
  *       entropy length. DF variants use the entropy constraints documented on
  *       LIBERAC_CTR_DRBG_INSTANTIATE() and LIBERAC_CTR_DRBG_RESEED().
@@ -75,7 +84,7 @@ LIBERAC_API LiberaCError LIBERAC_RANDOM_BYTES(uint8_t *OUTPUT, size_t OUTPUT_LEN
 LIBERAC_API size_t LIBERAC_CTR_DRBG_SEED_SIZE(LiberaCAlgID ALG);
 
 /**
- * @brief Instantiate an AES CTR-DRBG from caller-supplied entropy.
+ * @brief Instantiate a CTR-DRBG from caller-supplied entropy.
  * @param[out] CONTEXT Destination context. On success it is ready to generate;
  *                     failures after initialization clear its state.
  * @param[in] ENTROPY Entropy input supplied by the caller; never null.
@@ -85,14 +94,15 @@ LIBERAC_API size_t LIBERAC_CTR_DRBG_SEED_SIZE(LiberaCAlgID ALG);
  * @param[in] PERSONALIZATION Optional personalization string; may be null only
  *                            when PERSONALIZATION_LENGTH is zero.
  * @param[in] PERSONALIZATION_LENGTH Personalization length in bytes.
- * @param[in] ALG Selected LIBERAC_ALG_CTR_DRBG_AES_*_DF or *_NO_DF identifier.
+ * @param[in] ALG Selected LIBERAC_ALG_CTR_DRBG_* identifier.
  * @return LIBERAC_SUCCESS on success or a negative LiberaCError on failure.
  *
- * For a DF algorithm, ENTROPY_LENGTH must be at least the AES key length and
- * ENTROPY_LENGTH + NONCE_LENGTH must be at least the key length plus half that
- * length rounded up. For a NO_DF algorithm, ENTROPY_LENGTH must equal
- * LIBERAC_CTR_DRBG_SEED_SIZE(ALG), NONCE_LENGTH must be zero, and the
- * personalization string must not exceed the seed size.
+ * For a DF algorithm, ENTROPY_LENGTH must be at least the selected security
+ * strength: 14 bytes for legacy TDEA, or the AES key length. The combined
+ * entropy and nonce lengths must be at least 21 bytes for TDEA, or the AES key
+ * length plus half that length rounded up. For a NO_DF algorithm,
+ * ENTROPY_LENGTH must equal LIBERAC_CTR_DRBG_SEED_SIZE(ALG), NONCE_LENGTH must
+ * be zero, and the personalization string must not exceed the seed size.
  *
  * @warning The caller is responsible for the quality, independence, and
  *          claimed entropy of caller-supplied ENTROPY and NONCE data.
@@ -105,14 +115,14 @@ LIBERAC_API LiberaCError LIBERAC_CTR_DRBG_INSTANTIATE(
     LiberaCAlgID ALG);
 
 /**
- * @brief Instantiate an AES CTR-DRBG using operating-system entropy.
+ * @brief Instantiate a CTR-DRBG using operating-system entropy.
  * @param[out] CONTEXT Destination context.
  * @param[in] PERSONALIZATION Optional personalization string; may be null only
  *                            when PERSONALIZATION_LENGTH is zero.
  * @param[in] PERSONALIZATION_LENGTH Personalization length in bytes. For a
  *                                   NO_DF algorithm it must not exceed the
  *                                   algorithm's seed size.
- * @param[in] ALG Selected LIBERAC_ALG_CTR_DRBG_AES_*_DF or *_NO_DF identifier.
+ * @param[in] ALG Selected LIBERAC_ALG_CTR_DRBG_* identifier.
  * @return LIBERAC_SUCCESS on success, LIBERAC_ERROR_RANDOM_FAILED if operating-
  *         system entropy cannot be obtained, or another negative LiberaCError.
  */
@@ -126,8 +136,9 @@ LIBERAC_API LiberaCError LIBERAC_CTR_DRBG_INSTANTIATE_OS(
  * @param[in,out] CONTEXT Instantiated context to update.
  * @param[in] ENTROPY Fresh entropy input; never null.
  * @param[in] ENTROPY_LENGTH Entropy length in bytes. DF variants require at
- *                           least the AES key length; NO_DF variants require
- *                           exactly LIBERAC_CTR_DRBG_SEED_SIZE(CONTEXT->ALG).
+ *                           least 14 bytes for TDEA or the AES key length;
+ *                           NO_DF variants require exactly
+ *                           LIBERAC_CTR_DRBG_SEED_SIZE(CONTEXT->ALG).
  * @param[in] ADDITIONAL Optional additional input; may be null only when
  *                       ADDITIONAL_LENGTH is zero.
  * @param[in] ADDITIONAL_LENGTH Additional-input length. For NO_DF variants it
@@ -158,8 +169,8 @@ LIBERAC_API LiberaCError LIBERAC_CTR_DRBG_RESEED_OS(
  * @brief Generate pseudorandom bytes and advance CTR-DRBG state.
  * @param[in,out] CONTEXT Instantiated context.
  * @param[out] OUTPUT Destination; may be null only when OUTPUT_LENGTH is zero.
- * @param[in] OUTPUT_LENGTH Bytes requested, at most
- *                          LIBERAC_CTR_DRBG_MAX_REQUEST_BYTES.
+ * @param[in] OUTPUT_LENGTH Bytes requested, at most 1,024 for legacy TDEA or
+ *                          LIBERAC_CTR_DRBG_MAX_REQUEST_BYTES for AES.
  * @param[in] ADDITIONAL Optional request-specific additional input; may be null
  *                       only when ADDITIONAL_LENGTH is zero.
  * @param[in] ADDITIONAL_LENGTH Additional-input length. For NO_DF variants it
@@ -171,6 +182,8 @@ LIBERAC_API LiberaCError LIBERAC_CTR_DRBG_RESEED_OS(
  *         reseed interval is exceeded, LIBERAC_ERROR_MESSAGE_TOO_LARGE for an
  *         oversized request, or another negative LiberaCError on failure.
  * @note If generation fails after output processing begins, OUTPUT is cleared.
+ * @warning The TDEA identifiers exist for legacy compatibility only. New
+ *          systems should select an AES CTR-DRBG identifier.
  */
 LIBERAC_API LiberaCError LIBERAC_CTR_DRBG_GENERATE(
     LiberaCCtrDrbgContext *CONTEXT,
