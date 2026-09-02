@@ -21,7 +21,7 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -DBUILD_SHARED_LIBS=OFF -DLIBERAC_BUILD_TESTS=ON
       - name: Build focused ECC tests
-        run: cmake --build build --config Release --target liberacrypt_ecc_unit liberacrypt_ecc_differential
+        run: cmake --build build --config Release --target liberacrypt_ecc_unit liberacrypt_ecc_differential crypto_ecdsa_unit crypto_ecdsa_kat
       - name: Run focused ECC tests
         run: ctest --test-dir build -C Release -L ecc --output-on-failure
 
@@ -35,7 +35,7 @@ jobs:
       - name: Configure
         run: cmake -S . -B build-sanitize -DBUILD_SHARED_LIBS=OFF -DLIBERAC_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
       - name: Build focused ECC tests
-        run: cmake --build build-sanitize --target liberacrypt_ecc_unit liberacrypt_ecc_differential
+        run: cmake --build build-sanitize --target liberacrypt_ecc_unit liberacrypt_ecc_differential crypto_ecdsa_unit crypto_ecdsa_kat
       - name: Run focused ECC tests
         env:
           ASAN_OPTIONS: detect_leaks=0

@@ -4,6 +4,7 @@ set(LIBERAC_ECC_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/src/Util/ECC/ecc_field.c
     ${CMAKE_SOURCE_DIR}/src/Util/ECC/ecc_projective.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Reference.c
+    ${CMAKE_SOURCE_DIR}/src/Util/ECC/ecc_scalar_arith.c
     ${CMAKE_SOURCE_DIR}/src/Util/ECC/ecc_scalar_vartime.c
     ${CMAKE_SOURCE_DIR}/src/Util/ECC/ecc_scalar_secret.c
     ${CMAKE_SOURCE_DIR}/src/Util/ECC/ecc_encoding.c

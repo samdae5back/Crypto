@@ -121,6 +121,18 @@ crypto_add_public_test(
     "unit;pqc;key-encapsulation;smaug-t"
 )
 crypto_add_public_test(
+    crypto_ecdsa_unit
+    LiberaCrypt.DigitalSignature.ECDSA.Unit
+    DigitalSignature/ECDSA/UnitTest.c
+    "unit;digital-signature;ecdsa;ecc"
+)
+crypto_add_public_test(
+    crypto_ecdsa_kat
+    LiberaCrypt.DigitalSignature.ECDSA.RFC6979
+    DigitalSignature/ECDSA/KAT.c
+    "kat;digital-signature;ecdsa;ecc"
+)
+crypto_add_public_test(
     crypto_ml_dsa_unit
     LiberaCrypt.DigitalSignature.ML-DSA.Unit
     DigitalSignature/ML-DSA/UnitTest.c

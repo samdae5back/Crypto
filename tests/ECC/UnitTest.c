@@ -94,6 +94,63 @@ static int fail_curve(CryptoEcCurveId id, const char *stage) {
     return 0;
 }
 
+static int test_scalar_arithmetic(const CryptoEcCurve *curve) {
+    CryptoEcScalar one;
+    CryptoEcScalar two;
+    CryptoEcScalar three;
+    CryptoEcScalar value;
+    CryptoEcScalar inverse;
+    uint8_t encoded[66] = {0u};
+    uint8_t expected[66] = {0u};
+
+    expected[curve->scalar_bytes - 1u] = 1u;
+    if (crypto_ec_scalar_from_bytes(
+            curve, &one, expected, curve->scalar_bytes) != LIBERAC_SUCCESS)
+        return fail_curve(curve->id, "scalar arithmetic import one");
+    expected[curve->scalar_bytes - 1u] = 2u;
+    if (crypto_ec_scalar_from_bytes(
+            curve, &two, expected, curve->scalar_bytes) != LIBERAC_SUCCESS)
+        return fail_curve(curve->id, "scalar arithmetic import two");
+    expected[curve->scalar_bytes - 1u] = 3u;
+    if (crypto_ec_scalar_from_bytes(
+            curve, &three, expected, curve->scalar_bytes) != LIBERAC_SUCCESS)
+        return fail_curve(curve->id, "scalar arithmetic import three");
+
+    crypto_ec_scalar_multiply(curve, &value, &two, &three);
+    memset(expected, 0, sizeof(expected));
+    expected[curve->scalar_bytes - 1u] = 6u;
+    crypto_ec_scalar_to_bytes(curve, encoded, &value);
+    if (memcmp(encoded, expected, curve->scalar_bytes) != 0)
+        return fail_curve(curve->id, "scalar Montgomery multiply");
+
+    crypto_ec_scalar_invert_fixed(curve, &inverse, &two);
+    crypto_ec_scalar_multiply(curve, &value, &two, &inverse);
+    memset(expected, 0, sizeof(expected));
+    expected[curve->scalar_bytes - 1u] = 1u;
+    crypto_ec_scalar_to_bytes(curve, encoded, &value);
+    if (memcmp(encoded, expected, curve->scalar_bytes) != 0)
+        return fail_curve(curve->id, "scalar fixed inverse");
+
+    scalar_from_order(curve, encoded, 1u);
+    if (crypto_ec_scalar_from_bytes(
+            curve, &value, encoded, curve->scalar_bytes) != LIBERAC_SUCCESS)
+        return fail_curve(curve->id, "scalar import n-1");
+    crypto_ec_scalar_add(curve, &value, &value, &one);
+    if (crypto_ec_scalar_zero_mask(curve, &value) == 0u)
+        return fail_curve(curve->id, "scalar modular add");
+
+    scalar_from_order(curve, encoded, 0u);
+    if (crypto_ec_scalar_from_bytes(
+            curve, &value, encoded, curve->scalar_bytes) == LIBERAC_SUCCESS)
+        return fail_curve(curve->id, "scalar canonical range check");
+    if (crypto_ec_scalar_from_bytes_reduced(
+            curve, &value, encoded, curve->scalar_bytes) != LIBERAC_SUCCESS ||
+        crypto_ec_scalar_zero_mask(curve, &value) == 0u)
+        return fail_curve(curve->id, "scalar reduced import");
+
+    return 1;
+}
+
 static int test_curve(CryptoEcCurveId id) {
     const CryptoEcCurve *curve = crypto_ec_curve_get(id);
     CryptoEcAffinePoint generator;
@@ -108,6 +165,7 @@ static int test_curve(CryptoEcCurveId id) {
     size_t encoded_length;
 
     if (!curve) return fail_curve(id, "curve lookup");
+    if (!test_scalar_arithmetic(curve)) return 0;
 
     crypto_ec_affine_generator(curve, &generator);
     if (!crypto_ec_affine_is_on_curve(curve, &generator) ||

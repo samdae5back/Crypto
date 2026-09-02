@@ -88,12 +88,14 @@ set(LIBERAC_SOURCES
     src/Util/ECC/ecc_field.c
     src/Util/ECC/ecc_projective.c
     src/Util/ECC/ecc_reference.c
+    src/Util/ECC/ecc_scalar_arith.c
     src/Util/ECC/ecc_scalar_vartime.c
     src/Util/ECC/ecc_scalar_secret.c
     src/Util/ECC/ecc_encoding.c
     src/Util/Prime/prime.c
     src/AsymmetricCipher/RSA/rsa.c
     src/AsymmetricCipher/ElGamal/elgamal.c
+    src/DigitalSignature/ECDSA/ecdsa.c
     src/KeyAgreement/ecdh.c
     src/KeyAgreement/x25519.c
     src/HashFunction/SHA2/sha2.c

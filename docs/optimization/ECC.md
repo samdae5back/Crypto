@@ -1,9 +1,10 @@
 # Portable short-Weierstrass ECC arithmetic
 
 This layer provides the common prime-field and point arithmetic used by the
-public P-256, P-384, and P-521 ECDH implementation and planned ECDSA support.
-The key-agreement API is exposed through `KeyAgreement.h`; the lower-level
-field, point, and scalar-multiplication interfaces remain internal.
+public P-256, P-384, and P-521 ECDH and ECDSA implementations. The
+key-agreement and signature APIs are exposed through `KeyAgreement.h` and
+`DigitalSignature.h`; the lower-level field, point, and scalar interfaces
+remain internal.
 
 The production arithmetic intentionally exposes only two scalar-multiplication
 policies: an optimized variable-time path for public scalars and a fixed-schedule
@@ -27,6 +28,9 @@ than pretending it is another short-Weierstrass parameter choice.
 - Fixed maximum storage: 17 little-endian 32-bit limbs (enough for P-521).
 - Field representation: Montgomery residues with curve-specific `R`, `R^2`,
   and `-p^-1 mod 2^32` constants.
+- Group-order scalar representation: a separate Montgomery domain modulo `n`
+  with curve-specific constants. It shares the portable word arithmetic but
+  never reuses field-modulus values.
 - Multiplication: portable full-width schoolbook multiplication followed by a
   word-by-word Montgomery reduction.
 - Inversion: fixed-exponent powering to `p - 2`.
@@ -105,6 +109,28 @@ The raw x-coordinate is deliberately not passed through a KDF inside ECDH. The
 public API documents it as key-agreement material that should be fed into a
 protocol-appropriate KDF such as HKDF.
 
+## ECDSA integration
+
+`src/DigitalSignature/ECDSA/ecdsa.c` supports ECDSA over P-256, P-384, and
+P-521. Private keys are fixed-width big-endian scalars and generated public
+keys are uncompressed SEC 1 points; verification accepts compressed points as
+well. Signatures use a fixed-width raw `r || s` encoding rather than ASN.1 DER,
+and signing does not apply low-s normalization.
+
+Message hashes are converted with the ECDSA left-truncation and conditional
+reduction rules. The public API accepts fixed-output SHA-2 and SHA-3 choices
+whose collision strength is at least the selected curve's security strength.
+Per-message nonces follow RFC 6979 using HMAC with the selected message hash.
+A fixed batch of sixteen nonce candidates is generated and the first valid
+candidate is mask-selected, avoiding a scalar-dependent early exit in the
+normal signing path.
+
+Private-key public derivation and nonce-point multiplication use the
+fixed-schedule secret-scalar ladder. Arithmetic modulo the group order uses the
+dedicated scalar Montgomery domain, including fixed-exponent inversion to
+`n - 2`. Verification handles only public values and therefore uses the
+four-bit variable-time multiplication path for `uG` and `vQ`.
+
 ## X25519 backend
 
 `src/KeyAgreement/x25519.c` implements RFC 7748 separately with sixteen
@@ -147,6 +173,8 @@ The focused ECC arithmetic tests cover:
 - independent `2G` affine coordinates for all three curves, checked against
   the test-only textbook reference result;
 - scalar validity boundaries at zero, `n - 1`, and `n`;
+- scalar Montgomery multiplication, modular addition, fixed-exponent inversion,
+  canonical import, and one-step reduced import for every supported order;
 - agreement among the test-only affine oracle, four-bit windowed Jacobian, and
   fixed-schedule ladder multiplication for scalar 1 and scalar 2; and
 - deterministic differential comparisons of the test oracle and both
@@ -155,12 +183,15 @@ The focused ECC arithmetic tests cover:
 The public key-agreement tests additionally cover RFC 7748 Alice/Bob X25519
 vectors, bilateral ECDH agreement on all three NIST curves, compressed SEC 1
 peer keys, invalid zero ECDH scalars, X25519 all-zero rejection, and OS-random
-key-generation round trips.
+key-generation round trips. ECDSA tests cover the RFC 6979 P-256/SHA-256,
+P-384/SHA-384, and P-521/SHA-512 vectors; SHA-3 key-generation/sign/verify
+round trips; deterministic repeatability; compressed public keys; malformed
+keys and signatures; output clearing; and buffer and overlap validation.
 
-The ECC validation workflow builds and runs the focused arithmetic tests on
-hosted Ubuntu, macOS, and Windows runners and adds an Ubuntu ASan/UBSan run. The
-normal repository CI builds the public key-agreement tests across the same three
-operating systems.
+The ECC validation workflow builds and runs the focused arithmetic and ECDSA
+tests on hosted Ubuntu, macOS, and Windows runners and adds an Ubuntu
+ASan/UBSan run. The normal repository CI builds the public key-agreement and
+ECDSA tests across the same three operating systems.
 
 ## Benchmarking
 

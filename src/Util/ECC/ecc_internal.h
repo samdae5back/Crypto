@@ -22,6 +22,10 @@ typedef struct CryptoEcFieldElement {
     uint32_t limb[CRYPTO_EC_MAX_LIMBS];
 } CryptoEcFieldElement;
 
+typedef struct CryptoEcScalar {
+    uint32_t limb[CRYPTO_EC_MAX_LIMBS];
+} CryptoEcScalar;
+
 typedef struct CryptoEcAffinePoint {
     CryptoEcFieldElement x;
     CryptoEcFieldElement y;
@@ -51,6 +55,10 @@ typedef struct CryptoEcCurve {
     uint32_t generator_y[CRYPTO_EC_MAX_LIMBS];
     uint32_t inverse_exponent[CRYPTO_EC_MAX_LIMBS];
     uint32_t square_root_exponent[CRYPTO_EC_MAX_LIMBS];
+    uint32_t scalar_montgomery_factor;
+    uint32_t scalar_montgomery_one[CRYPTO_EC_MAX_LIMBS];
+    uint32_t scalar_montgomery_r2[CRYPTO_EC_MAX_LIMBS];
+    uint32_t scalar_inverse_exponent[CRYPTO_EC_MAX_LIMBS];
 } CryptoEcCurve;
 
 /* Domain parameters. */
@@ -105,6 +113,35 @@ void crypto_ec_field_to_bytes(const CryptoEcCurve *curve,
                               const CryptoEcFieldElement *in);
 uint32_t crypto_ec_field_lsb(const CryptoEcCurve *curve,
                              const CryptoEcFieldElement *in);
+
+/* Fixed-width scalar arithmetic modulo the prime group order. */
+void crypto_ec_scalar_zero(CryptoEcScalar *out);
+LiberaCError crypto_ec_scalar_from_bytes(const CryptoEcCurve *curve,
+                                         CryptoEcScalar *out,
+                                         const uint8_t *input,
+                                         size_t input_length);
+LiberaCError crypto_ec_scalar_from_bytes_reduced(
+    const CryptoEcCurve *curve, CryptoEcScalar *out,
+    const uint8_t *input, size_t input_length);
+void crypto_ec_scalar_to_bytes(const CryptoEcCurve *curve,
+                               uint8_t *output,
+                               const CryptoEcScalar *in);
+void crypto_ec_scalar_add(const CryptoEcCurve *curve,
+                          CryptoEcScalar *out,
+                          const CryptoEcScalar *a,
+                          const CryptoEcScalar *b);
+void crypto_ec_scalar_multiply(const CryptoEcCurve *curve,
+                               CryptoEcScalar *out,
+                               const CryptoEcScalar *a,
+                               const CryptoEcScalar *b);
+void crypto_ec_scalar_invert_fixed(const CryptoEcCurve *curve,
+                                   CryptoEcScalar *out,
+                                   const CryptoEcScalar *a);
+uint32_t crypto_ec_scalar_equal_mask(const CryptoEcCurve *curve,
+                                     const CryptoEcScalar *a,
+                                     const CryptoEcScalar *b);
+uint32_t crypto_ec_scalar_zero_mask(const CryptoEcCurve *curve,
+                                    const CryptoEcScalar *a);
 
 /* Affine and Jacobian point operations. */
 void crypto_ec_affine_set_infinity(CryptoEcAffinePoint *point);

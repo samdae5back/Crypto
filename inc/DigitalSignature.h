@@ -8,12 +8,13 @@
 
 /**
  * @file DigitalSignature.h
- * @brief Runtime-selected post-quantum digital-signature APIs.
+ * @brief Runtime-selected classical and post-quantum digital-signature APIs.
  *
  * Keys and signatures are encoded as fixed-size byte strings. Use the size
  * query functions, or the matching compile-time constants, to allocate them.
- * Signing functions implement the non-prehash variants and obtain their
- * per-signature randomness from the operating-system random source.
+ * Post-quantum signing functions implement the non-prehash variants and
+ * obtain their per-signature randomness from the operating-system random
+ * source. ECDSA signs messages deterministically according to RFC 6979.
  *
  * @defgroup crypto_digital_signature Digital-signature API
  * @brief Key generation, signing, and verification for supported signatures.
@@ -24,6 +25,27 @@
 
 /** @brief Maximum domain-separation context length accepted by signature APIs. */
 #define LIBERAC_SIGNATURE_CONTEXT_MAX_BYTES 255u
+
+/** @brief P-256 ECDSA private-scalar length in bytes. */
+#define LIBERAC_ECDSA_P256_PRIVATE_KEY_BYTES 32u
+/** @brief P-256 uncompressed SEC 1 public-key length in bytes. */
+#define LIBERAC_ECDSA_P256_PUBLIC_KEY_BYTES 65u
+/** @brief P-256 fixed-width raw signature length in bytes. */
+#define LIBERAC_ECDSA_P256_SIGNATURE_BYTES 64u
+
+/** @brief P-384 ECDSA private-scalar length in bytes. */
+#define LIBERAC_ECDSA_P384_PRIVATE_KEY_BYTES 48u
+/** @brief P-384 uncompressed SEC 1 public-key length in bytes. */
+#define LIBERAC_ECDSA_P384_PUBLIC_KEY_BYTES 97u
+/** @brief P-384 fixed-width raw signature length in bytes. */
+#define LIBERAC_ECDSA_P384_SIGNATURE_BYTES 96u
+
+/** @brief P-521 ECDSA private-scalar length in bytes. */
+#define LIBERAC_ECDSA_P521_PRIVATE_KEY_BYTES 66u
+/** @brief P-521 uncompressed SEC 1 public-key length in bytes. */
+#define LIBERAC_ECDSA_P521_PUBLIC_KEY_BYTES 133u
+/** @brief P-521 fixed-width raw signature length in bytes. */
+#define LIBERAC_ECDSA_P521_SIGNATURE_BYTES 132u
 
 /** @brief ML-DSA-44 encoded public-key length in bytes. */
 #define LIBERAC_ML_DSA_44_PUBLIC_KEY_BYTES 1312u
@@ -126,6 +148,106 @@
 #define LIBERAC_SLH_DSA_256F_SIGNATURE_BYTES 49856u
 
 LIBERAC_BEGIN_DECLS
+
+/**
+ * @brief Return the fixed-width ECDSA private-key size for a curve selector.
+ * @param[in] ALG A LIBERAC_ALG_ECDSA_P256, _P384, or _P521 identifier.
+ * @return Required bytes, or zero if ALG is unsupported.
+ */
+LIBERAC_API size_t LIBERAC_ECDSA_PRIVATE_KEY_SIZE(LiberaCAlgID ALG);
+
+/**
+ * @brief Return the generated ECDSA public-key size for a curve selector.
+ * @param[in] ALG A LIBERAC_ALG_ECDSA_P256, _P384, or _P521 identifier.
+ * @return Uncompressed SEC 1 public-key bytes, or zero if unsupported.
+ * @note Verification also accepts the corresponding compressed SEC 1 point.
+ */
+LIBERAC_API size_t LIBERAC_ECDSA_PUBLIC_KEY_SIZE(LiberaCAlgID ALG);
+
+/**
+ * @brief Return the fixed-width raw ECDSA signature size.
+ * @param[in] ALG A LIBERAC_ALG_ECDSA_P256, _P384, or _P521 identifier.
+ * @return Bytes required for r || s, or zero if ALG is unsupported.
+ */
+LIBERAC_API size_t LIBERAC_ECDSA_SIGNATURE_SIZE(LiberaCAlgID ALG);
+
+/**
+ * @brief Generate an ECDSA private scalar and public point.
+ * @param[out] PUBLIC_KEY Buffer receiving an uncompressed SEC 1 point.
+ * @param[in] PUBLIC_KEY_LENGTH Available public-key bytes.
+ * @param[out] PRIVATE_KEY Buffer receiving a fixed-width big-endian scalar.
+ * @param[in] PRIVATE_KEY_LENGTH Available private-key bytes.
+ * @param[in] ALG ECDSA curve selector.
+ * @return LIBERAC_SUCCESS on success or a negative LiberaCError on failure.
+ * @note Once output validation succeeds, an operational failure clears both
+ *       required output regions.
+ */
+LIBERAC_API LiberaCError LIBERAC_ECDSA_KEYGEN(
+    uint8_t *PUBLIC_KEY, size_t PUBLIC_KEY_LENGTH,
+    uint8_t *PRIVATE_KEY, size_t PRIVATE_KEY_LENGTH,
+    LiberaCAlgID ALG);
+
+/**
+ * @brief Derive an ECDSA public key from a supplied private scalar.
+ * @param[out] PUBLIC_KEY Buffer receiving an uncompressed SEC 1 point.
+ * @param[in] PUBLIC_KEY_LENGTH Available public-key bytes.
+ * @param[in] PRIVATE_KEY Fixed-width big-endian scalar in 1 <= d < n.
+ * @param[in] PRIVATE_KEY_LENGTH Exact private-key length for ALG.
+ * @param[in] ALG ECDSA curve selector.
+ * @return LIBERAC_SUCCESS on success, LIBERAC_ERROR_INVALID_KEY for an invalid
+ *         scalar, or another negative LiberaCError on failure.
+ */
+LIBERAC_API LiberaCError LIBERAC_ECDSA_PUBLIC_FROM_PRIVATE(
+    uint8_t *PUBLIC_KEY, size_t PUBLIC_KEY_LENGTH,
+    const uint8_t *PRIVATE_KEY, size_t PRIVATE_KEY_LENGTH,
+    LiberaCAlgID ALG);
+
+/**
+ * @brief Generate a deterministic RFC 6979 ECDSA signature.
+ *
+ * The signature is the fixed-width big-endian concatenation r || s, with each
+ * integer occupying LIBERAC_ECDSA_PRIVATE_KEY_SIZE(ALG) bytes. No DER wrapper
+ * and no low-s normalization are applied.
+ *
+ * @param[in] PRIVATE_KEY Fixed-width private scalar in 1 <= d < n.
+ * @param[in] PRIVATE_KEY_LENGTH Exact private-key length for ALG.
+ * @param[in] MESSAGE Message bytes; may be null only when MESSAGE_LENGTH is 0.
+ * @param[in] MESSAGE_LENGTH Message length in bytes.
+ * @param[out] SIGNATURE Buffer receiving the fixed-width r || s encoding.
+ * @param[in] SIGNATURE_LENGTH Available signature bytes.
+ * @param[in] HASH_ALG Approved fixed-output SHA-2 or SHA-3 selector whose
+ *                     collision strength is not below the selected curve.
+ * @param[in] ALG ECDSA curve selector.
+ * @return LIBERAC_SUCCESS on success or a negative LiberaCError on failure.
+ * @note Signing needs no per-message random source. Key generation still uses
+ *       operating-system randomness.
+ */
+LIBERAC_API LiberaCError LIBERAC_ECDSA_SIGN(
+    const uint8_t *PRIVATE_KEY, size_t PRIVATE_KEY_LENGTH,
+    const uint8_t *MESSAGE, size_t MESSAGE_LENGTH,
+    uint8_t *SIGNATURE, size_t SIGNATURE_LENGTH,
+    LiberaCAlgID HASH_ALG, LiberaCAlgID ALG);
+
+/**
+ * @brief Verify a fixed-width raw ECDSA signature.
+ * @param[in] PUBLIC_KEY Compressed or uncompressed SEC 1 public point.
+ * @param[in] PUBLIC_KEY_LENGTH Exact encoded public-key length.
+ * @param[in] MESSAGE Message bytes; may be null only when MESSAGE_LENGTH is 0.
+ * @param[in] MESSAGE_LENGTH Message length in bytes.
+ * @param[in] SIGNATURE Fixed-width big-endian r || s encoding.
+ * @param[in] SIGNATURE_LENGTH Exact signature length for ALG.
+ * @param[in] HASH_ALG The same approved hash selector used while signing.
+ * @param[in] ALG ECDSA curve selector.
+ * @return LIBERAC_SUCCESS for a valid signature,
+ *         LIBERAC_ERROR_SIGNATURE_INVALID for a malformed or non-matching
+ *         signature, LIBERAC_ERROR_INVALID_KEY for an invalid public key, or
+ *         another negative LiberaCError for invalid inputs.
+ */
+LIBERAC_API LiberaCError LIBERAC_ECDSA_VERIFY(
+    const uint8_t *PUBLIC_KEY, size_t PUBLIC_KEY_LENGTH,
+    const uint8_t *MESSAGE, size_t MESSAGE_LENGTH,
+    const uint8_t *SIGNATURE, size_t SIGNATURE_LENGTH,
+    LiberaCAlgID HASH_ALG, LiberaCAlgID ALG);
 
 /**
  * @brief Return the encoded ML-DSA public-key size for an algorithm.
