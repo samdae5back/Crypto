@@ -103,6 +103,12 @@ crypto_add_public_test(
     "unit;asymmetric-cipher"
 )
 crypto_add_public_test(
+    crypto_rsa_pkcs1_test
+    LiberaCrypt.AsymmetricCipher.RSA.PKCS1
+    AsymmetricCipher/RSA/OaepPssTest.c
+    "unit;kat;asymmetric-cipher;rsa"
+)
+crypto_add_public_test(
     crypto_ml_kem_unit
     LiberaCrypt.KeyEncapsulation.ML-KEM.Unit
     KeyEncapsulation/ML-KEM/UnitTest.c

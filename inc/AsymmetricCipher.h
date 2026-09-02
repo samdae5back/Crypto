@@ -8,39 +8,47 @@
 
 /**
  * @file AsymmetricCipher.h
- * @brief Public-key encryption APIs for raw RSA and safe-prime ElGamal.
+ * @brief RSA encryption/signature schemes and safe-prime ElGamal APIs.
  *
  * All key and ciphertext objects in this header own dynamically allocated
  * LiberaCBignum members. Initialize each object with its matching INIT
  * function before first use, and release it with the matching FREE function.
  * The algorithm identifier is supplied at run time as the final argument.
  *
- * @warning LIBERAC_ALG_RSA_RAW and LIBERAC_ALG_ELGAMAL_SAFE_PRIME provide the mathematical
- *          primitives only. They do not add padding, message encoding,
- *          integrity, or chosen-ciphertext protection. Applications should
- *          not use them as general-purpose encryption schemes without a
- *          suitable, independently reviewed higher-level construction.
+ * @warning LIBERAC_ALG_RSA_RAW and LIBERAC_ALG_ELGAMAL_SAFE_PRIME provide
+ *          mathematical primitives only. They do not add padding, message
+ *          encoding, integrity, or chosen-ciphertext protection. Use
+ *          LIBERAC_ALG_RSA_OAEP for RSA encryption and LIBERAC_ALG_RSA_PSS
+ *          for RSA signatures.
  *
  * @defgroup crypto_asymmetric_cipher Asymmetric-cipher API
- * @brief Raw RSA and safe-prime ElGamal operations and managed key objects.
+ * @brief RSA OAEP/PSS, raw RSA, and safe-prime ElGamal operations.
  * @{
  */
 
 #include "Util.h"
 
-/** @brief Raw RSA public key. */
+/** @brief RSA public key. */
 typedef struct {
     LiberaCBignum N; /**< RSA modulus. */
     LiberaCBignum E; /**< Public exponent; generated keys use 65537. */
 } LiberaCRsaPublicKey;
 
-/** @brief Raw RSA private key. */
+/** @brief RSA private key. */
 typedef struct {
     LiberaCBignum N; /**< RSA modulus. */
     LiberaCBignum D; /**< Private exponent. */
     LiberaCBignum P; /**< First secret prime factor of N. */
     LiberaCBignum Q; /**< Second secret prime factor of N. */
 } LiberaCRsaPrivateKey;
+
+/**
+ * @brief Select a PSS salt whose length equals the selected hash digest.
+ *
+ * Pass this value as SALT_LENGTH to the PSS sign or verify API. Verification
+ * still requires that exact resolved length; it does not auto-detect salt.
+ */
+#define LIBERAC_RSA_PSS_SALT_LENGTH_DIGEST ((size_t)-1)
 
 /** @brief Safe-prime ElGamal public key. */
 typedef struct {
@@ -94,13 +102,14 @@ LIBERAC_API void LIBERAC_RSA_PRIVATE_KEY_INIT(LiberaCRsaPrivateKey *KEY);
 LIBERAC_API void LIBERAC_RSA_PRIVATE_KEY_FREE(LiberaCRsaPrivateKey *KEY);
 
 /**
- * @brief Generate a raw RSA key pair.
+ * @brief Generate an RSA key pair.
  * @param[in,out] PUBLIC_KEY Initialized destination for the public key.
  * @param[in,out] PRIVATE_KEY Initialized destination for the private key.
  * @param[in] MODULUS_BITS Requested modulus size in bits; must be at least 32.
  * @param[in] PRIME_ROUNDS Miller-Rabin rounds used for prime generation. Zero
  *                         selects the default of 32 rounds.
- * @param[in] ALG Must be LIBERAC_ALG_RSA_RAW.
+ * @param[in] ALG Any LIBERAC_ALG_RSA_RAW, _OAEP, or _PSS identifier. The
+ *                generated key material is scheme-independent.
  * @return LIBERAC_SUCCESS on success; LIBERAC_ERROR_INVALID_ALG_ID for an
  *         unsupported identifier, LIBERAC_ERROR_INVALID_ARGUMENT for invalid
  *         inputs, or another LiberaCError describing generation failure.
@@ -131,6 +140,111 @@ LIBERAC_API LiberaCError LIBERAC_RSA_ENCRYPT(LiberaCBignum *CIPHERTEXT, const Li
  * @warning This function does not validate or remove an RSA padding scheme.
  */
 LIBERAC_API LiberaCError LIBERAC_RSA_DECRYPT(LiberaCBignum *MESSAGE, const LiberaCBignum *CIPHERTEXT, const LiberaCRsaPrivateKey *PRIVATE_KEY, LiberaCAlgID ALG);
+
+/**
+ * @brief Return the RSA modulus width in octets for a public key.
+ * @param[in] PUBLIC_KEY Initialized RSA public key.
+ * @return ceil(bit_length(N) / 8), or zero for an invalid key.
+ */
+LIBERAC_API size_t LIBERAC_RSA_PUBLIC_MODULUS_SIZE(const LiberaCRsaPublicKey *PUBLIC_KEY);
+
+/**
+ * @brief Return the RSA modulus width in octets for a private key.
+ * @param[in] PRIVATE_KEY Initialized RSA private key.
+ * @return ceil(bit_length(N) / 8), or zero for an invalid key.
+ */
+LIBERAC_API size_t LIBERAC_RSA_PRIVATE_MODULUS_SIZE(const LiberaCRsaPrivateKey *PRIVATE_KEY);
+
+/**
+ * @brief Return the largest OAEP plaintext for a modulus/hash combination.
+ * @param[in] MODULUS_BYTES RSA modulus width k in octets.
+ * @param[in] HASH_ALG SHA-1 or fixed-output SHA-2 selector used by OAEP/MGF1.
+ * @param[in] ALG Must be LIBERAC_ALG_RSA_OAEP.
+ * @return k - 2*hLen - 2, or zero when unsupported or structurally too small.
+ * @note A return value of zero can also describe a valid empty-only encoding.
+ */
+LIBERAC_API size_t LIBERAC_RSA_OAEP_MAX_MESSAGE_SIZE(size_t MODULUS_BYTES, LiberaCAlgID HASH_ALG, LiberaCAlgID ALG);
+
+/**
+ * @brief Encrypt bytes with RSAES-OAEP and MGF1.
+ * @param[out] CIPHERTEXT Destination; the first modulus-size bytes are written.
+ * @param[in] CIPHERTEXT_LENGTH Destination capacity.
+ * @param[in] MESSAGE Plaintext; may be null only when MESSAGE_LENGTH is zero.
+ * @param[in] MESSAGE_LENGTH Plaintext bytes, at most the OAEP size query.
+ * @param[in] LABEL Optional associated label; null only when LABEL_LENGTH is zero.
+ * @param[in] LABEL_LENGTH Label bytes hashed into the OAEP encoding.
+ * @param[in] PUBLIC_KEY Recipient RSA public key.
+ * @param[in] HASH_ALG SHA-1 or fixed-output SHA-2 selector used for Hash and MGF1.
+ * @param[in] ALG Must be LIBERAC_ALG_RSA_OAEP.
+ * @return LIBERAC_SUCCESS on success or a negative LiberaCError on failure.
+ * @note Fresh seed material is obtained from the operating-system random source.
+ */
+LIBERAC_API LiberaCError LIBERAC_RSA_OAEP_ENCRYPT(
+    uint8_t *CIPHERTEXT, size_t CIPHERTEXT_LENGTH,
+    const uint8_t *MESSAGE, size_t MESSAGE_LENGTH,
+    const uint8_t *LABEL, size_t LABEL_LENGTH,
+    const LiberaCRsaPublicKey *PUBLIC_KEY,
+    LiberaCAlgID HASH_ALG, LiberaCAlgID ALG);
+
+/**
+ * @brief Decrypt and authenticate an RSAES-OAEP ciphertext.
+ * @param[out] MESSAGE Destination with capacity for the maximum OAEP plaintext.
+ * @param[in] MESSAGE_CAPACITY Destination capacity.
+ * @param[out] MESSAGE_LENGTH Recovered length; set to zero on every failure.
+ * @param[in] CIPHERTEXT Exact modulus-width ciphertext.
+ * @param[in] CIPHERTEXT_LENGTH Ciphertext length; must equal the modulus width.
+ * @param[in] LABEL Label that must match the encryption label.
+ * @param[in] LABEL_LENGTH Label length.
+ * @param[in] PRIVATE_KEY Recipient RSA private key.
+ * @param[in] HASH_ALG SHA-1 or fixed-output SHA-2 selector used for Hash and MGF1.
+ * @param[in] ALG Must be LIBERAC_ALG_RSA_OAEP.
+ * @return LIBERAC_SUCCESS on success. Every ciphertext/range/OAEP-format failure
+ *         returns LIBERAC_ERROR_AUTHENTICATION_FAILED.
+ * @note The maximum plaintext region is cleared before decoding and remains
+ *       cleared on failure. OAEP format checks use one full delimiter scan.
+ */
+LIBERAC_API LiberaCError LIBERAC_RSA_OAEP_DECRYPT(
+    uint8_t *MESSAGE, size_t MESSAGE_CAPACITY, size_t *MESSAGE_LENGTH,
+    const uint8_t *CIPHERTEXT, size_t CIPHERTEXT_LENGTH,
+    const uint8_t *LABEL, size_t LABEL_LENGTH,
+    const LiberaCRsaPrivateKey *PRIVATE_KEY,
+    LiberaCAlgID HASH_ALG, LiberaCAlgID ALG);
+
+/**
+ * @brief Sign a message with RSASSA-PSS and MGF1.
+ * @param[in] PRIVATE_KEY RSA private key.
+ * @param[in] MESSAGE Message bytes; null only when MESSAGE_LENGTH is zero.
+ * @param[in] MESSAGE_LENGTH Message length.
+ * @param[out] SIGNATURE Modulus-width signature destination.
+ * @param[in] SIGNATURE_LENGTH Destination capacity.
+ * @param[in] SALT_LENGTH Exact salt bytes, or LIBERAC_RSA_PSS_SALT_LENGTH_DIGEST.
+ * @param[in] HASH_ALG SHA-1 or fixed-output SHA-2 selector used for Hash and MGF1.
+ * @param[in] ALG Must be LIBERAC_ALG_RSA_PSS.
+ * @return LIBERAC_SUCCESS on success or a negative LiberaCError on failure.
+ */
+LIBERAC_API LiberaCError LIBERAC_RSA_PSS_SIGN(
+    const LiberaCRsaPrivateKey *PRIVATE_KEY,
+    const uint8_t *MESSAGE, size_t MESSAGE_LENGTH,
+    uint8_t *SIGNATURE, size_t SIGNATURE_LENGTH,
+    size_t SALT_LENGTH, LiberaCAlgID HASH_ALG, LiberaCAlgID ALG);
+
+/**
+ * @brief Verify an RSASSA-PSS signature with an exact salt-length policy.
+ * @param[in] PUBLIC_KEY RSA public key.
+ * @param[in] MESSAGE Message bytes; null only when MESSAGE_LENGTH is zero.
+ * @param[in] MESSAGE_LENGTH Message length.
+ * @param[in] SIGNATURE Exact modulus-width signature.
+ * @param[in] SIGNATURE_LENGTH Signature length.
+ * @param[in] SALT_LENGTH Required salt bytes, or digest-length sentinel.
+ * @param[in] HASH_ALG SHA-1 or fixed-output SHA-2 selector used for Hash and MGF1.
+ * @param[in] ALG Must be LIBERAC_ALG_RSA_PSS.
+ * @return LIBERAC_SUCCESS or LIBERAC_ERROR_SIGNATURE_INVALID for a mismatch.
+ */
+LIBERAC_API LiberaCError LIBERAC_RSA_PSS_VERIFY(
+    const LiberaCRsaPublicKey *PUBLIC_KEY,
+    const uint8_t *MESSAGE, size_t MESSAGE_LENGTH,
+    const uint8_t *SIGNATURE, size_t SIGNATURE_LENGTH,
+    size_t SALT_LENGTH, LiberaCAlgID HASH_ALG, LiberaCAlgID ALG);
 
 /**
  * @brief Initialize an ElGamal public-key object.

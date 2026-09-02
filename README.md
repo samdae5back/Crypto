@@ -45,9 +45,10 @@ LiberaCrypt uses `LIBERAC_` for public C functions, macros, constants, and
 algorithm selectors, `LiberaC` for public type names, `LiberaCrypt.h` as its
 umbrella header, and the `LiberaCrypt::LiberaCrypt` CMake target.
 
-> Security note: the RSA interface currently exposes the raw textbook
-> operation. It is useful for implementation tests, but applications must not
-> treat raw RSA as a secure encryption scheme.
+> Security note: use RSAES-OAEP for RSA encryption and RSASSA-PSS for RSA
+> signatures. The raw textbook RSA entry points remain available for primitive
+> tests and compatibility, but applications must not treat raw RSA as a secure
+> encryption or signature scheme.
 
 ## Portability considerations
 
@@ -276,7 +277,7 @@ the same byte stream as one request for the combined length.
 - AIMer 128/192/256 fast and small parameter sets
 - HAETAE-120, HAETAE-180, and HAETAE-260
 - All twelve FIPS 205 SLH-DSA SHA2/SHAKE small/fast parameter sets
-- Raw RSA and safe-prime ElGamal
+- RSAES-OAEP, RSASSA-PSS, raw RSA, and safe-prime ElGamal
 - Unsigned big-number byte load/store and lifecycle operations
 - Probable-prime, prime, and safe-prime generation
 - Random bytes obtained directly from the operating system entropy source
@@ -339,6 +340,41 @@ count, and memory indices do not depend on secret exponent bits, and stored
 private exponents are padded to the public modulus limb width. ISO C, however,
 cannot guarantee identical instruction latency on every processor/compiler, so
 hardware-level timing claims require platform-specific validation.
+
+### RSAES-OAEP and RSASSA-PSS
+
+The RSA scheme layer implements RSAES-OAEP encryption and RSASSA-PSS
+signatures according to [PKCS #1 v2.2 / RFC 8017](https://www.rfc-editor.org/rfc/rfc8017.html).
+Both schemes use MGF1 and require the same caller-selected fixed-output hash for
+the main hash and MGF1. SHA-1 is accepted only for legacy interoperability; the
+fixed-output SHA-2 family, including SHA-512/224 and SHA-512/256, is supported
+for current protocol profiles. SHA-3, SHAKE, and LSH selectors are rejected
+rather than assigned a non-PKCS #1 encoding implicitly.
+
+OAEP accepts an optional label, obtains a fresh seed from the operating-system
+random source, and enforces the RFC bound `mLen <= k - 2*hLen - 2`. Decryption
+requires an exact `k`-byte ciphertext and a destination sized for the maximum
+plaintext. The leading byte, label hash, zero padding, and `0x01` delimiter are
+checked with one full delimiter scan; ciphertext representatives outside the
+RSA range and every OAEP-format mismatch return the same
+`LIBERAC_ERROR_AUTHENTICATION_FAILED`. The maximum plaintext output region is
+cleared before decoding and remains cleared on failure.
+
+PSS uses `emBits = modBits - 1`, clears and verifies the unused high bits,
+requires the `0xbc` trailer, and binds verification to an exact salt length.
+`LIBERAC_RSA_PSS_SALT_LENGTH_DIGEST` selects a salt equal to the digest size
+without enabling salt auto-detection. Signature length must exactly equal the
+modulus width; malformed encodings return `LIBERAC_ERROR_SIGNATURE_INVALID`.
+
+Private RSA operations reuse the modulus-width fixed-schedule Montgomery
+exponentiation path. OAEP encryption additionally uses a public-exponent path
+whose exponent-controlled schedule is public while base loading, multiplication,
+and final reduction avoid branches or indices derived from the randomized
+encoded plaintext. These are source-level schedule properties, not universal
+physical constant-time claims. Raw RSA still routes public inputs through the
+faster variable-time sliding-window path and remains explicitly unsuitable as a
+standalone application scheme. Detailed encoding, error, and interoperability
+evidence is recorded in `docs/optimization/RSA.md`.
 
 ### Ed25519
 
@@ -514,6 +550,9 @@ When `LIBERAC_BUILD_TESTS` is enabled, CMake generates:
 - operation tests for every supported post-quantum KEM and signature family
 - RFC 8032 Ed25519 known-answer tests, strict-encoding negative tests, and
   deterministic sign/verify round trips
+- OpenSSL-generated RSAES-OAEP/SHA-256 decryption and
+  RSASSA-PSS/SHA-256 verification regressions, randomized OAEP/PSS round trips,
+  strict salt/label/length checks, malformed encodings, and output clearing
 - 100-record KATs for all 9 KEM parameter sets and all 24 current signature
   parameter sets
 - verification of 300 context-explicit HAETAE 1.1.2 signatures as a
