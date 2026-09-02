@@ -57,6 +57,22 @@ static const CryptoEcCurve CRYPTO_EC_P256 = {
         UINT32_C(0x00000000), UINT32_C(0x00000000), UINT32_C(0x40000000),
         UINT32_C(0x00000000), UINT32_C(0x00000000), UINT32_C(0x40000000),
         UINT32_C(0xc0000000), UINT32_C(0x3fffffff)
+    },
+    UINT32_C(0xee00bc4f),
+    {
+        UINT32_C(0x039cdaaf), UINT32_C(0x0c46353d), UINT32_C(0x58e8617b),
+        UINT32_C(0x43190552), UINT32_C(0x00000000), UINT32_C(0x00000000),
+        UINT32_C(0xffffffff), UINT32_C(0x00000000)
+    },
+    {
+        UINT32_C(0xbe79eea2), UINT32_C(0x83244c95), UINT32_C(0x49bd6fa6),
+        UINT32_C(0x4699799c), UINT32_C(0x2b6bec59), UINT32_C(0x2845b239),
+        UINT32_C(0xf3d95620), UINT32_C(0x66e12d94)
+    },
+    {
+        UINT32_C(0xfc63254f), UINT32_C(0xf3b9cac2), UINT32_C(0xa7179e84),
+        UINT32_C(0xbce6faad), UINT32_C(0xffffffff), UINT32_C(0xffffffff),
+        UINT32_C(0x00000000), UINT32_C(0xffffffff)
     }
 };
 
@@ -115,6 +131,25 @@ static const CryptoEcCurve CRYPTO_EC_P384 = {
         UINT32_C(0xbfffffff), UINT32_C(0xffffffff), UINT32_C(0xffffffff),
         UINT32_C(0xffffffff), UINT32_C(0xffffffff), UINT32_C(0xffffffff),
         UINT32_C(0xffffffff), UINT32_C(0xffffffff), UINT32_C(0x3fffffff)
+    },
+    UINT32_C(0xe88fdc45),
+    {
+        UINT32_C(0x333ad68d), UINT32_C(0x1313e695), UINT32_C(0xb74f5885),
+        UINT32_C(0xa7e5f24d), UINT32_C(0x0bc8d220), UINT32_C(0x389cb27e),
+        UINT32_C(0x00000000), UINT32_C(0x00000000), UINT32_C(0x00000000),
+        UINT32_C(0x00000000), UINT32_C(0x00000000), UINT32_C(0x00000000)
+    },
+    {
+        UINT32_C(0x19b409a9), UINT32_C(0x2d319b24), UINT32_C(0xdf1aa419),
+        UINT32_C(0xff3d81e5), UINT32_C(0xfcb82947), UINT32_C(0xbc3e483a),
+        UINT32_C(0x4aab1cc5), UINT32_C(0xd40d4917), UINT32_C(0x28266895),
+        UINT32_C(0x3fb05b7a), UINT32_C(0x2b39bf21), UINT32_C(0x0c84ee01)
+    },
+    {
+        UINT32_C(0xccc52971), UINT32_C(0xecec196a), UINT32_C(0x48b0a77a),
+        UINT32_C(0x581a0db2), UINT32_C(0xf4372ddf), UINT32_C(0xc7634d81),
+        UINT32_C(0xffffffff), UINT32_C(0xffffffff), UINT32_C(0xffffffff),
+        UINT32_C(0xffffffff), UINT32_C(0xffffffff), UINT32_C(0xffffffff)
     }
 };
 
@@ -191,6 +226,31 @@ static const CryptoEcCurve CRYPTO_EC_P521 = {
         UINT32_C(0x00000000), UINT32_C(0x00000000), UINT32_C(0x00000000),
         UINT32_C(0x00000000), UINT32_C(0x00000000), UINT32_C(0x00000000),
         UINT32_C(0x00000000), UINT32_C(0x00000080)
+    },
+    UINT32_C(0x79a995c7),
+    {
+        UINT32_C(0xfb800000), UINT32_C(0x70b763cd), UINT32_C(0x28a24824),
+        UINT32_C(0x23bb31dc), UINT32_C(0x17e2251b), UINT32_C(0x5b847b2d),
+        UINT32_C(0xca4019ff), UINT32_C(0x3e206834), UINT32_C(0x02d73cbc),
+        UINT32_C(0x00000000), UINT32_C(0x00000000), UINT32_C(0x00000000),
+        UINT32_C(0x00000000), UINT32_C(0x00000000), UINT32_C(0x00000000),
+        UINT32_C(0x00000000), UINT32_C(0x00000000)
+    },
+    {
+        UINT32_C(0x61c64ca7), UINT32_C(0x1163115a), UINT32_C(0x4374a642),
+        UINT32_C(0x18354a56), UINT32_C(0x0791d9dc), UINT32_C(0x5d4dd6d3),
+        UINT32_C(0xd3402705), UINT32_C(0x4fb35b72), UINT32_C(0xb7756e3a),
+        UINT32_C(0xcff3d142), UINT32_C(0xa8e567bc), UINT32_C(0x5bcc6d61),
+        UINT32_C(0x492d0d45), UINT32_C(0x2d8e03d1), UINT32_C(0x8c44383d),
+        UINT32_C(0x5b5a3afe), UINT32_C(0x0000019a)
+    },
+    {
+        UINT32_C(0x91386407), UINT32_C(0xbb6fb71e), UINT32_C(0x899c47ae),
+        UINT32_C(0x3bb5c9b8), UINT32_C(0xf709a5d0), UINT32_C(0x7fcc0148),
+        UINT32_C(0xbf2f966b), UINT32_C(0x51868783), UINT32_C(0xfffffffa),
+        UINT32_C(0xffffffff), UINT32_C(0xffffffff), UINT32_C(0xffffffff),
+        UINT32_C(0xffffffff), UINT32_C(0xffffffff), UINT32_C(0xffffffff),
+        UINT32_C(0xffffffff), UINT32_C(0x000001ff)
     }
 };
 

@@ -245,6 +245,13 @@ enum {
     /** HAETAE-260 digital-signature parameter set. */
     LIBERAC_ALG_HAETAE_260 = 0x7203,
 
+    /** ECDSA over the NIST P-256 curve. */
+    LIBERAC_ALG_ECDSA_P256 = 0x7301,
+    /** ECDSA over the NIST P-384 curve. */
+    LIBERAC_ALG_ECDSA_P384 = 0x7302,
+    /** ECDSA over the NIST P-521 curve. */
+    LIBERAC_ALG_ECDSA_P521 = 0x7303,
+
     /** SLH-DSA-SHA2-128s digital-signature parameter set. */
     LIBERAC_ALG_SLH_DSA_SHA2_128S = 0x8001,
     /** SLH-DSA-SHA2-128f digital-signature parameter set. */

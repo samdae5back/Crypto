@@ -20,7 +20,10 @@ The cryptographic implementation remains independent of an external cryptographi
 
 ## Cryptographic primitives
 
-LiberaCrypt includes classical and post-quantum cryptographic algorithms, including AES, Triple-DES, SHA-1/SHA-2/SHA-3/SHAKE, CTR_DRBG, RSA, ElGamal, ML-KEM, ML-DSA, SLH-DSA, NTRU+, SMAUG-T, AIMer, and HAETAE.
+LiberaCrypt includes classical and post-quantum cryptographic algorithms,
+including AES, Triple-DES, SHA-1/SHA-2/SHA-3/SHAKE, CTR_DRBG, RSA, ElGamal,
+ECDH, X25519, ECDSA, ML-KEM, ML-DSA, SLH-DSA, NTRU+, SMAUG-T, AIMer, and
+HAETAE.
 
 ## Project principles
 
@@ -101,11 +104,12 @@ inc/                              public category API headers only
 src/*.c                           public category API entry points
 src/AsymmetricCipher/{RSA,ElGamal}
 src/BlockCipher/{AES,TripleDES}
-src/DigitalSignature/{AIMer,HAETAE,ML-DSA,SLH-DSA}
+src/DigitalSignature/{AIMer,ECDSA,HAETAE,ML-DSA,SLH-DSA}
 src/HashFunction/{SHA1,SHA2,SHA3,LSH}
+src/KeyAgreement/{ecdh,x25519}
 src/KeyEncapsulation/{ML-KEM,NTRU-Plus,SMAUG-T}
 src/RandomNumberGeneration/{CTR_DRBG,KAT,Noise}
-src/Util/{Bignum,Bit,Core,Endian,NTT,Prime}
+src/Util/{Bignum,Bit,Core,ECC,Endian,NTT,Prime}
 cmake/                            platform export policy
 tests/                            unit, KAT, and public-header tests
 ```
