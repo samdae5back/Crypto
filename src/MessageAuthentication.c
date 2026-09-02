@@ -9,6 +9,7 @@
 #include "BlockCipher/AES/aes_internal.h"
 #include "BlockCipher/TripleDES/triple_des_internal.h"
 #include "HashFunction.h"
+#include "MessageAuthentication/Poly1305/poly1305_internal.h"
 #include "Util/Core/memory_internal.h"
 #include "Util/Core/secure_zero.h"
 
@@ -520,4 +521,55 @@ LiberaCError LIBERAC_GMAC_VERIFY(
         NULL, 0u, TAG, TAG_LENGTH,
         NULL, 0u, KEY, KEY_LENGTH,
         IV, IV_LENGTH, MESSAGE, MESSAGE_LENGTH, ALG);
+}
+
+size_t LIBERAC_POLY1305_TAG_SIZE(LiberaCAlgID ALG) {
+    return ALG == LIBERAC_ALG_POLY1305 ? LIBERAC_POLY1305_TAG_BYTES : 0u;
+}
+
+LiberaCError LIBERAC_POLY1305(
+    uint8_t *TAG, size_t TAG_CAPACITY,
+    const uint8_t *MESSAGE, size_t MESSAGE_LENGTH,
+    const uint8_t *KEY, size_t KEY_LENGTH,
+    LiberaCAlgID ALG) {
+    uint8_t complete_tag[LIBERAC_POLY1305_TAG_BYTES];
+
+    if (ALG != LIBERAC_ALG_POLY1305)
+        return LIBERAC_ERROR_INVALID_ALG_ID;
+    if (!TAG || !KEY || (!MESSAGE && MESSAGE_LENGTH != 0u))
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
+    if (KEY_LENGTH != LIBERAC_POLY1305_KEY_BYTES)
+        return LIBERAC_ERROR_INVALID_KEY;
+    if (TAG_CAPACITY < LIBERAC_POLY1305_TAG_BYTES)
+        return LIBERAC_ERROR_BUFFER_TOO_SMALL;
+
+    crypto_poly1305_internal(complete_tag, MESSAGE, MESSAGE_LENGTH, KEY);
+    memcpy(TAG, complete_tag, sizeof(complete_tag));
+    crypto_zeroize(complete_tag, sizeof(complete_tag));
+    return LIBERAC_SUCCESS;
+}
+
+LiberaCError LIBERAC_POLY1305_VERIFY(
+    const uint8_t *TAG, size_t TAG_LENGTH,
+    const uint8_t *MESSAGE, size_t MESSAGE_LENGTH,
+    const uint8_t *KEY, size_t KEY_LENGTH,
+    LiberaCAlgID ALG) {
+    uint8_t expected[LIBERAC_POLY1305_TAG_BYTES];
+    LiberaCError err;
+
+    if (ALG != LIBERAC_ALG_POLY1305)
+        return LIBERAC_ERROR_INVALID_ALG_ID;
+    if (!TAG || !KEY || (!MESSAGE && MESSAGE_LENGTH != 0u) ||
+        TAG_LENGTH != LIBERAC_POLY1305_TAG_BYTES) {
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
+    }
+    if (KEY_LENGTH != LIBERAC_POLY1305_KEY_BYTES)
+        return LIBERAC_ERROR_INVALID_KEY;
+
+    crypto_poly1305_internal(expected, MESSAGE, MESSAGE_LENGTH, KEY);
+    err = crypto_constant_time_equal(expected, TAG, sizeof(expected))
+              ? LIBERAC_SUCCESS
+              : LIBERAC_ERROR_AUTHENTICATION_FAILED;
+    crypto_zeroize(expected, sizeof(expected));
+    return err;
 }

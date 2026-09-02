@@ -209,6 +209,13 @@ enum {
     /** Three-key Triple-DES EDE in cipher block chaining (CBC) mode. */
     LIBERAC_ALG_TDES_EDE3_CBC = 0x00400218,
 
+    /** ChaCha20 with a 256-bit key, 32-bit counter, and 96-bit nonce. */
+    LIBERAC_ALG_CHACHA20 = 0x5101,
+    /** Poly1305 one-time authenticator. */
+    LIBERAC_ALG_POLY1305 = 0x5201,
+    /** RFC 8439 ChaCha20-Poly1305 authenticated encryption. */
+    LIBERAC_ALG_CHACHA20_POLY1305 = 0x5301,
+
     /** AES-128 CTR_DRBG using the derivation function. */
     LIBERAC_ALG_CTR_DRBG_AES_128_DF = 0x6001,
     /** AES-192 CTR_DRBG using the derivation function. */

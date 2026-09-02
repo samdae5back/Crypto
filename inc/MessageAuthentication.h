@@ -5,11 +5,11 @@
 
 /**
  * @file MessageAuthentication.h
- * @brief Runtime-selected HMAC, CMAC, and GMAC API.
+ * @brief Runtime-selected HMAC, CMAC, GMAC, and Poly1305 API.
  *
  * @defgroup crypto_message_authentication Message-authentication API
  * @brief One-shot generation and constant-time verification of HMAC, CMAC,
- *        and GMAC tags.
+ *        GMAC, and Poly1305 tags.
  *
  * The selected primitive is identified with an existing hash or block-cipher
  * LiberaCAlgID:
@@ -18,6 +18,8 @@
  *   fixed-output SHA-3 identifier. SHAKE and LSH identifiers are rejected.
  * - CMAC accepts AES-128/192/256 ECB and three-key Triple-DES EDE ECB.
  * - GMAC accepts AES-128/192/256 GCM.
+ * - Poly1305 accepts its dedicated identifier and an exactly 32-byte one-time
+ *   key. Its complete 16-byte tag is always produced and required.
  *
  * Tag lengths are expressed in bytes. HMAC and CMAC permit a non-empty prefix
  * of the full tag; applications must choose a length appropriate for their
@@ -40,6 +42,10 @@
 #define LIBERAC_CMAC_MAX_TAG_BYTES 16u
 /** Maximum full GMAC tag size. */
 #define LIBERAC_GMAC_MAX_TAG_BYTES 16u
+/** Poly1305 one-time-key size, in bytes. */
+#define LIBERAC_POLY1305_KEY_BYTES 32u
+/** Complete Poly1305 tag size, in bytes. */
+#define LIBERAC_POLY1305_TAG_BYTES 16u
 
 LIBERAC_BEGIN_DECLS
 
@@ -152,6 +158,60 @@ LIBERAC_API LiberaCError LIBERAC_CMAC(
  * @retval LIBERAC_ERROR_INVALID_KEY @p KEY_LENGTH does not match @p ALG.
  */
 LIBERAC_API LiberaCError LIBERAC_CMAC_VERIFY(
+    const uint8_t *TAG, size_t TAG_LENGTH,
+    const uint8_t *MESSAGE, size_t MESSAGE_LENGTH,
+    const uint8_t *KEY, size_t KEY_LENGTH,
+    LiberaCAlgID ALG);
+
+/**
+ * @brief Return the Poly1305 tag size for its algorithm identifier.
+ *
+ * @param[in] ALG LIBERAC_ALG_POLY1305.
+ * @return 16 for LIBERAC_ALG_POLY1305, otherwise zero.
+ */
+LIBERAC_API size_t LIBERAC_POLY1305_TAG_SIZE(LiberaCAlgID ALG);
+
+/**
+ * @brief Compute a complete Poly1305 tag with a one-time key.
+ *
+ * A Poly1305 key must be uniformly generated for one message only. Reusing the
+ * same key for another message destroys the authenticator's security. Protocols
+ * should normally use a standardized key-generation construction such as
+ * ChaCha20-Poly1305 instead of managing one-time keys directly.
+ *
+ * @param[out] TAG Destination for the complete 16-byte tag.
+ * @param[in]  TAG_CAPACITY Size of @p TAG in bytes.
+ * @param[in]  MESSAGE Message, or NULL when @p MESSAGE_LENGTH is zero.
+ * @param[in]  MESSAGE_LENGTH Message length in bytes.
+ * @param[in]  KEY Exactly 32 bytes of one-time key material.
+ * @param[in]  KEY_LENGTH Size of @p KEY in bytes.
+ * @param[in]  ALG LIBERAC_ALG_POLY1305.
+ *
+ * @retval LIBERAC_SUCCESS The tag was produced.
+ * @retval LIBERAC_ERROR_INVALID_ALG_ID @p ALG is not Poly1305.
+ * @retval LIBERAC_ERROR_INVALID_ARGUMENT A required pointer is invalid.
+ * @retval LIBERAC_ERROR_INVALID_KEY @p KEY_LENGTH is not 32 bytes.
+ * @retval LIBERAC_ERROR_BUFFER_TOO_SMALL @p TAG_CAPACITY is less than 16.
+ */
+LIBERAC_API LiberaCError LIBERAC_POLY1305(
+    uint8_t *TAG, size_t TAG_CAPACITY,
+    const uint8_t *MESSAGE, size_t MESSAGE_LENGTH,
+    const uint8_t *KEY, size_t KEY_LENGTH,
+    LiberaCAlgID ALG);
+
+/**
+ * @brief Verify a complete Poly1305 tag in constant time.
+ *
+ * @p TAG_LENGTH must be exactly LIBERAC_POLY1305_TAG_BYTES. Other parameters
+ * have the same meaning and constraints as LIBERAC_POLY1305().
+ *
+ * @retval LIBERAC_SUCCESS The tag is valid.
+ * @retval LIBERAC_ERROR_AUTHENTICATION_FAILED The tag does not match.
+ * @retval LIBERAC_ERROR_INVALID_ALG_ID @p ALG is not Poly1305.
+ * @retval LIBERAC_ERROR_INVALID_ARGUMENT A pointer or tag length is invalid.
+ * @retval LIBERAC_ERROR_INVALID_KEY @p KEY_LENGTH is not 32 bytes.
+ */
+LIBERAC_API LiberaCError LIBERAC_POLY1305_VERIFY(
     const uint8_t *TAG, size_t TAG_LENGTH,
     const uint8_t *MESSAGE, size_t MESSAGE_LENGTH,
     const uint8_t *KEY, size_t KEY_LENGTH,

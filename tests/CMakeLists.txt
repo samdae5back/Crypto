@@ -59,6 +59,19 @@ crypto_add_public_test(
 )
 
 crypto_add_public_test(
+    crypto_modern_symmetric_unit
+    LiberaCrypt.ModernSymmetric.Unit
+    ModernSymmetric/UnitTest.c
+    "unit;modern-symmetric;stream-cipher;message-authentication;aead;chacha20;poly1305"
+)
+crypto_add_public_test(
+    crypto_modern_symmetric_kat
+    LiberaCrypt.ModernSymmetric.RFC8439
+    ModernSymmetric/KAT.c
+    "kat;modern-symmetric;stream-cipher;message-authentication;aead;chacha20;poly1305"
+)
+
+crypto_add_public_test(
     crypto_hash_function_unit
     LiberaCrypt.HashFunction.Unit
     HashFunction/UnitTest.c
