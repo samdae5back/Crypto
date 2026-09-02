@@ -21,9 +21,9 @@ The cryptographic implementation remains independent of an external cryptographi
 ## Cryptographic primitives
 
 LiberaCrypt includes classical and post-quantum cryptographic algorithms,
-including AES, Triple-DES, SHA-1/SHA-2/SHA-3/SHAKE, CTR_DRBG, RSA, ElGamal,
-ECDH, X25519, ECDSA, Ed25519, ML-KEM, ML-DSA, SLH-DSA, NTRU+, SMAUG-T,
-AIMer, and HAETAE.
+including AES, Triple-DES, SHA-1/SHA-2/SHA-3/SHAKE, HMAC, CMAC, GMAC, HKDF,
+PBKDF2-HMAC, CTR_DRBG, RSA, ElGamal, ECDH, X25519, ECDSA, Ed25519, ML-KEM,
+ML-DSA, SLH-DSA, NTRU+, SMAUG-T, AIMer, and HAETAE.
 
 ## Project principles
 
@@ -109,6 +109,7 @@ src/DigitalSignature/{AIMer,ECDSA,Ed25519,HAETAE,ML-DSA,SLH-DSA}
 src/HashFunction/{SHA1,SHA2,SHA3,LSH}
 src/KeyAgreement/{ecdh,x25519}
 src/KeyEncapsulation/{ML-KEM,NTRU-Plus,SMAUG-T}
+src/{KeyDerivation,MessageAuthentication}.c
 src/RandomNumberGeneration/{CTR_DRBG,KAT,Noise}
 src/Util/{Bignum,Bit,Core,ECC,Endian,NTT,Prime}
 cmake/                            platform export policy
@@ -180,6 +181,8 @@ Public operation names start with `LIBERAC_`. For APIs that accept an algorithm
 identifier, `LiberaCAlgID` is the last argument. The complete identifier set is
 in `inc/Def.h` and is available from `LiberaCrypt.h`.
 
+### Symmetric encryption
+
 AES and Triple-DES encryption and decryption use one API pair for all key sizes
 and modes. Triple-DES is included strictly for interoperability with legacy
 systems; new protocols should use an authenticated AES mode such as GCM.
@@ -220,6 +223,8 @@ authentication fails.
 The same dispatcher supports three-key Triple-DES EDE in ECB and CBC modes with
 a 24-byte key and 8-byte block alignment. It does not support two-key TDEA or
 single DES. DES parity bits are ignored rather than corrected or validated.
+
+### Hashes and XOFs
 
 All fixed-output hashes and XOFs use the same hash API:
 
@@ -267,8 +272,54 @@ Fixed-output algorithms permit one squeeze and write exactly their standard
 digest size. SHAKE permits repeated squeezes; concatenating their outputs gives
 the same byte stream as one request for the combined length.
 
+### Message authentication and key derivation
+
+Message authentication uses separate one-shot generation and verification APIs:
+
+- HMAC accepts the fixed-output SHA-1, SHA-2, and SHA-3 identifiers. SHAKE and
+  LSH identifiers are rejected. A caller may request a non-empty prefix up to
+  the selected digest size.
+- CMAC accepts AES-128/192/256 ECB identifiers and three-key Triple-DES EDE ECB.
+  A caller may request a non-empty prefix up to the cipher block size.
+- GMAC accepts AES-128/192/256 GCM identifiers and GCM tag lengths of 4, 8, or
+  12 through 16 bytes. Its IV must be non-empty; a 12-byte IV follows GCM's
+  direct counter construction.
+- `LIBERAC_HMAC_VERIFY`, `LIBERAC_CMAC_VERIFY`, and
+  `LIBERAC_GMAC_VERIFY` compare tag contents through the shared
+  constant-time equality helper and return
+  `LIBERAC_ERROR_AUTHENTICATION_FAILED` on mismatch.
+
+The key-derivation APIs compose the same runtime-selected HMAC layer:
+
+- `LIBERAC_HKDF_EXTRACT`, `LIBERAC_HKDF_EXPAND`, and `LIBERAC_HKDF`
+  implement RFC 5869. An omitted salt is treated as a digest-sized all-zero
+  salt, Expand requires at least one digest of PRK material, and output is
+  limited to `255 * HashLen` bytes.
+- `LIBERAC_PBKDF2_HMAC` accepts a positive 64-bit iteration count, encodes the
+  block counter in four-byte big-endian form, and enforces the
+  `(2^32 - 1) * HashLen` derived-key bound. Empty passwords and salts are
+  permitted for protocol compatibility; applications remain responsible for
+  password policy and work-factor selection.
+- Both families accept fixed-output SHA-1, SHA-2, and SHA-3 HMAC selectors.
+  Protocols that serialize standard algorithm identifiers must still restrict
+  the choice to the identifiers their profile permits.
+
+HKDF-Extract rejects PRK overlap with IKM or salt; HKDF-Expand rejects
+OKM overlap with its PRK or info; and PBKDF2 rejects derived-key overlap with
+password or salt. The combined HKDF keeps its intermediate PRK locally, so
+already-consumed IKM/salt need not remain live during Expand. Allocation sizes
+are checked for `size_t` overflow, intermediate PRKs and iteration blocks are
+explicitly erased, and a partially produced output is cleared if an internal
+operation fails. PBKDF2 currently invokes the public
+one-shot HMAC path for every PRF call; a reusable prepared-HMAC state remains a
+future measured optimization, not a claimed current speedup. The standards,
+limits, and vectors are also recorded in `docs/key-derivation.md`.
+
 ## Other supported families
 
+- ECDH and ECDSA over NIST P-256, P-384, and P-521; X25519; and Ed25519
+- HMAC with fixed-output SHA-1/SHA-2/SHA-3, AES/Triple-DES CMAC, and AES-GMAC
+- HKDF and PBKDF2-HMAC with fixed-output SHA-1/SHA-2/SHA-3
 - CTR_DRBG with AES-128/192/256, with and without `Block_Cipher_df`
 - ML-KEM-512, ML-KEM-768, and ML-KEM-1024
 - NTRU+768, NTRU+864, and NTRU+1152
@@ -363,8 +414,10 @@ cleared before decoding and remains cleared on failure.
 PSS uses `emBits = modBits - 1`, clears and verifies the unused high bits,
 requires the `0xbc` trailer, and binds verification to an exact salt length.
 `LIBERAC_RSA_PSS_SALT_LENGTH_DIGEST` selects a salt equal to the digest size
-without enabling salt auto-detection. Signature length must exactly equal the
-modulus width; malformed encodings return `LIBERAC_ERROR_SIGNATURE_INVALID`.
+without enabling salt auto-detection. Signing accepts a destination capacity
+of at least the modulus width, while verification requires an exactly
+modulus-width signature; malformed encodings return
+`LIBERAC_ERROR_SIGNATURE_INVALID`.
 
 Private RSA operations reuse the modulus-width fixed-schedule Montgomery
 exponentiation path. OAEP encryption additionally uses a public-exponent path
@@ -375,6 +428,59 @@ physical constant-time claims. Raw RSA still routes public inputs through the
 faster variable-time sliding-window path and remains explicitly unsuitable as a
 standalone application scheme. Detailed encoding, error, and interoperability
 evidence is recorded in `docs/optimization/RSA.md`.
+
+### Short-Weierstrass ECC, ECDH, ECDSA, and X25519
+
+The detailed ECC implementation record already existed in
+`docs/optimization/ECC.md`; the summary is included here so the README remains
+the central implementation index.
+
+| Area | Reference-shaped baseline | LiberaCrypt implementation | Effect |
+| --- | --- | --- | --- |
+| Prime-field arithmetic | Affine point formulas and general division expose an inversion at each addition or doubling. | P-256, P-384, and P-521 use at most seventeen little-endian 32-bit limbs in curve-specific Montgomery fields. Production point operations use Jacobian coordinates and perform one final affine inversion. | Removes inversions from the scalar-multiplication loop while avoiding `unsigned __int128`, intrinsics, assembly, VLAs, and native-endian casts. |
+| Public scalar multiplication | Bit-at-a-time affine double-and-add branches on public bits and repeatedly inverts. | A four-bit Jacobian window precomputes sixteen public-point multiples, skips public leading-zero windows, and directly indexes the table. | Reduces point-operation and inversion cost for public operations such as ECDSA verification; variable-time behavior is confined to public values. |
+| Secret scalar multiplication | A simple double-and-add loop branches on secret bits and may stop at the scalar's significant length. | A fixed-width Montgomery ladder scans exactly the curve scalar bit count. Every bit performs one complete-behaviour Jacobian addition, one doubling, and two masked swaps; ladder state is erased afterward. | Removes secret-bit branches, secret-indexed tables, and secret-dependent loop length at the source level. |
+| Exceptional point cases | Generic Jacobian formulas need caller branches for infinity, equal points, and opposite points. | Compute the generic addition and doubling candidates, then mask-select the correct result for exceptional cases. | Gives complete behaviour at the point-operation boundary without scalar-dependent exceptional-case branches. |
+| ECDSA order arithmetic and nonces | Reuse field-modulus arithmetic or loop until a valid deterministic nonce appears. | Use a separate Montgomery domain modulo the group order `n`. RFC 6979 generates a fixed batch of sixteen candidates and mask-selects the first valid candidate. | Keeps field and scalar invariants separate and avoids a nonce-validity early exit in the normal signing path. |
+| X25519 | Treat the Montgomery curve as another short-Weierstrass parameter choice or rely on target-specific wide arithmetic. | A separate RFC 7748 backend uses sixteen radix-2^16 limbs, portable `uint64_t` products, reduction via `2^256 = 38 mod (2^255 - 19)`, and a 255-bit masked ladder. | Preserves X25519 clamping, little-endian encoding, and ladder semantics without target extensions. |
+
+ECDH private operations use only the secret ladder. Generated P-curve public
+keys are uncompressed SEC 1 points; agreement also accepts canonical compressed
+points, rejects invalid points and infinity, and returns the fixed-width raw
+x-coordinate for a protocol KDF. The library intentionally does not hide a KDF
+inside ECDH.
+
+ECDSA signatures use fixed-width raw `r || s`, not ASN.1 DER, and signing does
+not force low-`s` normalization. Hash conversion follows the ECDSA
+left-truncation rules. Private-key derivation and signing use the secret ladder;
+verification uses the public four-bit path. X25519 applies clamping internally,
+accepts RFC 7748 non-canonical u-coordinate decoding semantics, and rejects an
+all-zero shared result.
+
+The production paths are compared against a test-only textbook affine oracle.
+The first validated hosted benchmark was recorded in the superseded
+[draft PR #26](https://github.com/samdae5back/LiberaCrypt/pull/26). It used the
+exact ECC implementation head later merged through
+[PR #27](https://github.com/samdae5back/LiberaCrypt/pull/27) and reported these
+ratios relative to that intentionally slow affine baseline:
+
+| Hosted runner | Four-bit public path: P-256 / P-384 / P-521 | Fixed ladder: P-256 / P-384 / P-521 |
+| --- | ---: | ---: |
+| Linux | 44.8x / 71.3x / 97.0x | 21.9x / 35.5x / 48.0x |
+| Windows | 43.9x / 68.8x / 95.8x | 20.3x / 34.8x / 47.6x |
+
+These ratios compare two LiberaCrypt paths at commit
+`0369104b452f71e8698988fa2c33b2916de7d89d`; they are not a cross-library
+benchmark or a promise for other machines. The fixed ladder is roughly twice as
+slow as the public windowed path in those runs because it deliberately performs
+a full operation schedule and scans rather than directly indexing its choices.
+
+Focused coverage includes generator and SEC 1 encoding tests, scalar boundaries,
+group-order arithmetic, 96 deterministic differential scalars per curve, RFC
+6979 ECDSA vectors, 24 bidirectional ECDSA/OpenSSL checks, RFC 7748 X25519
+vectors, compressed-key handling, negative cases, Ubuntu/macOS/Windows builds,
+and ASan/UBSan. The secret-path description remains a source-level schedule
+claim, not a universal physical constant-time guarantee.
 
 ### Ed25519
 
@@ -399,6 +505,52 @@ Verification rejects non-canonical point encodings, `S >= L`, the identity
 public key, and public keys outside the prime-order subgroup before checking the
 uncofactored RFC 8032 equation. Detailed representation, validation, and test
 evidence is recorded in `docs/optimization/Ed25519.md`.
+
+### Message authentication, key derivation, AEAD, and CTR_DRBG
+
+| Area | Direct or reference-shaped organization | LiberaCrypt implementation | Effect |
+| --- | --- | --- | --- |
+| HMAC | Duplicate each supported hash inside the MAC layer or materialize whole-message concatenations. | Reuse the runtime incremental hash API for inner and outer hashing. Long-key normalization, pads, hash contexts, inner digest, and full tag are cleared on every exit. | Keeps one validated hash state machine and bounds secret temporary lifetime. |
+| CMAC and GMAC | Re-expand an AES key for every authenticated block or maintain an independent GMAC implementation. | AES-CMAC prepares one AES context for the complete MAC. GMAC invokes the AES-GCM authentication path with an empty plaintext. | Reuses block-cipher and AEAD logic instead of duplicating schedules and tag rules. |
+| Tag verification | Family-specific early-exit byte comparisons. | HMAC, CMAC, GMAC, GCM, CCM, and authenticated PQC paths share the constant-time byte-equality helper. | Avoids first-difference exits and reduces duplicate security-sensitive comparison code. |
+| HKDF and PBKDF2 | Hash-specific KDF copies and unchecked concatenation sizes. | Compose runtime HMAC, encode counters explicitly in big-endian bytes, check `size_t` and standard output bounds, reject unsafe overlap at each component boundary, clear intermediate secrets, and clear partial output after internal failure. | One portable KDF implementation across accepted hashes with explicit failure and memory rules. |
+| GCM authentication | A GHASH lookup table indexed by intermediate data. | Multiply in GF(2^128) with a fixed 128-bit serial loop, masks, and no secret-indexed table. GCM verifies the tag before releasing plaintext. | Favors portable cache behaviour and authentication-before-decryption over table-driven throughput. |
+| CCM authentication | Release decrypted plaintext before CBC-MAC validation. | Decrypt to the caller buffer, compute and compare the expected CBC-MAC tag, then erase the complete plaintext region on any failure. | Prevents unauthenticated plaintext from remaining available after the API returns an error. |
+| CTR_DRBG AES work | Expand the AES key for every generated block. | Reuse one expanded AES context across each update, generate, BCC, or derivation-function pass; erase AES contexts, seed material, temporary blocks, and failed output. | Removes repeated per-block key setup while preserving SP 800-90A state transitions. |
+
+AES-GCM accepts the standard 96-bit-IV fast path and hashes other non-empty IV
+lengths. Its tag and counter length bounds are checked before processing.
+AES-CCM enforces nonce lengths from 7 through 13 bytes, even tag lengths from 4
+through 16 bytes, and the message bound implied by its encoded `q` value.
+Both modes reuse a single AES key schedule for the complete operation and clear
+authentication state and keystream blocks before returning.
+
+CTR_DRBG supports AES-128/192/256 with and without `Block_Cipher_df`, explicit
+instantiate/reseed/generate state transitions, per-request and reseed-counter
+limits, optional additional input, OS-entropy instantiation/reseed helpers, and
+an explicit context clear operation. NIST known-answer and derivation-function
+tests validate the construction. No speed ratio is claimed for the reuse and
+table-free choices.
+
+### ML-KEM portable hot paths
+
+The first ML-KEM optimization pass is fully recorded in
+`docs/optimization/ML-KEM.md`. Its structural changes precede the separately
+measured Barrett/Montgomery selection below.
+
+| Area | Initial path | Current portable path | Deterministic effect |
+| --- | --- | --- | --- |
+| Polynomial packing | Encode and decode each coefficient one bit at a time while recomputing byte/bit positions. | Use a `uint32_t` little-endian bit reservoir and emit or consume complete bytes as they become available. | Removes the bit-at-a-time inner loop while preserving every FIPS 203 encoded byte. |
+| Matrix sampling | Request three SHAKE128 bytes for each pair of 12-bit rejection candidates. | Squeeze one 168-byte SHAKE128 rate block and parse the same consecutive three-byte groups. | Preserves the XOF stream and candidate order while reducing squeeze-helper calls; it does not claim fewer Keccak rounds. |
+| K-PKE decryption inner product | Inverse-transform each of the `k` pointwise products, then add in coefficient space. | Add all products in the NTT domain and perform one inverse NTT, using transform linearity. | Removes exactly 1, 2, and 3 inverse NTT calls for ML-KEM-512, -768, and -1024 respectively. |
+| NTT helper overhead | Reverse seven-bit indices with division/modulo loops and call a separate two-coefficient multiplication helper for every pair. | Use a fixed unsigned mask/shift reversal and a local `static inline` base-multiplication helper. | Removes repeated small-loop and call overhead without adding lookup tables or extensions. |
+
+All loop choices depend only on public parameters or the standard public matrix
+rejection sampler. The packed codec, bit reversal, and inverse-NTT reordering
+were checked for equivalence during development, then accepted through all
+three ML-KEM KAT suites, unit tests, and the multi-OS CI matrix. No numerical
+speedup is assigned to this pass because the repository retains operation-count
+evidence rather than a controlled same-host timing comparison.
 
 ### ML-KEM modular reduction selection
 
@@ -544,9 +696,19 @@ When `LIBERAC_BUILD_TESTS` is enabled, CMake generates:
 - operation-level unit tests for key generation, encryption/decryption,
   encapsulation/decapsulation, and signing/verification
 - AES and Triple-DES known-answer tests, plus round-trip coverage for every
-  supported mode and key size
+  supported mode and key size; an AES-GCM negative authentication case verifies
+  plaintext clearing
 - SHA-1, SHA-2, SHA-3, SHAKE, and LSH known-answer tests
-- CTR_DRBG known-answer and derivation-function tests
+- HMAC known-answer tests across every accepted hash, including long keys;
+  AES- and Triple-DES-CMAC vectors; GMAC vectors; truncated-tag verification;
+  tampering, invalid-selector, length, and buffer checks; the MAC suites were
+  also cross-checked with OpenSSL 3.5.5 during development
+- RFC 5869 HKDF, RFC 6070 PBKDF2-HMAC-SHA1, RFC 7914
+  PBKDF2-HMAC-SHA256, and SHA3-256 runtime-dispatch cases, plus KDF boundary,
+  overlap, output-clearing, and invalid-argument tests; the retained vectors and
+  SHA3 dispatch case were independently cross-checked through OpenSSL HMAC
+- CTR_DRBG known-answer, derivation-function, reseed-limit, and clear-state
+  tests
 - operation tests for every supported post-quantum KEM and signature family
 - RFC 8032 Ed25519 known-answer tests, strict-encoding negative tests, and
   deterministic sign/verify round trips
