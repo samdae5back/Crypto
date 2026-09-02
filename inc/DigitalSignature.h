@@ -47,6 +47,13 @@
 /** @brief P-521 fixed-width raw signature length in bytes. */
 #define LIBERAC_ECDSA_P521_SIGNATURE_BYTES 132u
 
+/** @brief Ed25519 private seed length in bytes. */
+#define LIBERAC_ED25519_PRIVATE_KEY_BYTES 32u
+/** @brief Ed25519 compressed public-key length in bytes. */
+#define LIBERAC_ED25519_PUBLIC_KEY_BYTES 32u
+/** @brief Ed25519 signature length in bytes. */
+#define LIBERAC_ED25519_SIGNATURE_BYTES 64u
+
 /** @brief ML-DSA-44 encoded public-key length in bytes. */
 #define LIBERAC_ML_DSA_44_PUBLIC_KEY_BYTES 1312u
 /** @brief ML-DSA-44 encoded private-key length in bytes. */
@@ -248,6 +255,103 @@ LIBERAC_API LiberaCError LIBERAC_ECDSA_VERIFY(
     const uint8_t *MESSAGE, size_t MESSAGE_LENGTH,
     const uint8_t *SIGNATURE, size_t SIGNATURE_LENGTH,
     LiberaCAlgID HASH_ALG, LiberaCAlgID ALG);
+
+/**
+ * @brief Return the Ed25519 private-seed size.
+ * @param[in] ALG LIBERAC_ALG_ED25519.
+ * @return 32 for Ed25519, or zero for an unsupported identifier.
+ */
+LIBERAC_API size_t LIBERAC_ED25519_PRIVATE_KEY_SIZE(LiberaCAlgID ALG);
+
+/**
+ * @brief Return the Ed25519 compressed public-key size.
+ * @param[in] ALG LIBERAC_ALG_ED25519.
+ * @return 32 for Ed25519, or zero for an unsupported identifier.
+ */
+LIBERAC_API size_t LIBERAC_ED25519_PUBLIC_KEY_SIZE(LiberaCAlgID ALG);
+
+/**
+ * @brief Return the Ed25519 signature size.
+ * @param[in] ALG LIBERAC_ALG_ED25519.
+ * @return 64 for Ed25519, or zero for an unsupported identifier.
+ */
+LIBERAC_API size_t LIBERAC_ED25519_SIGNATURE_SIZE(LiberaCAlgID ALG);
+
+/**
+ * @brief Generate an Ed25519 private seed and matching public key.
+ * @param[out] PUBLIC_KEY Buffer receiving the 32-byte compressed point.
+ * @param[in] PUBLIC_KEY_LENGTH Available public-key bytes.
+ * @param[out] PRIVATE_KEY Buffer receiving the 32-byte private seed.
+ * @param[in] PRIVATE_KEY_LENGTH Available private-key bytes.
+ * @param[in] ALG LIBERAC_ALG_ED25519.
+ * @return LIBERAC_SUCCESS on success or a negative LiberaCError on failure.
+ * @note Once output validation succeeds, an operational failure clears both
+ *       required output regions.
+ */
+LIBERAC_API LiberaCError LIBERAC_ED25519_KEYGEN(
+    uint8_t *PUBLIC_KEY, size_t PUBLIC_KEY_LENGTH,
+    uint8_t *PRIVATE_KEY, size_t PRIVATE_KEY_LENGTH,
+    LiberaCAlgID ALG);
+
+/**
+ * @brief Derive an Ed25519 public key from a private seed.
+ * @param[out] PUBLIC_KEY Buffer receiving the 32-byte compressed point.
+ * @param[in] PUBLIC_KEY_LENGTH Available public-key bytes.
+ * @param[in] PRIVATE_KEY Exact 32-byte private seed.
+ * @param[in] PRIVATE_KEY_LENGTH Private-seed length.
+ * @param[in] ALG LIBERAC_ALG_ED25519.
+ * @return LIBERAC_SUCCESS on success or a negative LiberaCError on failure.
+ */
+LIBERAC_API LiberaCError LIBERAC_ED25519_PUBLIC_FROM_PRIVATE(
+    uint8_t *PUBLIC_KEY, size_t PUBLIC_KEY_LENGTH,
+    const uint8_t *PRIVATE_KEY, size_t PRIVATE_KEY_LENGTH,
+    LiberaCAlgID ALG);
+
+/**
+ * @brief Generate a deterministic pure-mode Ed25519 signature.
+ *
+ * The private key is the RFC 8032 32-byte seed. Ed25519 performs its mandated
+ * SHA-512 hashing internally; a caller-selectable prehash is intentionally not
+ * accepted by this pure-mode API.
+ *
+ * @param[in] PRIVATE_KEY Exact 32-byte private seed.
+ * @param[in] PRIVATE_KEY_LENGTH Private-seed length.
+ * @param[in] MESSAGE Message bytes; may be NULL only when MESSAGE_LENGTH is 0.
+ * @param[in] MESSAGE_LENGTH Message length in bytes.
+ * @param[out] SIGNATURE Buffer receiving the 64-byte R || S signature.
+ * @param[in] SIGNATURE_LENGTH Available signature bytes.
+ * @param[in] ALG LIBERAC_ALG_ED25519.
+ * @return LIBERAC_SUCCESS on success or a negative LiberaCError on failure.
+ */
+LIBERAC_API LiberaCError LIBERAC_ED25519_SIGN(
+    const uint8_t *PRIVATE_KEY, size_t PRIVATE_KEY_LENGTH,
+    const uint8_t *MESSAGE, size_t MESSAGE_LENGTH,
+    uint8_t *SIGNATURE, size_t SIGNATURE_LENGTH,
+    LiberaCAlgID ALG);
+
+/**
+ * @brief Verify a strict pure-mode Ed25519 signature.
+ *
+ * Verification requires canonical point encodings, S < L, and a non-identity
+ * public key in the prime-order subgroup.
+ *
+ * @param[in] PUBLIC_KEY Exact 32-byte compressed public key.
+ * @param[in] PUBLIC_KEY_LENGTH Public-key length.
+ * @param[in] MESSAGE Message bytes; may be NULL only when MESSAGE_LENGTH is 0.
+ * @param[in] MESSAGE_LENGTH Message length in bytes.
+ * @param[in] SIGNATURE Exact 64-byte R || S signature.
+ * @param[in] SIGNATURE_LENGTH Signature length.
+ * @param[in] ALG LIBERAC_ALG_ED25519.
+ * @return LIBERAC_SUCCESS for a valid signature,
+ *         LIBERAC_ERROR_SIGNATURE_INVALID for a malformed or non-matching
+ *         signature, LIBERAC_ERROR_INVALID_KEY for an invalid public key, or
+ *         another negative LiberaCError for invalid inputs.
+ */
+LIBERAC_API LiberaCError LIBERAC_ED25519_VERIFY(
+    const uint8_t *PUBLIC_KEY, size_t PUBLIC_KEY_LENGTH,
+    const uint8_t *MESSAGE, size_t MESSAGE_LENGTH,
+    const uint8_t *SIGNATURE, size_t SIGNATURE_LENGTH,
+    LiberaCAlgID ALG);
 
 /**
  * @brief Return the encoded ML-DSA public-key size for an algorithm.

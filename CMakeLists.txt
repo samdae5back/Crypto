@@ -96,6 +96,7 @@ set(LIBERAC_SOURCES
     src/AsymmetricCipher/RSA/rsa.c
     src/AsymmetricCipher/ElGamal/elgamal.c
     src/DigitalSignature/ECDSA/ecdsa.c
+    src/DigitalSignature/Ed25519/ed25519.c
     src/KeyAgreement/ecdh.c
     src/KeyAgreement/x25519.c
     src/HashFunction/SHA2/sha2.c

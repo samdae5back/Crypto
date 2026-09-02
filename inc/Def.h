@@ -251,6 +251,8 @@ enum {
     LIBERAC_ALG_ECDSA_P384 = 0x7302,
     /** ECDSA over the NIST P-521 curve. */
     LIBERAC_ALG_ECDSA_P521 = 0x7303,
+    /** Ed25519 pure-mode digital signatures as specified by RFC 8032. */
+    LIBERAC_ALG_ED25519 = 0x7311,
 
     /** SLH-DSA-SHA2-128s digital-signature parameter set. */
     LIBERAC_ALG_SLH_DSA_SHA2_128S = 0x8001,

@@ -7,6 +7,7 @@
 
 #include "DigitalSignature/AIMer/aimer_internal.h"
 #include "DigitalSignature/ECDSA/ecdsa_internal.h"
+#include "DigitalSignature/Ed25519/ed25519_internal.h"
 #include "DigitalSignature/HAETAE/haetae_internal.h"
 #include "DigitalSignature/ML-DSA/ml_dsa_internal.h"
 #include "DigitalSignature/SLH-DSA/slh_dsa_internal.h"
@@ -57,6 +58,54 @@ LiberaCError LIBERAC_ECDSA_VERIFY(
     return crypto_ecdsa_verify_internal(
         alg, hash_alg, public_key, public_key_length, message,
         message_length, signature, signature_length);
+}
+
+size_t LIBERAC_ED25519_PRIVATE_KEY_SIZE(LiberaCAlgID alg) {
+    return crypto_ed25519_private_key_size_internal(alg);
+}
+
+size_t LIBERAC_ED25519_PUBLIC_KEY_SIZE(LiberaCAlgID alg) {
+    return crypto_ed25519_public_key_size_internal(alg);
+}
+
+size_t LIBERAC_ED25519_SIGNATURE_SIZE(LiberaCAlgID alg) {
+    return crypto_ed25519_signature_size_internal(alg);
+}
+
+LiberaCError LIBERAC_ED25519_KEYGEN(
+    uint8_t *public_key, size_t public_key_length,
+    uint8_t *private_key, size_t private_key_length,
+    LiberaCAlgID alg) {
+    return crypto_ed25519_keygen_internal(
+        alg, public_key, public_key_length, private_key, private_key_length);
+}
+
+LiberaCError LIBERAC_ED25519_PUBLIC_FROM_PRIVATE(
+    uint8_t *public_key, size_t public_key_length,
+    const uint8_t *private_key, size_t private_key_length,
+    LiberaCAlgID alg) {
+    return crypto_ed25519_public_from_private_internal(
+        alg, public_key, public_key_length, private_key, private_key_length);
+}
+
+LiberaCError LIBERAC_ED25519_SIGN(
+    const uint8_t *private_key, size_t private_key_length,
+    const uint8_t *message, size_t message_length,
+    uint8_t *signature, size_t signature_length,
+    LiberaCAlgID alg) {
+    return crypto_ed25519_sign_internal(
+        alg, private_key, private_key_length, message, message_length,
+        signature, signature_length);
+}
+
+LiberaCError LIBERAC_ED25519_VERIFY(
+    const uint8_t *public_key, size_t public_key_length,
+    const uint8_t *message, size_t message_length,
+    const uint8_t *signature, size_t signature_length,
+    LiberaCAlgID alg) {
+    return crypto_ed25519_verify_internal(
+        alg, public_key, public_key_length, message, message_length,
+        signature, signature_length);
 }
 
 size_t LIBERAC_ML_DSA_PUBLIC_KEY_SIZE(LiberaCAlgID alg) {
