@@ -24,15 +24,15 @@ static int ecb_kat(void) {
     uint8_t recovered[8];
 
     return LIBERAC_BLOCK_CIPHER_ENCRYPT(
-               ciphertext, sizeof(ciphertext), NULL, 0u,
+               ciphertext, sizeof(ciphertext),
                plaintext, sizeof(plaintext), KEY, sizeof(KEY),
-               NULL, 0u, NULL, 0u,
+               NULL, 0u,
                LIBERAC_ALG_TDES_EDE3_ECB) != LIBERAC_SUCCESS ||
            memcmp(ciphertext, expected, sizeof(expected)) != 0 ||
            LIBERAC_BLOCK_CIPHER_DECRYPT(
-               recovered, sizeof(recovered), NULL, 0u,
+               recovered, sizeof(recovered),
                ciphertext, sizeof(ciphertext), KEY, sizeof(KEY),
-               NULL, 0u, NULL, 0u,
+               NULL, 0u,
                LIBERAC_ALG_TDES_EDE3_ECB) != LIBERAC_SUCCESS ||
            memcmp(recovered, plaintext, sizeof(plaintext)) != 0;
 }
@@ -53,15 +53,15 @@ static int cbc_kat(void) {
     uint8_t recovered[16];
 
     return LIBERAC_BLOCK_CIPHER_ENCRYPT(
-               ciphertext, sizeof(ciphertext), NULL, 0u,
+               ciphertext, sizeof(ciphertext),
                plaintext, sizeof(plaintext), KEY, sizeof(KEY),
-               iv, sizeof(iv), NULL, 0u,
+               iv, sizeof(iv),
                LIBERAC_ALG_TDES_EDE3_CBC) != LIBERAC_SUCCESS ||
            memcmp(ciphertext, expected, sizeof(expected)) != 0 ||
            LIBERAC_BLOCK_CIPHER_DECRYPT(
-               recovered, sizeof(recovered), NULL, 0u,
+               recovered, sizeof(recovered),
                ciphertext, sizeof(ciphertext), KEY, sizeof(KEY),
-               iv, sizeof(iv), NULL, 0u,
+               iv, sizeof(iv),
                LIBERAC_ALG_TDES_EDE3_CBC) != LIBERAC_SUCCESS ||
            memcmp(recovered, plaintext, sizeof(plaintext)) != 0;
 }
@@ -77,12 +77,12 @@ static int in_place_test(void) {
     }
     memcpy(original, data, sizeof(data));
     return LIBERAC_BLOCK_CIPHER_ENCRYPT(
-               data, sizeof(data), NULL, 0u, data, sizeof(data),
-               KEY, sizeof(KEY), iv, sizeof(iv), NULL, 0u,
+               data, sizeof(data), data, sizeof(data),
+               KEY, sizeof(KEY), iv, sizeof(iv),
                LIBERAC_ALG_TDES_EDE3_CBC) != LIBERAC_SUCCESS ||
            LIBERAC_BLOCK_CIPHER_DECRYPT(
-               data, sizeof(data), NULL, 0u, data, sizeof(data),
-               KEY, sizeof(KEY), iv, sizeof(iv), NULL, 0u,
+               data, sizeof(data), data, sizeof(data),
+               KEY, sizeof(KEY), iv, sizeof(iv),
                LIBERAC_ALG_TDES_EDE3_CBC) != LIBERAC_SUCCESS ||
            memcmp(data, original, sizeof(data)) != 0;
 }
@@ -94,31 +94,26 @@ static int validation_test(void) {
     return LIBERAC_BLOCK_CIPHER_KEY_SIZE(LIBERAC_ALG_TDES_EDE3_ECB) !=
                LIBERAC_TDES_EDE3_KEY_BYTES ||
            LIBERAC_BLOCK_CIPHER_ENCRYPT(
-               data, sizeof(data), NULL, 0u, data, sizeof(data),
-               KEY, sizeof(KEY), NULL, 0u, NULL, 0u,
+               data, sizeof(data), data, sizeof(data),
+               KEY, sizeof(KEY), NULL, 0u,
                LIBERAC_ALG_TDES_EDE3_ECB) !=
                LIBERAC_ERROR_INVALID_ARGUMENT ||
            LIBERAC_BLOCK_CIPHER_ENCRYPT(
-               data, 7u, NULL, 0u, data, 8u,
-               KEY, sizeof(KEY), NULL, 0u, NULL, 0u,
+               data, 7u, data, 8u,
+               KEY, sizeof(KEY), NULL, 0u,
                LIBERAC_ALG_TDES_EDE3_ECB) !=
                LIBERAC_ERROR_BUFFER_TOO_SMALL ||
            LIBERAC_BLOCK_CIPHER_ENCRYPT(
-               data, 8u, NULL, 0u, data, 8u,
-               KEY, sizeof(KEY) - 1u, NULL, 0u, NULL, 0u,
+               data, 8u, data, 8u,
+               KEY, sizeof(KEY) - 1u, NULL, 0u,
                LIBERAC_ALG_TDES_EDE3_ECB) != LIBERAC_ERROR_INVALID_KEY ||
            LIBERAC_BLOCK_CIPHER_ENCRYPT(
-               data, 8u, &ignored, 1u, data, 8u,
-               KEY, sizeof(KEY), NULL, 0u, NULL, 0u,
-               LIBERAC_ALG_TDES_EDE3_ECB) !=
-               LIBERAC_ERROR_INVALID_ARGUMENT ||
-           LIBERAC_BLOCK_CIPHER_ENCRYPT(
-               NULL, 0u, &ignored, 0u, NULL, 0u,
-               KEY, sizeof(KEY), &ignored, 0u, &ignored, 0u,
+               NULL, 0u, NULL, 0u,
+               KEY, sizeof(KEY), &ignored, 0u,
                LIBERAC_ALG_TDES_EDE3_ECB) != LIBERAC_SUCCESS ||
            LIBERAC_BLOCK_CIPHER_ENCRYPT(
-               NULL, 0u, NULL, 0u, NULL, 0u,
-               NULL, 0u, NULL, 0u, NULL, 0u,
+               NULL, 0u, NULL, 0u,
+               NULL, 0u, NULL, 0u,
                LIBERAC_ALG_TDES_EDE3_ECB) !=
                LIBERAC_ERROR_INVALID_ARGUMENT;
 }

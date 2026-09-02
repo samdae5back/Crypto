@@ -220,7 +220,7 @@ static int test_chacha20_poly1305(void) {
     }
 
     if (LIBERAC_AEAD_ENCRYPT(
-            ciphertext, sizeof(ciphertext), tag, sizeof(tag),
+            ciphertext, sizeof(ciphertext), tag, sizeof(tag), sizeof(tag),
             plaintext, sizeof(plaintext) - 1u, key, sizeof(key),
             nonce, sizeof(nonce), aad, sizeof(aad),
             LIBERAC_ALG_CHACHA20_POLY1305) != LIBERAC_SUCCESS ||

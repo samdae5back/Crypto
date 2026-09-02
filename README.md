@@ -190,11 +190,17 @@ Public operation names start with `LIBERAC_`. For APIs that accept an algorithm
 identifier, `LiberaCAlgID` is the last argument. The complete identifier set is
 in `inc/Def.h` and is available from `LiberaCrypt.h`.
 
-### Symmetric encryption
+### Unauthenticated block and stream encryption
 
-AES and Triple-DES encryption and decryption use one API pair for all key sizes
-and modes. Triple-DES is included strictly for interoperability with legacy
-systems; new protocols should use an authenticated AES mode such as GCM.
+The block-cipher API intentionally exposes only unauthenticated modes: AES
+ECB/CBC/CTR and three-key Triple-DES ECB/CBC. AES-GCM and AES-CCM are not
+accepted by `LIBERAC_BLOCK_CIPHER_*`; they belong to the authenticated-
+encryption API described below. This keeps tag and AAD parameters out of raw
+encryption calls and makes accidental unauthenticated use of an AEAD identifier
+fail with `LIBERAC_ERROR_INVALID_ALG_ID`.
+
+Triple-DES is included strictly for interoperability with legacy systems. New
+protocols should normally use an authenticated-encryption construction.
 
 AES does not define a separate master-key construction algorithm. Generate a
 uniform random key with the size required by the selected identifier; round-key
@@ -202,7 +208,7 @@ expansion remains an internal implementation detail:
 
 ```c
 uint8_t key[LIBERAC_AES_256_KEY_BYTES];
-size_t key_length = LIBERAC_BLOCK_CIPHER_KEY_SIZE(LIBERAC_ALG_AES_256_GCM);
+size_t key_length = LIBERAC_BLOCK_CIPHER_KEY_SIZE(LIBERAC_ALG_AES_256_CTR);
 
 LiberaCError error = LIBERAC_RANDOM_BYTES(key, key_length);
 ```
@@ -212,28 +218,24 @@ appropriate key-derivation protocol instead of copying or truncating that input.
 
 ```c
 uint8_t ciphertext[32];
-uint8_t tag[16];
 
 LiberaCError error = LIBERAC_BLOCK_CIPHER_ENCRYPT(
     ciphertext, sizeof(ciphertext),
-    tag, sizeof(tag),
     plaintext, sizeof(plaintext),
     key, sizeof(key),
-    nonce, sizeof(nonce),
-    aad, sizeof(aad),
-    LIBERAC_ALG_AES_256_GCM);
+    initial_counter, sizeof(initial_counter),
+    LIBERAC_ALG_AES_256_CTR);
 ```
 
-The AES dispatcher supports AES-128, AES-192, and AES-256 with ECB, CBC, CTR,
-CCM, and GCM. ECB and CBC inputs must be block-aligned; padding is intentionally
-left to the caller. AEAD decryption clears the plaintext output when tag
-authentication fails.
+The block-cipher dispatcher supports AES-128, AES-192, and AES-256 with ECB,
+CBC, and CTR. ECB and CBC inputs must be block-aligned; padding is intentionally
+left to the caller. CTR accepts arbitrary byte lengths.
 
 The same dispatcher supports three-key Triple-DES EDE in ECB and CBC modes with
 a 24-byte key and 8-byte block alignment. It does not support two-key TDEA or
 single DES. DES parity bits are ignored rather than corrected or validated.
 
-### ChaCha20, Poly1305, and ChaCha20-Poly1305
+### ChaCha20, Poly1305, and authenticated encryption
 
 The standalone stream-cipher API implements the
 [RFC 8439](https://www.rfc-editor.org/rfc/rfc8439.html) ChaCha20 variant with a
@@ -247,8 +249,19 @@ that already define safe one-time-key generation. It always produces and
 verifies the complete 16-byte tag from an exactly 32-byte one-time key. Direct
 users must never authenticate two messages with the same Poly1305 key.
 
-For normal application use, the standardized composition is available through
-the separate AEAD dispatcher:
+AES-GCM, AES-CCM, and ChaCha20-Poly1305 share the separate one-shot AEAD
+dispatcher. `LIBERAC_AEAD_KEY_SIZE()` returns the selected key size, while
+`LIBERAC_AEAD_NONCE_LENGTH_VALID()` and
+`LIBERAC_AEAD_TAG_LENGTH_VALID()` let callers validate variable algorithm
+parameters before an operation.
+
+| AEAD family | Nonce length | Tag length |
+| --- | --- | --- |
+| AES-GCM | Any non-empty length; 12 bytes recommended | 4, 8, or 12 through 16 bytes |
+| AES-CCM | 7 through 13 bytes | Even lengths from 4 through 16 bytes |
+| ChaCha20-Poly1305 | Exactly 12 bytes | Exactly 16 bytes |
+
+The requested tag length is separate from tag-buffer capacity:
 
 ```c
 uint8_t ciphertext[1024];
@@ -256,7 +269,7 @@ uint8_t tag[LIBERAC_CHACHA20_POLY1305_TAG_BYTES];
 
 LiberaCError error = LIBERAC_AEAD_ENCRYPT(
     ciphertext, sizeof(ciphertext),
-    tag, sizeof(tag),
+    tag, sizeof(tag), LIBERAC_CHACHA20_POLY1305_TAG_BYTES,
     plaintext, message_length,
     key, LIBERAC_CHACHA20_POLY1305_KEY_BYTES,
     nonce, LIBERAC_CHACHA20_POLY1305_NONCE_BYTES,
@@ -264,13 +277,18 @@ LiberaCError error = LIBERAC_AEAD_ENCRYPT(
     LIBERAC_ALG_CHACHA20_POLY1305);
 ```
 
+Every AEAD operation checks its selected algorithm's nonce and tag rules before
+processing. AES-CCM also checks the message bound implied by its nonce length.
+Authentication failure returns `LIBERAC_ERROR_AUTHENTICATION_FAILED` and clears
+the entire plaintext output.
+
 ChaCha20-Poly1305 reserves counter zero to derive the one-time Poly1305 key and
 starts payload encryption at counter one. Only the RFC 8439 12-byte nonce and
 complete 16-byte tag are accepted. Decryption authenticates AAD and ciphertext
 before transforming any ciphertext; a tag mismatch returns
-`LIBERAC_ERROR_AUTHENTICATION_FAILED` and clears the entire plaintext output.
-Exact input/output aliasing is supported, while partial overlaps and overlaps
-with key, nonce, AAD, or tag storage are rejected explicitly.
+`LIBERAC_ERROR_AUTHENTICATION_FAILED`. Exact input/output aliasing is supported,
+while partial overlaps and overlaps with key, nonce, AAD, or tag storage are
+rejected explicitly.
 
 ### Hashes and XOFs
 
@@ -594,6 +612,7 @@ evidence is recorded in `docs/optimization/Ed25519.md`.
 | --- | --- | --- | --- |
 | HMAC | Duplicate each supported hash inside the MAC layer or materialize whole-message concatenations. | Reuse the runtime incremental hash API for inner and outer hashing. Long-key normalization, pads, hash contexts, inner digest, and full tag are cleared on every exit. | Keeps one validated hash state machine and bounds secret temporary lifetime. |
 | CMAC and GMAC | Re-expand an AES key for every authenticated block or maintain an independent GMAC implementation. | AES-CMAC prepares one AES context for the complete MAC. GMAC invokes the AES-GCM authentication path with an empty plaintext. | Reuses block-cipher and AEAD logic instead of duplicating schedules and tag rules. |
+| AEAD dispatch | Let each public cipher API grow its own tag, nonce, and AAD conventions. | Route AES-GCM, AES-CCM, and ChaCha20-Poly1305 through one AEAD layer that validates algorithm-specific nonce and tag lengths before entering the portable core. Keep the block-cipher API limited to ECB/CBC/CTR. | Makes authenticated use explicit, keeps raw-cipher call sites small, and centralizes public parameter rules without duplicating the underlying implementations. |
 | ChaCha20 state setup | Recreate and decode the complete 16-word state for every 64-byte block. | Decode the constants, key, and nonce once per request, retain that base state, and change only the public counter between blocks. The 20 rounds are expressed as fixed `uint32_t` ARX operations. | Removes repeated byte decoding and provides a compiler-friendly scalar path without tables, intrinsics, assembly, or host-endian loads. |
 | Poly1305 arithmetic | Translate the RFC pseudocode through a dynamically allocated generic bignum. | Clamp `r` while decoding five 26-bit limbs, accumulate products in `uint64_t`, reduce with fixed carries, and mask-select the final canonical residue. | Avoids allocation, secret-indexed memory, native 128-bit types, and a data-dependent final subtraction; the largest multiplication sum stays below the documented 64-bit bound. |
 | ChaCha20-Poly1305 composition | Allocate and concatenate `AAD || pad || ciphertext || pad || lengths` before authenticating. | Feed each component directly into the internal incremental Poly1305 state, derive the one-time key from counter zero, and use counter one for payload. | Keeps temporary storage fixed-size regardless of message length and follows the RFC byte encoding explicitly. |
@@ -804,9 +823,10 @@ When `LIBERAC_BUILD_TESTS` is enabled, CMake generates:
 - public-header isolation checks
 - operation-level unit tests for key generation, encryption/decryption,
   encapsulation/decapsulation, and signing/verification
-- AES and Triple-DES known-answer tests, plus round-trip coverage for every
-  supported mode and key size; an AES-GCM negative authentication case verifies
-  plaintext clearing
+- AES and Triple-DES known-answer tests, plus block-mode round trips for every
+  supported key size; AES-GCM/CCM AEAD vectors and round trips cover every AES
+  key size, valid nonce/tag variants, rejection through the block-cipher API,
+  invalid lengths, tag-buffer capacity, and plaintext clearing on failure
 - SHA-1, SHA-2, SHA-3, SHAKE, and LSH known-answer tests
 - HMAC known-answer tests across every accepted hash, including long keys;
   AES- and Triple-DES-CMAC vectors; GMAC vectors; truncated-tag verification;

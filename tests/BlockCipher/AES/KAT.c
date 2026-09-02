@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+#include "AuthenticatedEncryption.h"
 #include "BlockCipher.h"
 
 #include <stdio.h>
@@ -42,17 +43,17 @@ static int ecb_kat(void) {
 
     for (i = 0u; i < 3u; ++i) {
         if (LIBERAC_BLOCK_CIPHER_ENCRYPT(
-                ciphertext, sizeof(ciphertext), NULL, 0u,
+                ciphertext, sizeof(ciphertext),
                 plaintext, sizeof(plaintext), keys[i], key_lengths[i],
-                NULL, 0u, NULL, 0u, algorithms[i]) != LIBERAC_SUCCESS) {
+                NULL, 0u, algorithms[i]) != LIBERAC_SUCCESS) {
             return 1;
         }
         if (memcmp(ciphertext, expected[i], sizeof(ciphertext)) != 0)
             return 1;
         if (LIBERAC_BLOCK_CIPHER_DECRYPT(
-                recovered, sizeof(recovered), NULL, 0u,
+                recovered, sizeof(recovered),
                 ciphertext, sizeof(ciphertext), keys[i], key_lengths[i],
-                NULL, 0u, NULL, 0u, algorithms[i]) != LIBERAC_SUCCESS) {
+                NULL, 0u, algorithms[i]) != LIBERAC_SUCCESS) {
             return 1;
         }
         if (memcmp(recovered, plaintext, sizeof(recovered)) != 0) return 1;
@@ -78,9 +79,9 @@ static int ecb_iotcc_kat(void) {
 
     for (i = 0u; i < sizeof(vectors) / sizeof(vectors[0]); ++i) {
         if (LIBERAC_BLOCK_CIPHER_ENCRYPT(
-                ciphertext, sizeof(ciphertext), NULL, 0u,
+                ciphertext, sizeof(ciphertext),
                 plaintext, sizeof(plaintext), key, vectors[i].key_length,
-                NULL, 0u, NULL, 0u, vectors[i].algorithm) != LIBERAC_SUCCESS ||
+                NULL, 0u, vectors[i].algorithm) != LIBERAC_SUCCESS ||
             memcmp(ciphertext, vectors[i].expected, sizeof(ciphertext)) != 0) {
             return 1;
         }
@@ -141,33 +142,33 @@ static int cbc_ctr_kat(void) {
 
     for (i = 0u; i < 3u; ++i) {
         if (LIBERAC_BLOCK_CIPHER_ENCRYPT(
-                output, sizeof(output), NULL, 0u,
+                output, sizeof(output),
                 plaintext, sizeof(plaintext), keys[i], key_lengths[i],
-                iv, sizeof(iv), NULL, 0u,
+                iv, sizeof(iv),
                 cbc_algorithms[i]) != LIBERAC_SUCCESS ||
             memcmp(output, cbc_expected[i], sizeof(output)) != 0) {
             return 1;
         }
         if (LIBERAC_BLOCK_CIPHER_DECRYPT(
-                recovered, sizeof(recovered), NULL, 0u,
+                recovered, sizeof(recovered),
                 cbc_expected[i], sizeof(cbc_expected[i]),
-                keys[i], key_lengths[i], iv, sizeof(iv), NULL, 0u,
+                keys[i], key_lengths[i], iv, sizeof(iv),
                 cbc_algorithms[i]) != LIBERAC_SUCCESS ||
             memcmp(recovered, plaintext, sizeof(recovered)) != 0) {
             return 1;
         }
         if (LIBERAC_BLOCK_CIPHER_ENCRYPT(
-                output, sizeof(output), NULL, 0u,
+                output, sizeof(output),
                 plaintext, sizeof(plaintext), keys[i], key_lengths[i],
-                counter, sizeof(counter), NULL, 0u,
+                counter, sizeof(counter),
                 ctr_algorithms[i]) != LIBERAC_SUCCESS ||
             memcmp(output, ctr_expected[i], sizeof(output)) != 0) {
             return 1;
         }
         if (LIBERAC_BLOCK_CIPHER_DECRYPT(
-                recovered, sizeof(recovered), NULL, 0u,
+                recovered, sizeof(recovered),
                 ctr_expected[i], sizeof(ctr_expected[i]),
-                keys[i], key_lengths[i], counter, sizeof(counter), NULL, 0u,
+                keys[i], key_lengths[i], counter, sizeof(counter),
                 ctr_algorithms[i]) != LIBERAC_SUCCESS ||
             memcmp(recovered, plaintext, sizeof(recovered)) != 0) {
             return 1;
@@ -206,8 +207,8 @@ static int gcm_kat(void) {
     size_t i;
 
     for (i = 0u; i < 3u; ++i) {
-        if (LIBERAC_BLOCK_CIPHER_ENCRYPT(
-                ciphertext, sizeof(ciphertext), tag, sizeof(tag),
+        if (LIBERAC_AEAD_ENCRYPT(
+                ciphertext, sizeof(ciphertext), tag, sizeof(tag), sizeof(tag),
                 plaintext, sizeof(plaintext), keys[i], key_lengths[i],
                 iv, sizeof(iv), NULL, 0u,
                 algorithms[i]) != LIBERAC_SUCCESS) {
@@ -217,7 +218,7 @@ static int gcm_kat(void) {
             memcmp(tag, expected_tag[i], sizeof(tag)) != 0) {
             return 1;
         }
-        if (LIBERAC_BLOCK_CIPHER_DECRYPT(
+        if (LIBERAC_AEAD_DECRYPT(
                 recovered, sizeof(recovered), expected_tag[i],
                 sizeof(expected_tag[i]), expected_ciphertext[i],
                 sizeof(expected_ciphertext[i]), keys[i], key_lengths[i],
@@ -257,8 +258,8 @@ static int ccm_kat(void) {
     uint8_t recovered[23];
     uint8_t tag[8];
 
-    if (LIBERAC_BLOCK_CIPHER_ENCRYPT(
-            ciphertext, sizeof(ciphertext), tag, sizeof(tag),
+    if (LIBERAC_AEAD_ENCRYPT(
+            ciphertext, sizeof(ciphertext), tag, sizeof(tag), sizeof(tag),
             plaintext, sizeof(plaintext), key, sizeof(key),
             nonce, sizeof(nonce), aad, sizeof(aad),
             LIBERAC_ALG_AES_128_CCM) != LIBERAC_SUCCESS) {
@@ -268,7 +269,7 @@ static int ccm_kat(void) {
         memcmp(tag, expected_tag, sizeof(tag)) != 0) {
         return 1;
     }
-    if (LIBERAC_BLOCK_CIPHER_DECRYPT(
+    if (LIBERAC_AEAD_DECRYPT(
             recovered, sizeof(recovered), expected_tag, sizeof(expected_tag),
             expected_ciphertext, sizeof(expected_ciphertext),
             key, sizeof(key), nonce, sizeof(nonce), aad, sizeof(aad),
