@@ -296,7 +296,8 @@ static LiberaCError bignum_ct_store_fixed(LiberaCBignum *out,
 static LiberaCError bignum_mod_exp_ct_core(
     LiberaCBignum *out1, const LiberaCBignum *base1,
     LiberaCBignum *out2, const LiberaCBignum *base2,
-    const LiberaCBignum *exponent, const LiberaCBignum *modulus) {
+    const LiberaCBignum *exponent, const LiberaCBignum *modulus,
+    int bases_are_fixed_and_reduced) {
     BignumCtMontCtx ctx;
     BignumCtExpState states[2];
     uint32_t *buffer = NULL, *one, *one_m, *cursor;
@@ -309,12 +310,16 @@ static LiberaCError bignum_mod_exp_ct_core(
         return LIBERAC_ERROR_INVALID_ARGUMENT;
     if (!(modulus->LIMBS[0] & 1u))
         return LIBERAC_ERROR_INVALID_ARGUMENT;
-    if (crypto_bignum_compare(base1, modulus) >= 0 ||
-        (base2 && crypto_bignum_compare(base2, modulus) >= 0))
-        return LIBERAC_ERROR_INVALID_ARGUMENT;
 
     count = base2 ? 2u : 1u;
     n = modulus->LENGTH;
+    if (bases_are_fixed_and_reduced) {
+        if (base1->CAPACITY < n || (base2 && base2->CAPACITY < n))
+            return LIBERAC_ERROR_INVALID_ARGUMENT;
+    } else if (crypto_bignum_compare(base1, modulus) >= 0 ||
+               (base2 && crypto_bignum_compare(base2, modulus) >= 0)) {
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
+    }
     if (exponent->CAPACITY < n)
         return LIBERAC_ERROR_INVALID_ARGUMENT;
     if (n > SIZE_MAX / 32u || n > SIZE_MAX / (2u + 4u * count))
@@ -346,8 +351,13 @@ static LiberaCError bignum_mod_exp_ct_core(
         states[s].product = cursor; cursor += n;
 
         memset(states[s].square, 0, n * sizeof(uint32_t));
-        for (i = 0u; i < base->LENGTH; ++i)
-            states[s].square[i] = base->LIMBS[i];
+        if (bases_are_fixed_and_reduced) {
+            for (i = 0u; i < n; ++i)
+                states[s].square[i] = base->LIMBS[i];
+        } else {
+            for (i = 0u; i < base->LENGTH; ++i)
+                states[s].square[i] = base->LIMBS[i];
+        }
         if (bignum_ct_mont_mul(states[s].base_m, states[s].square,
                               ctx.r2, &ctx) != 0)
             goto done;
@@ -397,11 +407,108 @@ done:
     return err;
 }
 
+LiberaCError crypto_bignum_mod_exp_public_fixed_base(
+    LiberaCBignum *out, const LiberaCBignum *base,
+    const LiberaCBignum *exponent, const LiberaCBignum *modulus) {
+    BignumCtMontCtx ctx;
+    uint32_t *buffer = NULL;
+    uint32_t *one, *one_m, *base_words, *base_m, *acc, *tmp, *result;
+    uint32_t borrow = 0u;
+    size_t n, bits, bit_index, i, buffer_words;
+    LiberaCError err = LIBERAC_ERROR_ARITHMETIC;
+
+    if (!out || !base || !exponent || !modulus ||
+        modulus->LENGTH == 0u || exponent->LENGTH == 0u ||
+        !(modulus->LIMBS[0] & 1u))
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
+
+    n = modulus->LENGTH;
+    if (base->CAPACITY < n || base->LENGTH > n || n > SIZE_MAX / 7u)
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
+
+    /* Compare the complete public modulus width without an early exit based on
+     * the fixed-width base. A final borrow means base < modulus. */
+    for (i = 0u; i < n; ++i) {
+        uint64_t subtrahend = (uint64_t)modulus->LIMBS[i] + borrow;
+        uint64_t minuend = base->LIMBS[i];
+        borrow = (uint32_t)(minuend < subtrahend);
+    }
+    if (borrow == 0u)
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
+
+    memset(&ctx, 0, sizeof(ctx));
+    if (bignum_ct_mont_init(&ctx, modulus) != 0)
+        return LIBERAC_ERROR_ALLOCATION_FAILED;
+
+    buffer_words = 7u * n;
+    buffer = (uint32_t *)calloc(buffer_words, sizeof(uint32_t));
+    if (!buffer) {
+        bignum_ct_mont_clear(&ctx);
+        return LIBERAC_ERROR_ALLOCATION_FAILED;
+    }
+
+    one = buffer;
+    one_m = one + n;
+    base_words = one_m + n;
+    base_m = base_words + n;
+    acc = base_m + n;
+    tmp = acc + n;
+    result = tmp + n;
+    one[0] = 1u;
+    for (i = 0u; i < n; ++i)
+        base_words[i] = base->LIMBS[i];
+
+    if (bignum_ct_mont_mul(one_m, one, ctx.r2, &ctx) != 0 ||
+        bignum_ct_mont_mul(base_m, base_words, ctx.r2, &ctx) != 0)
+        goto done;
+    memcpy(acc, one_m, n * sizeof(uint32_t));
+
+    /* The bit count, branches, and optional multiply depend only on the public
+     * exponent. Every value-dependent Montgomery reduction remains masked. */
+    bits = crypto_bignum_bit_length(exponent);
+    for (bit_index = bits; bit_index > 0u; --bit_index) {
+        if (bignum_ct_mont_mul(tmp, acc, acc, &ctx) != 0)
+            goto done;
+        {
+            uint32_t *swap = acc;
+            acc = tmp;
+            tmp = swap;
+        }
+        if (bignum_get_bit(exponent, bit_index - 1u)) {
+            if (bignum_ct_mont_mul(tmp, acc, base_m, &ctx) != 0)
+                goto done;
+            {
+                uint32_t *swap = acc;
+                acc = tmp;
+                tmp = swap;
+            }
+        }
+    }
+
+    if (bignum_ct_mont_mul(result, acc, one, &ctx) != 0)
+        goto done;
+    err = bignum_ct_store_fixed(out, result, n);
+
+done:
+    crypto_zeroize(buffer, buffer_words * sizeof(uint32_t));
+    free(buffer);
+    bignum_ct_mont_clear(&ctx);
+    return err;
+}
+
 LiberaCError crypto_bignum_mod_exp_ct(LiberaCBignum *out,
                                       const LiberaCBignum *base,
                                       const LiberaCBignum *exponent,
                                       const LiberaCBignum *modulus) {
-    return bignum_mod_exp_ct_core(out, base, NULL, NULL, exponent, modulus);
+    return bignum_mod_exp_ct_core(
+        out, base, NULL, NULL, exponent, modulus, 0);
+}
+
+LiberaCError crypto_bignum_mod_exp_ct_fixed_base(
+    LiberaCBignum *out, const LiberaCBignum *base,
+    const LiberaCBignum *exponent, const LiberaCBignum *modulus) {
+    return bignum_mod_exp_ct_core(
+        out, base, NULL, NULL, exponent, modulus, 1);
 }
 
 LiberaCError crypto_bignum_mod_exp2_ct(LiberaCBignum *out1,
@@ -413,5 +520,5 @@ LiberaCError crypto_bignum_mod_exp2_ct(LiberaCBignum *out1,
     if (!out2 || !base2 || out1 == out2)
         return LIBERAC_ERROR_INVALID_ARGUMENT;
     return bignum_mod_exp_ct_core(out1, base1, out2, base2,
-                                  exponent, modulus);
+                                  exponent, modulus, 0);
 }

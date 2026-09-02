@@ -103,6 +103,24 @@ crypto_add_public_test(
     "unit;asymmetric-cipher"
 )
 crypto_add_public_test(
+    crypto_rsa_pkcs1_test
+    LiberaCrypt.AsymmetricCipher.RSA.PKCS1
+    AsymmetricCipher/RSA/OaepPssTest.c
+    "unit;kat;asymmetric-cipher;rsa"
+)
+add_executable(
+    crypto_rsa_openssl_interop
+    AsymmetricCipher/RSA/OpenSslInterop.c
+)
+target_link_libraries(crypto_rsa_openssl_interop PRIVATE LiberaCrypt)
+set_target_properties(crypto_rsa_openssl_interop PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}")
+if(MSVC)
+    target_compile_definitions(
+        crypto_rsa_openssl_interop PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
+liberac_configure_portable_warnings(crypto_rsa_openssl_interop)
+crypto_add_public_test(
     crypto_ml_kem_unit
     LiberaCrypt.KeyEncapsulation.ML-KEM.Unit
     KeyEncapsulation/ML-KEM/UnitTest.c

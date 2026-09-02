@@ -46,6 +46,64 @@ LiberaCError LIBERAC_RSA_DECRYPT(LiberaCBignum *message,
     return crypto_rsa_decrypt_internal(alg, message, ciphertext, private_key);
 }
 
+size_t LIBERAC_RSA_PUBLIC_MODULUS_SIZE(
+    const LiberaCRsaPublicKey *public_key) {
+    return crypto_rsa_public_modulus_size_internal(public_key);
+}
+
+size_t LIBERAC_RSA_PRIVATE_MODULUS_SIZE(
+    const LiberaCRsaPrivateKey *private_key) {
+    return crypto_rsa_private_modulus_size_internal(private_key);
+}
+
+size_t LIBERAC_RSA_OAEP_MAX_MESSAGE_SIZE(
+    size_t modulus_bytes, LiberaCAlgID hash_alg, LiberaCAlgID alg) {
+    return crypto_rsa_oaep_max_message_size_internal(
+        modulus_bytes, hash_alg, alg);
+}
+
+LiberaCError LIBERAC_RSA_OAEP_ENCRYPT(
+    uint8_t *ciphertext, size_t ciphertext_length,
+    const uint8_t *message, size_t message_length,
+    const uint8_t *label, size_t label_length,
+    const LiberaCRsaPublicKey *public_key,
+    LiberaCAlgID hash_alg, LiberaCAlgID alg) {
+    return crypto_rsa_oaep_encrypt_internal(
+        alg, hash_alg, ciphertext, ciphertext_length,
+        message, message_length, label, label_length, public_key);
+}
+
+LiberaCError LIBERAC_RSA_OAEP_DECRYPT(
+    uint8_t *message, size_t message_capacity, size_t *message_length,
+    const uint8_t *ciphertext, size_t ciphertext_length,
+    const uint8_t *label, size_t label_length,
+    const LiberaCRsaPrivateKey *private_key,
+    LiberaCAlgID hash_alg, LiberaCAlgID alg) {
+    return crypto_rsa_oaep_decrypt_internal(
+        alg, hash_alg, message, message_capacity, message_length,
+        ciphertext, ciphertext_length, label, label_length, private_key);
+}
+
+LiberaCError LIBERAC_RSA_PSS_SIGN(
+    const LiberaCRsaPrivateKey *private_key,
+    const uint8_t *message, size_t message_length,
+    uint8_t *signature, size_t signature_length,
+    size_t salt_length, LiberaCAlgID hash_alg, LiberaCAlgID alg) {
+    return crypto_rsa_pss_sign_internal(
+        alg, hash_alg, private_key, message, message_length,
+        signature, signature_length, salt_length);
+}
+
+LiberaCError LIBERAC_RSA_PSS_VERIFY(
+    const LiberaCRsaPublicKey *public_key,
+    const uint8_t *message, size_t message_length,
+    const uint8_t *signature, size_t signature_length,
+    size_t salt_length, LiberaCAlgID hash_alg, LiberaCAlgID alg) {
+    return crypto_rsa_pss_verify_internal(
+        alg, hash_alg, public_key, message, message_length,
+        signature, signature_length, salt_length);
+}
+
 void LIBERAC_ELGAMAL_PUBLIC_KEY_INIT(LiberaCElgamalPublicKey *key) {
     crypto_elgamal_public_key_init_internal(key);
 }

@@ -157,6 +157,10 @@ enum {
 
     /** Raw textbook RSA operation without padding or message encoding. */
     LIBERAC_ALG_RSA_RAW = 0x2001,
+    /** RSAES-OAEP encryption and decryption according to PKCS #1 v2.2. */
+    LIBERAC_ALG_RSA_OAEP = 0x2002,
+    /** RSASSA-PSS signing and verification according to PKCS #1 v2.2. */
+    LIBERAC_ALG_RSA_PSS = 0x2003,
     /** ElGamal over a generated safe-prime group. */
     LIBERAC_ALG_ELGAMAL_SAFE_PRIME = 0x3001,
 

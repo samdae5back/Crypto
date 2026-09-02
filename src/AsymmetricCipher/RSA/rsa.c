@@ -66,8 +66,11 @@ LiberaCError crypto_rsa_keygen_internal(LiberaCAlgID ALG, LiberaCRsaPublicKey *P
     size_t p_bits, q_bits;
     int attempts;
     LiberaCError err;
-    if (ALG != LIBERAC_ALG_RSA_RAW) return LIBERAC_ERROR_INVALID_ALG_ID;
-    if (!PUBLIC_KEY || !PRIVATE_KEY || MODULUS_BITS < 32) return LIBERAC_ERROR_INVALID_ARGUMENT;
+    if (ALG != LIBERAC_ALG_RSA_RAW && ALG != LIBERAC_ALG_RSA_OAEP &&
+        ALG != LIBERAC_ALG_RSA_PSS)
+        return LIBERAC_ERROR_INVALID_ALG_ID;
+    if (!PUBLIC_KEY || !PRIVATE_KEY || MODULUS_BITS < 32)
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
     if (PRIME_ROUNDS == 0) PRIME_ROUNDS = 32;
     p_bits = MODULUS_BITS / 2u;
     q_bits = MODULUS_BITS - p_bits;

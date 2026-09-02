@@ -94,6 +94,7 @@ set(LIBERAC_SOURCES
     src/Util/ECC/ecc_encoding.c
     src/Util/Prime/prime.c
     src/AsymmetricCipher/RSA/rsa.c
+    src/AsymmetricCipher/RSA/rsa_pkcs1.c
     src/AsymmetricCipher/ElGamal/elgamal.c
     src/DigitalSignature/ECDSA/ecdsa.c
     src/DigitalSignature/Ed25519/ed25519.c

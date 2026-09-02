@@ -84,6 +84,20 @@ LiberaCError crypto_bignum_mod_exp_ct(LiberaCBignum *out,
                                       const LiberaCBignum *exponent,
                                       const LiberaCBignum *modulus);
 
+/* Same private-exponent schedule for a fixed-width base that the caller has
+ * already proved is below the modulus. The base must have modulus-width
+ * capacity; comparison and loading then avoid base-value-dependent exits. */
+LiberaCError crypto_bignum_mod_exp_ct_fixed_base(
+    LiberaCBignum *out, const LiberaCBignum *base,
+    const LiberaCBignum *exponent, const LiberaCBignum *modulus);
+
+/* Public exponent with a fixed-width, potentially secret base. The exponent
+ * controls the square/multiply schedule, while Montgomery arithmetic and base
+ * loading avoid branches and memory indices derived from the base value. */
+LiberaCError crypto_bignum_mod_exp_public_fixed_base(
+    LiberaCBignum *out, const LiberaCBignum *base,
+    const LiberaCBignum *exponent, const LiberaCBignum *modulus);
+
 /* Same secret exponent and modulus for two public bases.  Sharing Montgomery
  * setup avoids duplicated context/R^2 preparation in protocols such as
  * ElGamal encryption. */

@@ -23,4 +23,33 @@ LiberaCError crypto_rsa_decrypt_internal(LiberaCAlgID alg, LiberaCBignum *messag
                                         const LiberaCBignum *ciphertext,
                                         const LiberaCRsaPrivateKey *private_key);
 
+size_t crypto_rsa_public_modulus_size_internal(
+    const LiberaCRsaPublicKey *public_key);
+size_t crypto_rsa_private_modulus_size_internal(
+    const LiberaCRsaPrivateKey *private_key);
+size_t crypto_rsa_oaep_max_message_size_internal(
+    size_t modulus_bytes, LiberaCAlgID hash_alg, LiberaCAlgID alg);
+LiberaCError crypto_rsa_oaep_encrypt_internal(
+    LiberaCAlgID alg, LiberaCAlgID hash_alg,
+    uint8_t *ciphertext, size_t ciphertext_length,
+    const uint8_t *message, size_t message_length,
+    const uint8_t *label, size_t label_length,
+    const LiberaCRsaPublicKey *public_key);
+LiberaCError crypto_rsa_oaep_decrypt_internal(
+    LiberaCAlgID alg, LiberaCAlgID hash_alg,
+    uint8_t *message, size_t message_capacity, size_t *message_length,
+    const uint8_t *ciphertext, size_t ciphertext_length,
+    const uint8_t *label, size_t label_length,
+    const LiberaCRsaPrivateKey *private_key);
+LiberaCError crypto_rsa_pss_sign_internal(
+    LiberaCAlgID alg, LiberaCAlgID hash_alg,
+    const LiberaCRsaPrivateKey *private_key,
+    const uint8_t *message, size_t message_length,
+    uint8_t *signature, size_t signature_length, size_t salt_length);
+LiberaCError crypto_rsa_pss_verify_internal(
+    LiberaCAlgID alg, LiberaCAlgID hash_alg,
+    const LiberaCRsaPublicKey *public_key,
+    const uint8_t *message, size_t message_length,
+    const uint8_t *signature, size_t signature_length, size_t salt_length);
+
 #endif
