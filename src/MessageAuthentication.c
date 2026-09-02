@@ -5,6 +5,7 @@
 
 #include "MessageAuthentication.h"
 
+#include "AuthenticatedEncryption.h"
 #include "BlockCipher.h"
 #include "BlockCipher/AES/aes_internal.h"
 #include "BlockCipher/TripleDES/triple_des_internal.h"
@@ -463,21 +464,6 @@ static int gmac_algorithm_valid(LiberaCAlgID algorithm) {
            algorithm == LIBERAC_ALG_AES_256_GCM;
 }
 
-static int gmac_tag_length_valid(size_t tag_length) {
-    switch (tag_length) {
-        case 4u:
-        case 8u:
-        case 12u:
-        case 13u:
-        case 14u:
-        case 15u:
-        case 16u:
-            return 1;
-        default:
-            return 0;
-    }
-}
-
 LiberaCError LIBERAC_GMAC(
     uint8_t *TAG, size_t TAG_CAPACITY, size_t TAG_LENGTH,
     const uint8_t *MESSAGE, size_t MESSAGE_LENGTH,
@@ -487,7 +473,8 @@ LiberaCError LIBERAC_GMAC(
     if (!gmac_algorithm_valid(ALG)) {
         return LIBERAC_ERROR_INVALID_ALG_ID;
     }
-    if (!gmac_tag_length_valid(TAG_LENGTH) || TAG == NULL || KEY == NULL ||
+    if (!LIBERAC_AEAD_TAG_LENGTH_VALID(ALG, TAG_LENGTH) ||
+        TAG == NULL || KEY == NULL ||
         IV == NULL || IV_LENGTH == 0u ||
         (MESSAGE == NULL && MESSAGE_LENGTH != 0u)) {
         return LIBERAC_ERROR_INVALID_ARGUMENT;
@@ -496,8 +483,8 @@ LiberaCError LIBERAC_GMAC(
         return LIBERAC_ERROR_BUFFER_TOO_SMALL;
     }
 
-    return LIBERAC_BLOCK_CIPHER_ENCRYPT(
-        NULL, 0u, TAG, TAG_LENGTH,
+    return LIBERAC_AEAD_ENCRYPT(
+        NULL, 0u, TAG, TAG_CAPACITY, TAG_LENGTH,
         NULL, 0u, KEY, KEY_LENGTH,
         IV, IV_LENGTH, MESSAGE, MESSAGE_LENGTH, ALG);
 }
@@ -511,13 +498,14 @@ LiberaCError LIBERAC_GMAC_VERIFY(
     if (!gmac_algorithm_valid(ALG)) {
         return LIBERAC_ERROR_INVALID_ALG_ID;
     }
-    if (!gmac_tag_length_valid(TAG_LENGTH) || TAG == NULL || KEY == NULL ||
+    if (!LIBERAC_AEAD_TAG_LENGTH_VALID(ALG, TAG_LENGTH) ||
+        TAG == NULL || KEY == NULL ||
         IV == NULL || IV_LENGTH == 0u ||
         (MESSAGE == NULL && MESSAGE_LENGTH != 0u)) {
         return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
 
-    return LIBERAC_BLOCK_CIPHER_DECRYPT(
+    return LIBERAC_AEAD_DECRYPT(
         NULL, 0u, TAG, TAG_LENGTH,
         NULL, 0u, KEY, KEY_LENGTH,
         IV, IV_LENGTH, MESSAGE, MESSAGE_LENGTH, ALG);

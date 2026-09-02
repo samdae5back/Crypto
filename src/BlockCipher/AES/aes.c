@@ -406,14 +406,12 @@ static LiberaCError aes_ctr_crypt(const AES_CONTEXT *context,
 
 static LiberaCError aes_validate_request(
     const uint8_t *OUTPUT, size_t OUTPUT_CAPACITY,
-    const uint8_t *TAG, size_t TAG_LENGTH,
     const uint8_t *INPUT, size_t INPUT_LENGTH,
     const uint8_t *KEY, size_t KEY_LENGTH,
     const uint8_t *IV, size_t IV_LENGTH,
-    const uint8_t *AAD, size_t AAD_LENGTH,
     size_t expected_key_length, CryptoAesMode mode) {
     if (!KEY || (!INPUT && INPUT_LENGTH != 0u) ||
-        (!OUTPUT && INPUT_LENGTH != 0u) || (!AAD && AAD_LENGTH != 0u)) {
+        (!OUTPUT && INPUT_LENGTH != 0u)) {
         return LIBERAC_ERROR_INVALID_ARGUMENT;
     }
     if (KEY_LENGTH != expected_key_length) return LIBERAC_ERROR_INVALID_KEY;
@@ -423,31 +421,20 @@ static LiberaCError aes_validate_request(
     }
     switch (mode) {
         case CRYPTO_AES_MODE_ECB:
-            if (IV_LENGTH != 0u || AAD_LENGTH != 0u || TAG_LENGTH != 0u ||
-                (INPUT_LENGTH % AES_BLOCK_SIZE) != 0u) {
+            if (IV_LENGTH != 0u || (INPUT_LENGTH % AES_BLOCK_SIZE) != 0u) {
                 return LIBERAC_ERROR_INVALID_ARGUMENT;
             }
             break;
         case CRYPTO_AES_MODE_CBC:
-            if (!IV || IV_LENGTH != AES_BLOCK_SIZE || AAD_LENGTH != 0u ||
-                TAG_LENGTH != 0u ||
+            if (!IV || IV_LENGTH != AES_BLOCK_SIZE ||
                 (INPUT_LENGTH % AES_BLOCK_SIZE) != 0u) {
                 return LIBERAC_ERROR_INVALID_ARGUMENT;
             }
             break;
         case CRYPTO_AES_MODE_CTR:
-            if (!IV || IV_LENGTH != AES_BLOCK_SIZE || AAD_LENGTH != 0u ||
-                TAG_LENGTH != 0u) {
+            if (!IV || IV_LENGTH != AES_BLOCK_SIZE) {
                 return LIBERAC_ERROR_INVALID_ARGUMENT;
             }
-            break;
-        case CRYPTO_AES_MODE_CCM:
-            if (!IV || IV_LENGTH < 7u || IV_LENGTH > 13u || !TAG)
-                return LIBERAC_ERROR_INVALID_ARGUMENT;
-            break;
-        case CRYPTO_AES_MODE_GCM:
-            if (!IV || IV_LENGTH == 0u || !TAG)
-                return LIBERAC_ERROR_INVALID_ARGUMENT;
             break;
         default:
             return LIBERAC_ERROR_INVALID_ALG_ID;
@@ -458,18 +445,16 @@ static LiberaCError aes_validate_request(
 
 LiberaCError crypto_aes_encrypt(
     uint8_t *OUTPUT, size_t OUTPUT_CAPACITY,
-    uint8_t *TAG, size_t TAG_LENGTH,
     const uint8_t *INPUT, size_t INPUT_LENGTH,
     const uint8_t *KEY, size_t KEY_LENGTH,
     const uint8_t *IV, size_t IV_LENGTH,
-    const uint8_t *AAD, size_t AAD_LENGTH,
     size_t EXPECTED_KEY_LENGTH, CryptoAesMode MODE) {
     AES_CONTEXT context;
     LiberaCError err;
 
-    err = aes_validate_request(OUTPUT, OUTPUT_CAPACITY, TAG, TAG_LENGTH,
+    err = aes_validate_request(OUTPUT, OUTPUT_CAPACITY,
                                INPUT, INPUT_LENGTH, KEY, KEY_LENGTH,
-                               IV, IV_LENGTH, AAD, AAD_LENGTH,
+                               IV, IV_LENGTH,
                                EXPECTED_KEY_LENGTH, MODE);
     if (err != LIBERAC_SUCCESS) return err;
 
@@ -486,16 +471,6 @@ LiberaCError crypto_aes_encrypt(
         case CRYPTO_AES_MODE_CTR:
             err = aes_ctr_crypt(&context, OUTPUT, INPUT, INPUT_LENGTH, IV);
             break;
-        case CRYPTO_AES_MODE_CCM:
-            err = crypto_aes_ccm_encrypt(&context, OUTPUT, TAG, TAG_LENGTH,
-                                         INPUT, INPUT_LENGTH, IV, IV_LENGTH,
-                                         AAD, AAD_LENGTH);
-            break;
-        case CRYPTO_AES_MODE_GCM:
-            err = crypto_aes_gcm_encrypt(&context, OUTPUT, TAG, TAG_LENGTH,
-                                         INPUT, INPUT_LENGTH, IV, IV_LENGTH,
-                                         AAD, AAD_LENGTH);
-            break;
         default:
             err = LIBERAC_ERROR_INVALID_ALG_ID;
             break;
@@ -507,18 +482,16 @@ LiberaCError crypto_aes_encrypt(
 
 LiberaCError crypto_aes_decrypt(
     uint8_t *OUTPUT, size_t OUTPUT_CAPACITY,
-    const uint8_t *TAG, size_t TAG_LENGTH,
     const uint8_t *INPUT, size_t INPUT_LENGTH,
     const uint8_t *KEY, size_t KEY_LENGTH,
     const uint8_t *IV, size_t IV_LENGTH,
-    const uint8_t *AAD, size_t AAD_LENGTH,
     size_t EXPECTED_KEY_LENGTH, CryptoAesMode MODE) {
     AES_CONTEXT context;
     LiberaCError err;
 
-    err = aes_validate_request(OUTPUT, OUTPUT_CAPACITY, TAG, TAG_LENGTH,
+    err = aes_validate_request(OUTPUT, OUTPUT_CAPACITY,
                                INPUT, INPUT_LENGTH, KEY, KEY_LENGTH,
-                               IV, IV_LENGTH, AAD, AAD_LENGTH,
+                               IV, IV_LENGTH,
                                EXPECTED_KEY_LENGTH, MODE);
     if (err != LIBERAC_SUCCESS) return err;
 
@@ -534,16 +507,6 @@ LiberaCError crypto_aes_decrypt(
             break;
         case CRYPTO_AES_MODE_CTR:
             err = aes_ctr_crypt(&context, OUTPUT, INPUT, INPUT_LENGTH, IV);
-            break;
-        case CRYPTO_AES_MODE_CCM:
-            err = crypto_aes_ccm_decrypt(&context, OUTPUT, TAG, TAG_LENGTH,
-                                         INPUT, INPUT_LENGTH, IV, IV_LENGTH,
-                                         AAD, AAD_LENGTH);
-            break;
-        case CRYPTO_AES_MODE_GCM:
-            err = crypto_aes_gcm_decrypt(&context, OUTPUT, TAG, TAG_LENGTH,
-                                         INPUT, INPUT_LENGTH, IV, IV_LENGTH,
-                                         AAD, AAD_LENGTH);
             break;
         default:
             err = LIBERAC_ERROR_INVALID_ALG_ID;

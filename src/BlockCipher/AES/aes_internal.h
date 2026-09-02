@@ -21,9 +21,7 @@ typedef struct {
 typedef enum {
     CRYPTO_AES_MODE_ECB = 1,
     CRYPTO_AES_MODE_CBC = 2,
-    CRYPTO_AES_MODE_CTR = 3,
-    CRYPTO_AES_MODE_CCM = 4,
-    CRYPTO_AES_MODE_GCM = 5
+    CRYPTO_AES_MODE_CTR = 3
 } CryptoAesMode;
 
 /* Private raw-block API used by the modes and by CTR_DRBG. */
@@ -43,20 +41,16 @@ LiberaCError crypto_aes_decrypt_block(
 /* Private mode-independent entrypoints used only by src/BlockCipher.c. */
 LiberaCError crypto_aes_encrypt(
     uint8_t *OUTPUT, size_t OUTPUT_CAPACITY,
-    uint8_t *TAG, size_t TAG_LENGTH,
     const uint8_t *INPUT, size_t INPUT_LENGTH,
     const uint8_t *KEY, size_t KEY_LENGTH,
     const uint8_t *IV, size_t IV_LENGTH,
-    const uint8_t *AAD, size_t AAD_LENGTH,
     size_t EXPECTED_KEY_LENGTH, CryptoAesMode MODE);
 
 LiberaCError crypto_aes_decrypt(
     uint8_t *OUTPUT, size_t OUTPUT_CAPACITY,
-    const uint8_t *TAG, size_t TAG_LENGTH,
     const uint8_t *INPUT, size_t INPUT_LENGTH,
     const uint8_t *KEY, size_t KEY_LENGTH,
     const uint8_t *IV, size_t IV_LENGTH,
-    const uint8_t *AAD, size_t AAD_LENGTH,
     size_t EXPECTED_KEY_LENGTH, CryptoAesMode MODE);
 
 /* Cross-translation-unit AEAD helpers. All are private library symbols. */

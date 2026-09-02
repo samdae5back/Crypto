@@ -73,30 +73,6 @@ static LiberaCError block_cipher_parameters(LiberaCAlgID alg,
             key_length = LIBERAC_AES_256_KEY_BYTES;
             mode = CRYPTO_AES_MODE_CTR;
             break;
-        case LIBERAC_ALG_AES_128_CCM:
-            key_length = LIBERAC_AES_128_KEY_BYTES;
-            mode = CRYPTO_AES_MODE_CCM;
-            break;
-        case LIBERAC_ALG_AES_192_CCM:
-            key_length = LIBERAC_AES_192_KEY_BYTES;
-            mode = CRYPTO_AES_MODE_CCM;
-            break;
-        case LIBERAC_ALG_AES_256_CCM:
-            key_length = LIBERAC_AES_256_KEY_BYTES;
-            mode = CRYPTO_AES_MODE_CCM;
-            break;
-        case LIBERAC_ALG_AES_128_GCM:
-            key_length = LIBERAC_AES_128_KEY_BYTES;
-            mode = CRYPTO_AES_MODE_GCM;
-            break;
-        case LIBERAC_ALG_AES_192_GCM:
-            key_length = LIBERAC_AES_192_KEY_BYTES;
-            mode = CRYPTO_AES_MODE_GCM;
-            break;
-        case LIBERAC_ALG_AES_256_GCM:
-            key_length = LIBERAC_AES_256_KEY_BYTES;
-            mode = CRYPTO_AES_MODE_GCM;
-            break;
         default:
             return LIBERAC_ERROR_INVALID_ALG_ID;
     }
@@ -120,52 +96,44 @@ size_t LIBERAC_BLOCK_CIPHER_KEY_SIZE(LiberaCAlgID ALG) {
 
 LiberaCError LIBERAC_BLOCK_CIPHER_ENCRYPT(
     uint8_t *OUTPUT, size_t OUTPUT_CAPACITY,
-    uint8_t *TAG, size_t TAG_LENGTH,
     const uint8_t *INPUT, size_t INPUT_LENGTH,
     const uint8_t *KEY, size_t KEY_LENGTH,
     const uint8_t *IV, size_t IV_LENGTH,
-    const uint8_t *AAD, size_t AAD_LENGTH,
     LiberaCAlgID ALG) {
     BlockCipherParameters parameters;
     LiberaCError err = block_cipher_parameters(ALG, &parameters);
 
     if (err != LIBERAC_SUCCESS) return err;
     if (parameters.FAMILY == BLOCK_CIPHER_TDES) {
-        if (TAG_LENGTH != 0u || AAD_LENGTH != 0u)
-            return LIBERAC_ERROR_INVALID_ARGUMENT;
         return crypto_tdes_ede3_crypt(
             OUTPUT, OUTPUT_CAPACITY, INPUT, INPUT_LENGTH, KEY, KEY_LENGTH,
             IV, IV_LENGTH, parameters.TDES_MODE, 1);
     }
     return crypto_aes_encrypt(
-        OUTPUT, OUTPUT_CAPACITY, TAG, TAG_LENGTH,
+        OUTPUT, OUTPUT_CAPACITY,
         INPUT, INPUT_LENGTH, KEY, KEY_LENGTH,
-        IV, IV_LENGTH, AAD, AAD_LENGTH,
+        IV, IV_LENGTH,
         parameters.KEY_LENGTH, parameters.MODE);
 }
 
 LiberaCError LIBERAC_BLOCK_CIPHER_DECRYPT(
     uint8_t *OUTPUT, size_t OUTPUT_CAPACITY,
-    const uint8_t *TAG, size_t TAG_LENGTH,
     const uint8_t *INPUT, size_t INPUT_LENGTH,
     const uint8_t *KEY, size_t KEY_LENGTH,
     const uint8_t *IV, size_t IV_LENGTH,
-    const uint8_t *AAD, size_t AAD_LENGTH,
     LiberaCAlgID ALG) {
     BlockCipherParameters parameters;
     LiberaCError err = block_cipher_parameters(ALG, &parameters);
 
     if (err != LIBERAC_SUCCESS) return err;
     if (parameters.FAMILY == BLOCK_CIPHER_TDES) {
-        if (TAG_LENGTH != 0u || AAD_LENGTH != 0u)
-            return LIBERAC_ERROR_INVALID_ARGUMENT;
         return crypto_tdes_ede3_crypt(
             OUTPUT, OUTPUT_CAPACITY, INPUT, INPUT_LENGTH, KEY, KEY_LENGTH,
             IV, IV_LENGTH, parameters.TDES_MODE, 0);
     }
     return crypto_aes_decrypt(
-        OUTPUT, OUTPUT_CAPACITY, TAG, TAG_LENGTH,
+        OUTPUT, OUTPUT_CAPACITY,
         INPUT, INPUT_LENGTH, KEY, KEY_LENGTH,
-        IV, IV_LENGTH, AAD, AAD_LENGTH,
+        IV, IV_LENGTH,
         parameters.KEY_LENGTH, parameters.MODE);
 }
