@@ -22,8 +22,8 @@ The cryptographic implementation remains independent of an external cryptographi
 
 LiberaCrypt includes classical and post-quantum cryptographic algorithms,
 including AES, Triple-DES, SHA-1/SHA-2/SHA-3/SHAKE, CTR_DRBG, RSA, ElGamal,
-ECDH, X25519, ECDSA, ML-KEM, ML-DSA, SLH-DSA, NTRU+, SMAUG-T, AIMer, and
-HAETAE.
+ECDH, X25519, ECDSA, Ed25519, ML-KEM, ML-DSA, SLH-DSA, NTRU+, SMAUG-T,
+AIMer, and HAETAE.
 
 ## Project principles
 
@@ -104,7 +104,7 @@ inc/                              public category API headers only
 src/*.c                           public category API entry points
 src/AsymmetricCipher/{RSA,ElGamal}
 src/BlockCipher/{AES,TripleDES}
-src/DigitalSignature/{AIMer,ECDSA,HAETAE,ML-DSA,SLH-DSA}
+src/DigitalSignature/{AIMer,ECDSA,Ed25519,HAETAE,ML-DSA,SLH-DSA}
 src/HashFunction/{SHA1,SHA2,SHA3,LSH}
 src/KeyAgreement/{ecdh,x25519}
 src/KeyEncapsulation/{ML-KEM,NTRU-Plus,SMAUG-T}
@@ -340,6 +340,30 @@ private exponents are padded to the public modulus limb width. ISO C, however,
 cannot guarantee identical instruction latency on every processor/compiler, so
 hardware-level timing claims require platform-specific validation.
 
+### Ed25519
+
+The Ed25519 implementation follows pure-mode RFC 8032 with 32-byte private
+seeds, compressed 32-byte public keys, and 64-byte `R || S` signatures. SHA-512
+is fixed by the algorithm and is not exposed as a caller-selectable parameter.
+
+Field elements use sixteen little-endian radix-2^16 limbs over
+`2^255 - 19`. Products accumulate in portable `uint64_t` storage and fold with
+`2^256 = 38 (mod p)`, avoiding `unsigned __int128`, target intrinsics, assembly,
+VLAs, host-endian word casts, and signed-shift assumptions. Extended Edwards
+coordinates use complete addition formulas, so scalar multiplication needs no
+secret-dependent exceptional-case branch or affine inversion inside its loop.
+
+Scalar multiplication uses a four-bit fixed window. Sixteen point multiples
+are precomputed, every window performs four doublings and one addition, and a
+masked scan selects one of all sixteen entries. The schedule and table access
+pattern therefore do not depend on private scalar digits. This is a source-level
+fixed-schedule claim, not a universal hardware side-channel guarantee.
+
+Verification rejects non-canonical point encodings, `S >= L`, the identity
+public key, and public keys outside the prime-order subgroup before checking the
+uncofactored RFC 8032 equation. Detailed representation, validation, and test
+evidence is recorded in `docs/optimization/Ed25519.md`.
+
 ### ML-KEM modular reduction selection
 
 The portable ML-KEM NTT keeps coefficients canonical in `[0, q)` for
@@ -488,6 +512,8 @@ When `LIBERAC_BUILD_TESTS` is enabled, CMake generates:
 - SHA-1, SHA-2, SHA-3, SHAKE, and LSH known-answer tests
 - CTR_DRBG known-answer and derivation-function tests
 - operation tests for every supported post-quantum KEM and signature family
+- RFC 8032 Ed25519 known-answer tests, strict-encoding negative tests, and
+  deterministic sign/verify round trips
 - 100-record KATs for all 9 KEM parameter sets and all 24 current signature
   parameter sets
 - verification of 300 context-explicit HAETAE 1.1.2 signatures as a

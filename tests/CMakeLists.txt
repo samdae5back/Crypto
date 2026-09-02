@@ -133,6 +133,18 @@ crypto_add_public_test(
     "kat;digital-signature;ecdsa;ecc"
 )
 crypto_add_public_test(
+    crypto_ed25519_unit
+    LiberaCrypt.DigitalSignature.Ed25519.Unit
+    DigitalSignature/Ed25519/UnitTest.c
+    "unit;digital-signature;ed25519;ecc"
+)
+crypto_add_public_test(
+    crypto_ed25519_kat
+    LiberaCrypt.DigitalSignature.Ed25519.RFC8032
+    DigitalSignature/Ed25519/KAT.c
+    "kat;digital-signature;ed25519;ecc"
+)
+crypto_add_public_test(
     crypto_ml_dsa_unit
     LiberaCrypt.DigitalSignature.ML-DSA.Unit
     DigitalSignature/ML-DSA/UnitTest.c
