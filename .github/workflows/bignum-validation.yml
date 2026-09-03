@@ -47,24 +47,24 @@ jobs:
           -DCMAKE_PREFIX_PATH="${GITHUB_WORKSPACE}/install"
           -DLIBERACRYPT_SOURCE_ROOT="${GITHUB_WORKSPACE}"
 
-      - name: Build bignum benchmark
+      - name: Build bignum benchmarks
         run: cmake --build build-bench --config Release --parallel
 
-      - name: Run bignum benchmark
+      - name: Run stage-two bignum benchmark
         shell: bash
         run: |
           set -euo pipefail
-          bin="$(find build-bench -type f \( -name 'liberacrypt_bignum_benchmark' -o -name 'liberacrypt_bignum_benchmark.exe' \) | head -n 1)"
+          bin="$(find build-bench -type f \( -name 'liberacrypt_bignum_stage2_benchmark' -o -name 'liberacrypt_bignum_stage2_benchmark.exe' \) | head -n 1)"
           test -n "${bin}"
-          output="bignum-benchmark-${RUNNER_OS}.csv"
+          output="bignum-stage2-benchmark-${RUNNER_OS}.csv"
           "${bin}" > "${output}"
           cat "${output}"
 
       - name: Upload benchmark result
         uses: actions/upload-artifact@v4
         with:
-          name: bignum-benchmark-${{ runner.os }}
-          path: bignum-benchmark-${{ runner.os }}.csv
+          name: bignum-stage2-benchmark-${{ runner.os }}
+          path: bignum-stage2-benchmark-${{ runner.os }}.csv
           if-no-files-found: error
 
   sanitizer:
