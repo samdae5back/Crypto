@@ -50,30 +50,43 @@ void bignum_normalize(LiberaCBignum *a) {
     while (a->LENGTH && a->LIMBS[a->LENGTH - 1] == 0) --a->LENGTH;
 }
 
+static void bignum_clear_stale_tail(LiberaCBignum *value,
+                                    size_t old_length,
+                                    size_t new_length) {
+    if (value && value->LIMBS && old_length > new_length) {
+        crypto_zeroize(value->LIMBS + new_length,
+                       (old_length - new_length) * sizeof(uint32_t));
+    }
+}
+
 int crypto_bignum_copy(LiberaCBignum *OUT, const LiberaCBignum *IN) {
+    size_t old_length;
     if (!OUT || !IN) return -1;
     if (OUT == IN) return 0;
+    old_length = OUT->LENGTH;
     if (bignum_reserve(OUT, IN->LENGTH) != 0) return -1;
     if (IN->LENGTH) memcpy(OUT->LIMBS, IN->LIMBS, IN->LENGTH * sizeof(uint32_t));
-    if (OUT->LENGTH > IN->LENGTH) memset(OUT->LIMBS + IN->LENGTH, 0, (OUT->LENGTH - IN->LENGTH) * sizeof(uint32_t));
+    bignum_clear_stale_tail(OUT, old_length, IN->LENGTH);
     OUT->LENGTH = IN->LENGTH;
     return 0;
 }
 
 int crypto_bignum_set_u64(LiberaCBignum *OUT, uint64_t VALUE) {
+    size_t old_length, new_length;
     if (!OUT) return -1;
+    old_length = OUT->LENGTH;
     if (VALUE == 0) {
+        bignum_clear_stale_tail(OUT, old_length, 0u);
         OUT->LENGTH = 0;
         return 0;
     }
-    if (bignum_reserve(OUT, VALUE >> 32 ? 2 : 1) != 0) return -1;
+    new_length = VALUE >> 32 ? 2u : 1u;
+    if (bignum_reserve(OUT, new_length) != 0) return -1;
     OUT->LIMBS[0] = (uint32_t)VALUE;
-    if (VALUE >> 32) {
+    if (new_length == 2u)
         OUT->LIMBS[1] = (uint32_t)(VALUE >> 32);
-        OUT->LENGTH = 2;
-    } else {
-        OUT->LENGTH = 1;
-    }
+    bignum_clear_stale_tail(OUT, old_length, new_length);
+    OUT->LENGTH = new_length;
     return 0;
 }
 
@@ -170,91 +183,125 @@ int crypto_bignum_is_zero(const LiberaCBignum *VALUE) {
     return !VALUE || VALUE->LENGTH == 0;
 }
 
-int crypto_bignum_add(LiberaCBignum *OUT, const LiberaCBignum *A, const LiberaCBignum *B) {
-    LiberaCBignum t;
-    size_t n, i;
-    uint64_t carry = 0;
+int crypto_bignum_add(LiberaCBignum *OUT, const LiberaCBignum *A,
+                      const LiberaCBignum *B) {
+    size_t a_length, b_length, old_length, n, i;
+    uint64_t carry = 0u;
     if (!OUT || !A || !B) return -1;
-    crypto_bignum_init(&t);
-    n = A->LENGTH > B->LENGTH ? A->LENGTH : B->LENGTH;
-    if (bignum_reserve(&t, n + 1u) != 0) goto fail;
-    for (i = 0; i < n; ++i) {
-        uint64_t av = i < A->LENGTH ? A->LIMBS[i] : 0;
-        uint64_t bv = i < B->LENGTH ? B->LIMBS[i] : 0;
-        uint64_t s = av + bv + carry;
-        t.LIMBS[i] = (uint32_t)s;
-        carry = s >> 32;
+
+    a_length = A->LENGTH;
+    b_length = B->LENGTH;
+    old_length = OUT->LENGTH;
+    n = a_length > b_length ? a_length : b_length;
+    if (n == SIZE_MAX || bignum_reserve(OUT, n + 1u) != 0)
+        return -1;
+
+    /* Addition is naturally alias-safe by limb: both source limbs are read
+     * before the destination limb at the same index is overwritten.  Reusing
+     * OUT therefore avoids a temporary allocation even for OUT == A/B. */
+    for (i = 0u; i < n; ++i) {
+        uint64_t av = i < a_length ? A->LIMBS[i] : 0u;
+        uint64_t bv = i < b_length ? B->LIMBS[i] : 0u;
+        uint64_t sum = av + bv + carry;
+        OUT->LIMBS[i] = (uint32_t)sum;
+        carry = sum >> 32;
     }
-    if (carry) t.LIMBS[n++] = (uint32_t)carry;
-    t.LENGTH = n;
-    crypto_bignum_free(OUT);
-    *OUT = t;
+    if (carry != 0u)
+        OUT->LIMBS[n++] = (uint32_t)carry;
+    else
+        OUT->LIMBS[n] = 0u;
+    bignum_clear_stale_tail(OUT, old_length, n);
+    OUT->LENGTH = n;
     return 0;
-fail:
-    crypto_bignum_free(&t);
-    return -1;
 }
 
-int crypto_bignum_sub(LiberaCBignum *OUT, const LiberaCBignum *A, const LiberaCBignum *B) {
-    LiberaCBignum t;
-    size_t i;
-    uint64_t borrow = 0;
+int crypto_bignum_sub(LiberaCBignum *OUT, const LiberaCBignum *A,
+                      const LiberaCBignum *B) {
+    size_t a_length, b_length, old_length, i;
+    uint64_t borrow = 0u;
     if (!OUT || !A || !B || crypto_bignum_compare(A, B) < 0) return -1;
-    crypto_bignum_init(&t);
-    if (bignum_reserve(&t, A->LENGTH) != 0) goto fail;
-    for (i = 0; i < A->LENGTH; ++i) {
+
+    a_length = A->LENGTH;
+    b_length = B->LENGTH;
+    old_length = OUT->LENGTH;
+    if (bignum_reserve(OUT, a_length) != 0)
+        return -1;
+
+    /* As with addition, same-index overwrite is safe after both input limbs
+     * have been loaded, so subtraction can reuse OUT for aliased operands. */
+    for (i = 0u; i < a_length; ++i) {
         uint64_t av = A->LIMBS[i];
-        uint64_t bv = (i < B->LENGTH ? B->LIMBS[i] : 0) + borrow;
-        t.LIMBS[i] = (uint32_t)(av - bv);
+        uint64_t bv = (i < b_length ? B->LIMBS[i] : 0u) + borrow;
+        OUT->LIMBS[i] = (uint32_t)(av - bv);
         borrow = av < bv;
     }
-    t.LENGTH = A->LENGTH;
-    bignum_normalize(&t);
-    crypto_bignum_free(OUT);
-    *OUT = t;
+    OUT->LENGTH = a_length;
+    bignum_normalize(OUT);
+    bignum_clear_stale_tail(OUT, old_length, OUT->LENGTH);
     return 0;
-fail:
-    crypto_bignum_free(&t);
-    return -1;
 }
 
-int crypto_bignum_mul(LiberaCBignum *OUT, const LiberaCBignum *A, const LiberaCBignum *B) {
-    LiberaCBignum t;
-    size_t i, j, n;
-    if (!OUT || !A || !B) return -1;
-    crypto_bignum_init(&t);
-    if (A->LENGTH == 0 || B->LENGTH == 0) {
-        crypto_bignum_free(OUT);
-        *OUT = t;
+static int bignum_mul_noalias(LiberaCBignum *out,
+                              const LiberaCBignum *a,
+                              const LiberaCBignum *b) {
+    size_t a_length, b_length, old_length, product_length, i, j;
+    if (!out || !a || !b || out == a || out == b)
+        return -1;
+
+    a_length = a->LENGTH;
+    b_length = b->LENGTH;
+    old_length = out->LENGTH;
+    if (a_length == 0u || b_length == 0u) {
+        bignum_clear_stale_tail(out, old_length, 0u);
+        out->LENGTH = 0u;
         return 0;
     }
-    n = A->LENGTH + B->LENGTH + 1u;
-    if (bignum_reserve(&t, n) != 0) goto fail;
-    memset(t.LIMBS, 0, n * sizeof(uint32_t));
-    for (i = 0; i < A->LENGTH; ++i) {
-        uint64_t carry = 0;
-        for (j = 0; j < B->LENGTH; ++j) {
+    if (a_length > SIZE_MAX - b_length)
+        return -1;
+    product_length = a_length + b_length;
+    if (bignum_reserve(out, product_length) != 0)
+        return -1;
+    memset(out->LIMBS, 0, product_length * sizeof(uint32_t));
+    bignum_clear_stale_tail(out, old_length, product_length);
+
+    for (i = 0u; i < a_length; ++i) {
+        uint64_t carry = 0u;
+        for (j = 0u; j < b_length; ++j) {
             size_t k = i + j;
-            uint64_t cur = (uint64_t)A->LIMBS[i] * B->LIMBS[j] + t.LIMBS[k] + carry;
-            t.LIMBS[k] = (uint32_t)cur;
-            carry = cur >> 32;
+            uint64_t current = (uint64_t)a->LIMBS[i] * b->LIMBS[j] +
+                               out->LIMBS[k] + carry;
+            out->LIMBS[k] = (uint32_t)current;
+            carry = current >> 32;
         }
-        j = i + B->LENGTH;
-        while (carry) {
-            uint64_t cur = (uint64_t)t.LIMBS[j] + carry;
-            t.LIMBS[j] = (uint32_t)cur;
-            carry = cur >> 32;
-            ++j;
-        }
+        /* No earlier row can reach limb i+b_length.  Store the final carry
+         * directly instead of entering a carry-propagation while loop. */
+        out->LIMBS[i + b_length] = (uint32_t)carry;
     }
-    t.LENGTH = n;
-    bignum_normalize(&t);
-    crypto_bignum_free(OUT);
-    *OUT = t;
+    out->LENGTH = product_length;
+    bignum_normalize(out);
     return 0;
-fail:
-    crypto_bignum_free(&t);
-    return -1;
+}
+
+int crypto_bignum_mul(LiberaCBignum *OUT, const LiberaCBignum *A,
+                      const LiberaCBignum *B) {
+    LiberaCBignum tmp;
+    int rc;
+    if (!OUT || !A || !B) return -1;
+
+    if (OUT != A && OUT != B)
+        return bignum_mul_noalias(OUT, A, B);
+
+    /* Multiplication reuses source limbs across several output columns, so an
+     * aliased destination still needs a temporary. */
+    crypto_bignum_init(&tmp);
+    rc = bignum_mul_noalias(&tmp, A, B);
+    if (rc == 0) {
+        crypto_bignum_free(OUT);
+        *OUT = tmp;
+        crypto_bignum_init(&tmp);
+    }
+    crypto_bignum_free(&tmp);
+    return rc;
 }
 
 int bignum_get_bit(const LiberaCBignum *a, size_t bit) {

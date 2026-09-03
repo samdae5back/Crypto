@@ -1,122 +1,215 @@
 # Bignum optimization record
 
-This document records the second-stage optimization work for LiberaCrypt's
-shared arbitrary-precision arithmetic. The general bignum layer remains
-performance-oriented and variable-time. Secret-sensitive protocol operations
-continue to use fixed-width constant-schedule helpers where their control flow
-or memory access must not depend on secret values.
+This document is the consolidated engineering record for LiberaCrypt's second-stage
+arbitrary-precision arithmetic optimization.
+
+The short version is:
+
+- **Stage 1** removed the largest generic modular-arithmetic bottleneck. The new
+  word-based reducer is roughly **49x–83x faster for direct remainder** and
+  **26x–55x faster for multiply-then-reduce** in the measured 2048–4096-bit cases.
+- **Stage 2** removes avoidable output allocation and tightens the portable
+  multiplication/squaring loops. At 4096 bits, add/sub improve by roughly
+  **38%–47%**, squaring by **15%–61%**, while generic multiplication improves
+  modestly and is intentionally kept simple.
+- **Stage 3** evaluates Karatsuba separately. It is not part of Stage 2 and is
+  accepted only if a reproducible cross-platform crossover exists.
+
+All measured values below are **same-run pairwise comparisons**: the old/reference
+path and new path execute on the same hosted runner with the same deterministic
+inputs. Absolute microsecond values from different workflow runs are not combined
+into a cumulative speedup claim.
 
 The portable baseline remains 32-bit limbs with 32x32-to-64 arithmetic. No
 `__uint128_t`, compiler intrinsics, assembly, or host-endian word casts are
-required by the changes recorded here.
+required by Stage 1 or Stage 2.
 
-## Stage 1 — public reduction and Montgomery core
+## At a glance
 
-### Baseline
+| Stage | Baseline | Accepted change | Measured outcome |
+|---|---|---|---|
+| 1 | bit-at-a-time generic reduction, repeated-doubling `R^2`, shifted CIOS | normalized base-2^32 remainder, direct `R^2`, integrated-shift CIOS | very large reduction/setup win; smaller CIOS-core win |
+| 2 | allocate/replace add/sub/mul/square and older inner loops | safe output reuse, tight schoolbook carry handling, single doubled-cross square accumulation | large add/sub/square win; small-to-moderate multiply win |
+| 3 | Stage-2 schoolbook multiplication | benchmark-only one-level Karatsuba candidate | measured separately before any production adoption |
 
-Before this stage, `crypto_bignum_mod()` implemented generic remainder by
-scanning the dividend one bit at a time. For every bit it shifted a temporary
-remainder left, appended the next input bit, compared against the modulus, and
-allocated/subtracted a new bignum when reduction was needed. Consequently a
-large `multiply -> mod` path performed work proportional to the dividend bit
-count with substantial repeated temporary allocation.
+## Security boundary
 
-The optimized public and fixed-width secret Montgomery engines already used
-CIOS Montgomery multiplication, but each outer iteration completed the logical
-division by one radix limb by copying `n + 1` temporary limbs down by one
-position. Montgomery `R^2` setup was also built through `64*n` repeated bignum
-doublings and conditional subtractions.
+The generic bignum layer is intentionally performance-oriented and variable-time.
 
-### Accepted implementation
+Secret-sensitive operations remain on the fixed-width constant-schedule path.
+Stage 1 shares only the CIOS accumulation machinery and public-modulus `R^2`
+setup; the secret path still keeps fixed loop counts and masked final reduction.
+Stage 2 changes the generic add/sub/mul/square paths and does **not** replace the
+fixed-width secret exponentiation schedule.
 
-1. **Normalized word remainder.** Generic variable-time remainder now uses a
-   base-2^32 normalized long-division remainder algorithm. The divisor is
-   normalized so its high bit is set, one quotient digit is estimated per input
-   limb, the estimate is corrected when necessary, and only the remainder is
-   retained. A one-limb modulus still uses the existing `uint64_t`/`uint32_t`
-   remainder path. The implementation uses only fixed-width ISO C integer
-   arithmetic.
-2. **Direct `R^2` construction.** Montgomery setup constructs the public integer
-   `2^(64*n)` directly and reduces it once with the word reducer, rather than
-   performing `64*n` allocation-heavy doublings. This setup depends only on the
-   public modulus and does not enter a secret-dependent schedule.
-3. **Shift-free CIOS core.** The common Montgomery multiply core folds the
-   logical radix-limb shift into reduction write-back: reduced limb `j` is
-   written directly to slot `j-1`. This removes the per-outer-iteration
-   `n + 1`-limb copy.
-4. **Separate final-reduction policy is preserved.** The public Montgomery path
-   retains its public-data compare/branch and early exit. The secret
-   fixed-width path still computes `candidate - modulus` and mask-selects the
-   reduced or unreduced candidate with fixed loop counts. Sharing the CIOS
-   accumulation core therefore does not collapse the public/secret timing
-   boundary.
+---
 
-The older bit-at-a-time remainder, repeated-doubling `R^2` setup, and
-shift-after-each-round CIOS formulation are retained only inside the bignum
-benchmark as same-build comparison baselines; they are not linked into the
-library.
+# Stage 1 — public reduction and Montgomery core
 
-### Correctness and portability argument
+## What changed
 
-The normalized reducer is the usual base-2^32 long-division remainder
-construction. Normalization preserves the quotient and scales the remainder by
-an exact power of two; the final right shift reverses that scaling. Quotient
-estimation uses at most two high dividend limbs and the normalized high divisor
-limb, and the correction/add-back step handles an overestimate without relying
-on signed overflow.
+Before Stage 1, `crypto_bignum_mod()` scanned the dividend one bit at a time:
+shift the temporary remainder, append one bit, compare, and conditionally
+subtract. This was simple but extremely expensive for large operands.
 
-The shift-free CIOS formulation performs the same multiply and Montgomery
-reduction recurrence as the prior implementation. It changes only where the
-post-reduction words are stored. The benchmark checks the complete unreduced
-`n + 1`-limb candidate from both formulations before timing them.
+Stage 1 replaced that path with:
 
-All arithmetic uses `uint32_t`, `uint64_t`, and `size_t`. No signed right shift,
-plain-`char` signedness, host byte order, native 128-bit integer, or
-architecture-specific instruction is assumed.
+1. **Normalized base-2^32 long-division remainder.**
+2. **Direct Montgomery `R^2` construction** by reducing `2^(64n)` once instead
+   of performing `64n` allocation-heavy doublings.
+3. **Integrated-shift CIOS Montgomery multiplication**, removing the `n+1` limb
+   move after every outer iteration.
+4. Separate public and secret final-reduction policies remain intact.
 
-### Validation and benchmark method
+The exact pre-Stage-1 algorithms are retained only in the benchmark as reference
+implementations.
 
-`benchmarks/Bignum/Benchmark.c` performs differential checks before printing any
-measurements:
+## Benchmark result
 
-- normalized remainder versus the exact pre-stage bitwise reducer;
-- `multiply -> remainder` through both reduction paths;
-- direct `R^2` setup versus the exact repeated-doubling setup;
-- shift-free CIOS candidate versus the exact shift-after-each-round CIOS
-  candidate;
-- 80 additional deterministic randomized remainder cases from 64 through
-  1024 bits.
+### Generic remainder — speedup over original bitwise reducer
 
-The benchmark then reports median CPU microseconds per operation over five
-samples for 2048-, 3072-, and 4096-bit moduli. It measures:
+| Bits | Linux | macOS | Windows |
+|---:|---:|---:|---:|
+| 2048 | 83.4× | 55.5× | 71.8× |
+| 3072 | 69.5× | 48.6× | 60.0× |
+| 4096 | 81.3× | 51.9× | 66.9× |
 
-- a two-modulus-width remainder;
-- modular multiplication;
-- Montgomery `R^2` setup;
-- the raw Montgomery CIOS core.
+### Multiply then reduce — speedup over original path
 
-The `Bignum Validation` workflow builds a static library, runs the complete test
-suite, runs the benchmark on Ubuntu, macOS, and Windows, uploads each CSV, and
-runs the unit-test label under ASan/UBSan on Ubuntu. Hosted-runner measurements
-are comparative evidence for these exact revisions; they are not universal
-architecture claims.
+| Bits | Linux | macOS | Windows |
+|---:|---:|---:|---:|
+| 2048 | 55.3× | 32.3× | 44.2× |
+| 3072 | 46.3× | 25.8× | 37.7× |
+| 4096 | 52.8× | 30.3× | 42.6× |
 
-### Hosted benchmark result
+### Montgomery `R^2` setup — speedup over repeated doubling
 
-Results are populated from the final validated pull-request head after the
-Ubuntu, macOS, and Windows benchmark jobs complete.
+| Bits | Linux | macOS | Windows |
+|---:|---:|---:|---:|
+| 2048 | 78.0× | 47.0× | 62.8× |
+| 3072 | 67.4× | 41.7× | 57.1× |
+| 4096 | 78.0× | 49.2× | 60.7× |
 
-## Stage 2 — allocation/workspace and multiply/square tuning
+### Raw CIOS core — percent faster after integrated shift
 
-Planned after Stage 1 is validated. This stage will benchmark allocation reuse,
-capacity growth, reusable arithmetic scratch storage, and the schoolbook
-multiply/square inner loops as a separate pull request so Stage 1 numbers remain
-attributable to reduction and Montgomery changes only.
+| Bits | Linux | macOS | Windows |
+|---:|---:|---:|---:|
+| 2048 | 4.1% | 3.4% | 8.1% |
+| 3072 | 0.7% | 9.9% | 17.1% |
+| 4096 | 4.5% | 11.9% | 15.0% |
 
-## Stage 3 — measured large-operand multiplication
+The main Stage-1 win is therefore **algorithmic reduction/setup work**, not just
+loop tuning. The CIOS rewrite is useful but accounts for a much smaller share of
+the total improvement.
 
-Karatsuba or another large-operand multiplication path will be considered only
-after Stage 2. The schoolbook baseline remains the default unless a reproducible
-crossover appears at operand sizes that matter to LiberaCrypt's RSA, ElGamal,
-and prime-generation workloads. A rejected optimization is still recorded with
-its benchmark evidence rather than being retained for algorithm-count reasons.
+## Validation
+
+Before timing, the benchmark checks:
+
+- normalized remainder vs the exact old bitwise reducer;
+- multiply-then-reduce through both paths;
+- direct `R^2` vs repeated-doubling `R^2`;
+- complete `n+1`-limb CIOS candidates from old and new formulations;
+- 80 deterministic randomized reduction cases.
+
+Final accurate benchmark workflow:
+
+- run: `33740787602`
+- head: `3c929f18ff207f9d7aa7357e8380632d856cbe62`
+- artifacts:
+  - `bignum-stage1-accurate-Linux`
+  - `bignum-stage1-accurate-macOS`
+  - `bignum-stage1-accurate-Windows`
+
+The same head also passed the complete CI matrix, RSA validation, ECC validation,
+and the dedicated Bignum Validation workflow before Stage 1 was merged.
+
+---
+
+# Stage 2 — output reuse and multiply/square inner loops
+
+## What changed
+
+Stage 2 targets allocator and inner-loop overhead left after Stage 1:
+
+1. **Add/sub output reuse.** Same-index dependencies make these operations
+   naturally alias-safe, so existing destination capacity is reused.
+2. **Non-aliased multiply output reuse.** Destructive aliases keep a temporary.
+3. **Tighter schoolbook multiplication.** The result uses the exact maximum
+   width and each row's final carry is written directly.
+4. **Single doubled-cross square accumulation.** `2*a[i]*a[j]` is represented
+   portably in base 2^32 and accumulated once instead of calling the generic
+   product accumulator twice.
+5. **Non-aliased square output reuse.**
+
+`bignum_reserve()` deliberately keeps exact-size growth. A global geometric
+growth policy could retain unnecessary capacity in objects that may later hold
+private material, so Stage 2 prefers reusing capacity that already exists.
+
+## Benchmark result
+
+Stage 2 compares against the exact Stage-1 add/sub/mul/square implementations.
+Those generic operations were not changed by Stage 1, so for these operations
+the Stage-1 reference is also the relevant pre-Stage-2/original-style baseline.
+
+### Improvement range across 1024/2048/3072/4096-bit cases
+
+| Operation | Linux | macOS | Windows |
+|---|---:|---:|---:|
+| `add` | +47.1% to +59.4% | +46.1% to +66.1% | +40.7% to +55.6% |
+| `sub` | +45.4% to +60.1% | +43.7% to +65.5% | +38.5% to +50.0% |
+| `mul` | +2.8% to +18.1% | +3.2% to +10.1% | -2.0% to +10.7% |
+| `square` | +54.8% to +61.8% | +15.3% to +27.5% | +41.8% to +53.9% |
+
+A small Windows multiplication regression appeared at 3072 bits (`-2.0%`), while
+4096-bit Windows multiplication improved by `+10.7%`. This is why Stage 2 does
+not claim a universal large multiplication speedup; the strong, consistent gains
+are output reuse for linear operations and the square-specific rewrite.
+
+### Representative 4096-bit raw timings
+
+| Operation | Linux | macOS | Windows |
+|---|---:|---:|---:|
+| `add` | 0.516 → 0.273 μs (+47.1%) | 0.479 → 0.258 μs (+46.1%) | 0.540 → 0.320 μs (+40.7%) |
+| `sub` | 0.560 → 0.306 μs (+45.4%) | 0.471 → 0.265 μs (+43.7%) | 0.520 → 0.320 μs (+38.5%) |
+| `mul` | 11.700 → 11.369 μs (+2.8%) | 24.191 → 23.056 μs (+4.7%) | 20.600 → 18.400 μs (+10.7%) |
+| `square` | 50.926 → 20.101 μs (+60.5%) | 47.180 → 39.960 μs (+15.3%) | 50.200 → 29.200 μs (+41.8%) |
+
+Positive percentages mean the Stage-2 path is faster.
+
+## Validation
+
+`Stage2Benchmark.c` retains the exact Stage-1 allocating implementations as
+benchmark-only references. It runs 120 deterministic randomized cases over
+1–80 limbs and also validates in-place alias behavior before timing.
+
+Final accurate benchmark workflow:
+
+- run: `33800902324`
+- head: `293d736b22d807b554d8688dbd23849a97d7cfde`
+- artifacts:
+  - `bignum-stage2-accurate-Linux`
+  - `bignum-stage2-accurate-macOS`
+  - `bignum-stage2-accurate-Windows`
+
+That head passed the complete CI, RSA validation, ECC validation, dedicated
+Bignum Validation, and Ubuntu ASan/UBSan unit-test run.
+
+---
+
+# Stage 3 — measured large-operand multiplication
+
+Stage 3 is intentionally separated from Stage 2. The candidate is a portable,
+one-level Karatsuba split with Stage-2 schoolbook multiplication as the leaf.
+
+The acceptance rule is benchmark-driven:
+
+- keep schoolbook for small operands;
+- test 512 through 8192 bits;
+- require differential correctness before timing;
+- adopt a threshold only if the crossover is useful and reproducible across
+  Linux, macOS, and Windows;
+- otherwise retain Stage-2 schoolbook and record the rejected experiment.
+
+Stage 3 results and the adoption decision belong to the Stage-3 PR so that Stage
+2 remains independently reviewable and attributable.
