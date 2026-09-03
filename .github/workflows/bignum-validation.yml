@@ -50,21 +50,21 @@ jobs:
       - name: Build bignum benchmarks
         run: cmake --build build-bench --config Release --parallel
 
-      - name: Run stage-two bignum benchmark
+      - name: Run stage-three Karatsuba benchmark
         shell: bash
         run: |
           set -euo pipefail
-          bin="$(find build-bench -type f \( -name 'liberacrypt_bignum_stage2_benchmark' -o -name 'liberacrypt_bignum_stage2_benchmark.exe' \) | head -n 1)"
+          bin="$(find build-bench -type f \( -name 'liberacrypt_bignum_stage3_benchmark' -o -name 'liberacrypt_bignum_stage3_benchmark.exe' \) | head -n 1)"
           test -n "${bin}"
-          output="bignum-stage2-benchmark-${RUNNER_OS}.csv"
+          output="bignum-stage3-benchmark-${RUNNER_OS}.csv"
           "${bin}" > "${output}"
           cat "${output}"
 
       - name: Upload benchmark result
         uses: actions/upload-artifact@v4
         with:
-          name: bignum-stage2-benchmark-${{ runner.os }}
-          path: bignum-stage2-benchmark-${{ runner.os }}.csv
+          name: bignum-stage3-benchmark-${{ runner.os }}
+          path: bignum-stage3-benchmark-${{ runner.os }}.csv
           if-no-files-found: error
 
   sanitizer:
