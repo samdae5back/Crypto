@@ -88,6 +88,7 @@ set(LIBERAC_SOURCES
     src/RandomNumberGeneration/KAT/pqc_kat_rng.c
     src/Util/Bignum/bignum.c
     src/Util/Bignum/bignum_mul.c
+    src/Util/Bignum/bignum_mod_mul.c
     src/Util/Bignum/bignum_secure.c
     src/Util/Bignum/bignum_secret_arith.c
     src/Util/Bignum/bignum_secret_io.c
@@ -156,12 +157,14 @@ list(APPEND LIBERAC_SOURCES
     src/KeyEncapsulation/ML-KEM/hash.c
 )
 
-# Keep the Stage-2 schoolbook multiply implementation byte-for-byte in
-# bignum.c, but compile its internal symbol under a baseline name.  The Stage-3
-# dispatch in bignum_mul.c owns crypto_bignum_mul() and can fall back to this
-# exact implementation without duplicating it.
+# Keep the Stage-2 schoolbook multiply and multiply-then-reduce definitions in
+# bignum.c byte-for-byte, but compile them under baseline names. Stage-3 owns
+# the externally visible dispatch wrappers in bignum_mul.c/bignum_mod_mul.c.
+# Other calls inside bignum.c intentionally keep using the Stage-2 baseline;
+# external generic callers use the measured Stage-3 dispatch.
 set_source_files_properties(src/Util/Bignum/bignum.c PROPERTIES
-    COMPILE_DEFINITIONS "crypto_bignum_mul=crypto_bignum_mul_stage2")
+    COMPILE_DEFINITIONS
+        "crypto_bignum_mul=crypto_bignum_mul_stage2;crypto_bignum_mod_mul=crypto_bignum_mod_mul_stage2")
 
 # Build the pinned mldsa-native source three times inside one local adapter TU.
 # This avoids depending on symlinks used by the upstream example directory,
