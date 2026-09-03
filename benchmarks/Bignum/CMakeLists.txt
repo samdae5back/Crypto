@@ -37,3 +37,5 @@ liberac_add_bignum_benchmark(
     liberacrypt_bignum_stage3_benchmark Stage3Benchmark.c)
 liberac_add_bignum_benchmark(
     liberacrypt_bignum_stage3_accurate_benchmark Stage3AccurateBenchmark.c)
+liberac_add_bignum_benchmark(
+    liberacrypt_bignum_stage3_production_benchmark Stage3ProductionBenchmark.c)
