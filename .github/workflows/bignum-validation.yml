@@ -50,21 +50,21 @@ jobs:
       - name: Build bignum benchmarks
         run: cmake --build build-bench --config Release --parallel
 
-      - name: Run accurate stage-three crossover benchmark
+      - name: Run final stage-three production benchmark
         shell: bash
         run: |
           set -euo pipefail
-          bin="$(find build-bench -type f \( -name 'liberacrypt_bignum_stage3_accurate_benchmark' -o -name 'liberacrypt_bignum_stage3_accurate_benchmark.exe' \) | head -n 1)"
+          bin="$(find build-bench -type f \( -name 'liberacrypt_bignum_stage3_production_benchmark' -o -name 'liberacrypt_bignum_stage3_production_benchmark.exe' \) | head -n 1)"
           test -n "${bin}"
-          output="bignum-stage3-accurate-${RUNNER_OS}.csv"
+          output="bignum-stage3-production-${RUNNER_OS}.csv"
           "${bin}" > "${output}"
           cat "${output}"
 
       - name: Upload benchmark result
         uses: actions/upload-artifact@v4
         with:
-          name: bignum-stage3-accurate-${{ runner.os }}
-          path: bignum-stage3-accurate-${{ runner.os }}.csv
+          name: bignum-stage3-production-${{ runner.os }}
+          path: bignum-stage3-production-${{ runner.os }}.csv
           if-no-files-found: error
 
   sanitizer:
