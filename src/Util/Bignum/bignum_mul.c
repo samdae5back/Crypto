@@ -153,8 +153,11 @@ static int bignum_mul_karatsuba_noalias(LiberaCBignum *out,
     workspace = (uint32_t *)malloc(workspace_bytes);
     if (!workspace)
         return -1;
-    memset(workspace, 0, workspace_bytes);
 
+    /* Every used sub-buffer is fully initialized by the helpers below.  Do not
+     * zero the whole freshly allocated workspace here: that duplicates their
+     * initialization and materially shifts the crossover on some runners.
+     * The complete workspace is still securely zeroized before free. */
     z0 = workspace;
     z2 = z0 + z0_capacity;
     sum_a = z2 + z2_capacity;
