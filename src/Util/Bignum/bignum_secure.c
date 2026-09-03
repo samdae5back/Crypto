@@ -4,6 +4,7 @@
  */
 
 #include "bignum_internal.h"
+#include "bignum_montgomery.h"
 #include "Util/Core/secure_zero.h"
 
 #include <stdlib.h>
@@ -127,13 +128,6 @@ typedef struct {
     uint32_t *product;
 } BignumCtExpState;
 
-static uint32_t bignum_ct_n0inv(uint32_t n0) {
-    uint32_t x = 1u;
-    unsigned i;
-    for (i = 0u; i < 5u; ++i) x *= 2u - n0 * x;
-    return (uint32_t)(0u - x);
-}
-
 static void bignum_ct_mont_clear(BignumCtMontCtx *ctx) {
     size_t words;
     if (!ctx) return;
@@ -147,18 +141,16 @@ static void bignum_ct_mont_clear(BignumCtMontCtx *ctx) {
 
 static int bignum_ct_mont_init(BignumCtMontCtx *ctx,
                                const LiberaCBignum *modulus) {
-    LiberaCBignum x, reduced;
-    size_t i, rounds, words;
+    size_t words;
     if (!ctx || !modulus || modulus->LENGTH == 0u ||
         !(modulus->LIMBS[0] & 1u))
         return -1;
-    if (modulus->LENGTH > (SIZE_MAX - 2u) / 3u ||
-        modulus->LENGTH > SIZE_MAX / 64u)
+    if (modulus->LENGTH > (SIZE_MAX - 2u) / 3u)
         return -1;
 
     memset(ctx, 0, sizeof(*ctx));
     ctx->n = modulus->LENGTH;
-    ctx->n0inv = bignum_ct_n0inv(modulus->LIMBS[0]);
+    ctx->n0inv = bignum_mont_n0inv(modulus->LIMBS[0]);
     words = 3u * ctx->n + 2u;
     ctx->storage = (uint32_t *)calloc(words, sizeof(uint32_t));
     if (!ctx->storage) return -1;
@@ -167,33 +159,14 @@ static int bignum_ct_mont_init(BignumCtMontCtx *ctx,
     ctx->work = ctx->r2 + ctx->n;
     memcpy(ctx->mod, modulus->LIMBS, ctx->n * sizeof(uint32_t));
 
-    /* R^2 setup depends only on the public modulus and is performed once per
-     * exponentiation context. */
-    crypto_bignum_init(&x);
-    crypto_bignum_init(&reduced);
-    if (crypto_bignum_set_u64(&x, 1u) != LIBERAC_SUCCESS) goto fail;
-    rounds = 64u * ctx->n;
-    for (i = 0u; i < rounds; ++i) {
-        if (bignum_shift_left_one(&x) != 0) goto fail;
-        if (crypto_bignum_compare(&x, modulus) >= 0) {
-            if (crypto_bignum_sub(&reduced, &x, modulus) != LIBERAC_SUCCESS)
-                goto fail;
-            crypto_bignum_free(&x);
-            x = reduced;
-            crypto_bignum_init(&reduced);
-        }
+    /* The modulus is public. Computing R^2 with the public word reducer avoids
+     * 64n allocation-heavy doublings without changing the secret operation
+     * schedule that begins after the representation boundary. */
+    if (bignum_mont_compute_r2_words(ctx->r2, ctx->n, modulus) != 0) {
+        bignum_ct_mont_clear(ctx);
+        return -1;
     }
-    if (x.LENGTH > ctx->n) goto fail;
-    memcpy(ctx->r2, x.LIMBS, x.LENGTH * sizeof(uint32_t));
-    crypto_bignum_free(&x);
-    crypto_bignum_free(&reduced);
     return 0;
-
-fail:
-    crypto_bignum_free(&x);
-    crypto_bignum_free(&reduced);
-    bignum_ct_mont_clear(ctx);
-    return -1;
 }
 
 static void bignum_ct_select(uint32_t *out, const uint32_t *zero_choice,
@@ -209,48 +182,20 @@ static int bignum_ct_mont_mul(uint32_t *out, const uint32_t *a,
                               const uint32_t *b, BignumCtMontCtx *ctx) {
     uint32_t *t;
     uint32_t borrow, use_subtracted, mask;
-    size_t n, i, j;
+    size_t n, i;
     if (!out || !a || !b || !ctx || !ctx->work) return -1;
     n = ctx->n;
     t = ctx->work;
-    memset(t, 0, (n + 2u) * sizeof(uint32_t));
 
-    /* Coarsely integrated operand scanning Montgomery multiplication.  Loops
-     * and memory indices depend only on the public modulus width. */
-    for (i = 0u; i < n; ++i) {
-        uint64_t carry = 0u;
-        for (j = 0u; j < n; ++j) {
-            uint64_t z = (uint64_t)a[j] * b[i] + t[j] + carry;
-            t[j] = (uint32_t)z;
-            carry = z >> 32;
-        }
-        {
-            uint64_t z = (uint64_t)t[n] + carry;
-            t[n] = (uint32_t)z;
-            t[n + 1u] += (uint32_t)(z >> 32);
-        }
-
-        {
-            uint32_t m = t[0] * ctx->n0inv;
-            carry = 0u;
-            for (j = 0u; j < n; ++j) {
-                uint64_t z = (uint64_t)m * ctx->mod[j] + t[j] + carry;
-                t[j] = (uint32_t)z;
-                carry = z >> 32;
-            }
-            {
-                uint64_t z = (uint64_t)t[n] + carry;
-                t[n] = (uint32_t)z;
-                t[n + 1u] += (uint32_t)(z >> 32);
-            }
-        }
-
-        for (j = 0u; j <= n; ++j) t[j] = t[j + 1u];
-        t[n + 1u] = 0u;
-    }
+    /* The shared CIOS core has fixed loop counts and fixed memory indices for
+     * the public modulus width.  Secret/public callers differ only in the
+     * final reduction policy below. */
+    if (bignum_mont_cios_candidate(t, a, n, b, n, ctx->mod, n,
+                                    ctx->n0inv) != 0)
+        return -1;
 
     /* Compute candidate-modulus, then mask-select it iff candidate >= modulus.
-     * This replaces the data-dependent final subtraction branch. */
+     * This remains the fixed-schedule secret final reduction. */
     borrow = 0u;
     for (i = 0u; i < n; ++i) {
         uint64_t subtrahend = (uint64_t)ctx->mod[i] + borrow;
