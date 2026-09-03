@@ -1,0 +1,67 @@
+name: Tag bignum optimization stages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/Util/Bignum/bignum_mul.c'
+
+permissions:
+  contents: write
+
+jobs:
+  tag-stages:
+    if: contains(github.event.head_commit.message, 'Merge bignum Stage 3')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create immutable optimization-stage tags
+        shell: bash
+        env:
+          STAGE0_SHA: 3d9ccdec097a7f87360a06d95c291f15f0b58928
+          STAGE1_SHA: 1f9b9cd733f687af0720db741965ad252b7a44be
+          STAGE2_SHA: f0052dfc05c8a422a022f7aac04d1d248c5bf8ea
+        run: |
+          set -euo pipefail
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch --tags --force
+
+          create_tag_if_missing() {
+            name="$1"
+            target="$2"
+            message="$3"
+            if git rev-parse -q --verify "refs/tags/${name}" >/dev/null; then
+              echo "${name} already exists; leaving it unchanged"
+              return 0
+            fi
+            git tag -a "${name}" "${target}" -m "${message}"
+          }
+
+          create_tag_if_missing \
+            bignum-stage0-baseline \
+            "${STAGE0_SHA}" \
+            'Bignum optimization baseline before Stage 1'
+          create_tag_if_missing \
+            bignum-stage1-reduction-montgomery \
+            "${STAGE1_SHA}" \
+            'Bignum Stage 1: reduction and Montgomery optimization'
+          create_tag_if_missing \
+            bignum-stage2-mul-square \
+            "${STAGE2_SHA}" \
+            'Bignum Stage 2: output reuse and multiply/square tuning'
+          create_tag_if_missing \
+            bignum-stage3-karatsuba \
+            "${GITHUB_SHA}" \
+            'Bignum Stage 3: measured Karatsuba production dispatch'
+
+          git push origin \
+            refs/tags/bignum-stage0-baseline \
+            refs/tags/bignum-stage1-reduction-montgomery \
+            refs/tags/bignum-stage2-mul-square \
+            refs/tags/bignum-stage3-karatsuba
