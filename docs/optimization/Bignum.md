@@ -12,8 +12,10 @@ The short version is:
   multiplication/squaring loops. At 4096 bits, add/sub improve by roughly
   **38%–47%**, squaring by **15%–61%**, while generic multiplication improves
   modestly and is intentionally kept simple.
-- **Stage 3** evaluates Karatsuba separately. It is not part of Stage 2 and is
-  accepted only if a reproducible cross-platform crossover exists.
+- **Stage 3** finds a useful portable Karatsuba crossover. The conservative
+  one-shot benchmark is faster on all three hosted runners from **3072 bits**
+  upward, making **96 32-bit limbs / 3072 bits** the initial production threshold
+  candidate.
 
 All measured values below are **same-run pairwise comparisons**: the old/reference
 path and new path execute on the same hosted runner with the same deterministic
@@ -22,15 +24,15 @@ into a cumulative speedup claim.
 
 The portable baseline remains 32-bit limbs with 32x32-to-64 arithmetic. No
 `__uint128_t`, compiler intrinsics, assembly, or host-endian word casts are
-required by Stage 1 or Stage 2.
+required by the measured candidates.
 
 ## At a glance
 
-| Stage | Baseline | Accepted change | Measured outcome |
+| Stage | Baseline | Change / candidate | Measured outcome |
 |---|---|---|---|
 | 1 | bit-at-a-time generic reduction, repeated-doubling `R^2`, shifted CIOS | normalized base-2^32 remainder, direct `R^2`, integrated-shift CIOS | very large reduction/setup win; smaller CIOS-core win |
 | 2 | allocate/replace add/sub/mul/square and older inner loops | safe output reuse, tight schoolbook carry handling, single doubled-cross square accumulation | large add/sub/square win; small-to-moderate multiply win |
-| 3 | Stage-2 schoolbook multiplication | benchmark-only one-level Karatsuba candidate | measured separately before any production adoption |
+| 3 | Stage-2 schoolbook multiplication | one-level portable Karatsuba | stable useful crossover at 3072 bits and above |
 
 ## Security boundary
 
@@ -40,7 +42,9 @@ Secret-sensitive operations remain on the fixed-width constant-schedule path.
 Stage 1 shares only the CIOS accumulation machinery and public-modulus `R^2`
 setup; the secret path still keeps fixed loop counts and masked final reduction.
 Stage 2 changes the generic add/sub/mul/square paths and does **not** replace the
-fixed-width secret exponentiation schedule.
+fixed-width secret exponentiation schedule. Stage 3 is likewise evaluated for
+the generic multiplication path rather than silently routing fixed-width secret
+arithmetic through a variable-time Karatsuba implementation.
 
 ---
 
@@ -211,5 +215,86 @@ The acceptance rule is benchmark-driven:
   Linux, macOS, and Windows;
 - otherwise retain Stage-2 schoolbook and record the rejected experiment.
 
-Stage 3 results and the adoption decision belong to the Stage-3 PR so that Stage
-2 remains independently reviewable and attributable.
+## Benchmark result
+
+Two Karatsuba measurements are retained:
+
+- `one-level-karatsuba`: scratch storage is prepared outside the timed loop. This
+  isolates arithmetic and assembly cost.
+- `one-level-karatsuba-oneshot`: scratch is allocated and freed for every call.
+  This is the more conservative comparison against the current stateless generic
+  multiplication API.
+
+The table below uses the **one-shot** result. Positive numbers mean Karatsuba is
+faster than the production Stage-2 schoolbook multiplier.
+
+| Bits | Linux | macOS | Windows |
+|---:|---:|---:|---:|
+| 512 | -49.6% | -92.0% | -33.3% |
+| 1024 | -14.2% | -11.1% | +0.0% |
+| 1536 | -3.1% | -26.6% | +20.0% |
+| 2048 | +3.1% | +5.7% | +17.6% |
+| 3072 | +7.8% | +36.4% | +21.1% |
+| 4096 | +18.9% | +34.6% | +23.8% |
+| 6144 | +21.7% | +32.9% | +21.7% |
+| 8192 | +17.2% | +19.5% | +20.8% |
+
+The crossover is not stable below 2048 bits. At 2048 bits the result is already
+positive in this one-shot measurement, but the margin is small on Linux/macOS
+and the scratch-reuse measurement is still slower on macOS. Starting at
+**3072 bits (96 32-bit limbs)**, both the practical one-shot measurements and
+the reusable-scratch arithmetic measurements show a useful cross-platform win.
+
+Representative one-shot gains:
+
+| Bits | Linux | macOS | Windows |
+|---:|---:|---:|---:|
+| 3072 | +7.8% | +36.4% | +21.1% |
+| 4096 | +18.9% | +34.6% | +23.8% |
+| 6144 | +21.7% | +32.9% | +21.7% |
+| 8192 | +17.2% | +19.5% | +20.8% |
+
+## Stage-3 conclusion
+
+The benchmark establishes a reproducible portable crossover. The engineering
+decision is therefore:
+
+- **keep Stage-2 schoolbook multiplication below 96 limbs;**
+- **use 96 limbs / 3072 bits as the initial production Karatsuba threshold
+  candidate;**
+- keep the implementation one-level and portable unless later measurements
+  justify recursive Karatsuba or architecture-specific backends;
+- re-run the full validation/benchmark matrix after the production dispatch is
+  introduced before calling Stage 3 complete.
+
+This document deliberately says **threshold candidate** rather than claiming the
+benchmark-only Karatsuba code is already the production implementation. The
+current Stage-3 branch establishes the evidence needed for adoption; production
+dispatch still requires its own validation on the final code path.
+
+## Validation
+
+The Stage-3 benchmark performs 120 deterministic randomized differential
+comparisons over 4–160 limbs before timing.
+
+Final accurate benchmark workflow for the measurement branch:
+
+- run: `33801007748`
+- head: `a560a27882fad64ec2db58e16a889048e5de7a10`
+- artifacts:
+  - `bignum-stage3-accurate-Linux`
+  - `bignum-stage3-accurate-macOS`
+  - `bignum-stage3-accurate-Windows`
+
+## Reading the numbers correctly
+
+These tables are deliberately pairwise:
+
+- Stage 1 compares original reduction/Montgomery setup vs Stage 1.
+- Stage 2 compares the Stage-1 generic arithmetic baseline vs Stage 2.
+- Stage 3 compares Stage-2 schoolbook multiplication vs the Karatsuba candidate.
+
+Do not multiply percentages from separate workflow runs to manufacture a single
+"original to Stage 3" number. Different stages benchmark different operations,
+and hosted-runner absolute timings can vary between runs. The correct claims are
+the same-run ratios shown above.
