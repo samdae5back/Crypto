@@ -157,11 +157,9 @@ list(APPEND LIBERAC_SOURCES
     src/KeyEncapsulation/ML-KEM/hash.c
 )
 
-# Keep the Stage-2 schoolbook multiply and multiply-then-reduce definitions in
-# bignum.c byte-for-byte, but compile them under baseline names. Stage-3 owns
-# the externally visible dispatch wrappers in bignum_mul.c/bignum_mod_mul.c.
-# Other calls inside bignum.c intentionally keep using the Stage-2 baseline;
-# external generic callers use the measured Stage-3 dispatch.
+# Preserve the exact Stage-2 multiply and multiply-then-reduce definitions in
+# bignum.c under internal baseline names. Stage 3 exposes measured production
+# dispatch wrappers from bignum_mul.c and bignum_mod_mul.c.
 set_source_files_properties(src/Util/Bignum/bignum.c PROPERTIES
     COMPILE_DEFINITIONS
         "crypto_bignum_mul=crypto_bignum_mul_stage2;crypto_bignum_mod_mul=crypto_bignum_mod_mul_stage2")
@@ -269,3 +267,92 @@ install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/LiberaCryptConfigVersion.cmake
     DESTINATION ${LIBERAC_CMAKE_INSTALL_DIR}
 )
+set(LIBERAC_LICENSE_INSTALL_DIR ${CMAKE_INSTALL_DATADIR}/licenses/LiberaCrypt)
+install(FILES LICENSE
+    DESTINATION ${LIBERAC_LICENSE_INSTALL_DIR}
+    RENAME AGPL-3.0-only.txt
+)
+install(FILES THIRD_PARTY_NOTICES.md
+    DESTINATION ${LIBERAC_LICENSE_INSTALL_DIR}
+)
+install(FILES ${MLDSA_BACKEND_DIR}/LICENSE
+    DESTINATION ${LIBERAC_LICENSE_INSTALL_DIR}
+    RENAME mldsa-native-LICENSE.txt
+)
+install(FILES ${SLHDSA_BACKEND_DIR}/LICENSE
+    DESTINATION ${LIBERAC_LICENSE_INSTALL_DIR}
+    RENAME slhdsa-c-LICENSE.txt
+)
+install(FILES src/KeyEncapsulation/NTRU-Plus/LICENSE
+    DESTINATION ${LIBERAC_LICENSE_INSTALL_DIR}
+    RENAME ntru-plus-LICENSE.txt
+)
+install(FILES src/KeyEncapsulation/NTRU-Plus/UPSTREAM.md
+    DESTINATION ${LIBERAC_LICENSE_INSTALL_DIR}
+    RENAME ntru-plus-UPSTREAM.md
+)
+install(FILES src/KeyEncapsulation/SMAUG-T/LICENSE
+    DESTINATION ${LIBERAC_LICENSE_INSTALL_DIR}
+    RENAME smaug-t-LICENSE.txt
+)
+install(FILES src/KeyEncapsulation/SMAUG-T/UPSTREAM.md
+    DESTINATION ${LIBERAC_LICENSE_INSTALL_DIR}
+    RENAME smaug-t-UPSTREAM.md
+)
+install(FILES ${AIMER_BACKEND_DIR}/LICENSE
+    DESTINATION ${LIBERAC_LICENSE_INSTALL_DIR}
+    RENAME aimer-LICENSE.txt
+)
+install(FILES ${AIMER_BACKEND_DIR}/NOTICE
+    DESTINATION ${LIBERAC_LICENSE_INSTALL_DIR}
+    RENAME aimer-NOTICE.txt
+)
+install(FILES ${AIMER_BACKEND_DIR}/README.md
+    DESTINATION ${LIBERAC_LICENSE_INSTALL_DIR}
+    RENAME aimer-UPSTREAM.md
+)
+install(FILES ${HAETAE_SOURCE_DIR}/LICENSE
+    DESTINATION ${LIBERAC_LICENSE_INSTALL_DIR}
+    RENAME haetae-LICENSE.txt
+)
+install(FILES ${HAETAE_SOURCE_DIR}/NOTICE
+    DESTINATION ${LIBERAC_LICENSE_INSTALL_DIR}
+    RENAME haetae-NOTICE.txt
+)
+install(FILES ${HAETAE_SOURCE_DIR}/UPSTREAM.md
+    DESTINATION ${LIBERAC_LICENSE_INSTALL_DIR}
+    RENAME haetae-UPSTREAM.md
+)
+
+if(LIBERAC_BUILD_DOCS)
+    find_package(Doxygen 1.12 REQUIRED)
+    set(LIBERAC_DOXYGEN_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/docs")
+    set(LIBERAC_DOXYGEN_INDEX
+        "${LIBERAC_DOXYGEN_OUTPUT_DIR}/html/index.html")
+    set(LIBERAC_DOXYGEN_WARNINGS
+        "${LIBERAC_DOXYGEN_OUTPUT_DIR}/warnings.log")
+    configure_file(
+        cmake/Doxyfile.in
+        ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
+        @ONLY
+    )
+    add_custom_target(liberacrypt_docs
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+                ${LIBERAC_DOXYGEN_OUTPUT_DIR}
+        COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
+        DEPENDS ${LIBERAC_PUBLIC_HEADERS} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
+        BYPRODUCTS ${LIBERAC_DOXYGEN_INDEX} ${LIBERAC_DOXYGEN_WARNINGS}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        COMMENT "Generating LiberaCrypt public API documentation"
+        VERBATIM
+    )
+endif()
+
+if(LIBERAC_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+    add_subdirectory(tests/MessageAuthentication)
+    add_subdirectory(tests/KeyDerivation)
+    add_subdirectory(tests/ECC)
+    add_subdirectory(tests/KeyAgreement)
+endif()
