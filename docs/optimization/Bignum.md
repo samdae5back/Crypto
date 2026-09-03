@@ -201,8 +201,49 @@ Results are populated from the final validated Stage-2 pull-request head.
 
 ## Stage 3 — measured large-operand multiplication
 
-Karatsuba or another large-operand multiplication path will be considered only
-after Stage 2. The schoolbook baseline remains the default unless a reproducible
-crossover appears at operand sizes that matter to LiberaCrypt's RSA, ElGamal,
-and prime-generation workloads. A rejected optimization is still recorded with
-its benchmark evidence rather than being retained for algorithm-count reasons.
+### Candidate and acceptance rule
+
+The first candidate is deliberately the smallest portable Karatsuba extension:
+one top-level split with the accepted Stage-2 schoolbook multiplier as each
+leaf. For equal `n`-limb inputs it computes `z0`, `z2`, and
+`(a0+a1)(b0+b1)` and assembles the usual Karatsuba cross term. The candidate
+uses only 32-bit limbs and 32x32-to-64 products, with one reusable scratch block
+allocated outside the timed multiplication loop.
+
+This one-level form reduces the leading limb-multiplication count from roughly
+`n^2` to roughly `3n^2/4` without introducing recursive call/scratch complexity.
+It is therefore an intentionally conservative gate: if this form cannot beat
+the Stage-2 schoolbook path at realistic RSA/ElGamal sizes, a more complex
+portable recursive implementation is not justified by source-level operation
+counts alone.
+
+Production adoption requires a reproducible crossover rather than one isolated
+runner win. In particular:
+
+- compare 512, 1024, 1536, 2048, 3072, 4096, 6144, and 8192 bits;
+- require differential correctness before timing;
+- prefer a threshold that is beneficial on Ubuntu, macOS, and Windows rather
+  than architecture-specific tuning hidden in the portable backend;
+- retain schoolbook multiplication below the measured threshold;
+- if no stable crossover exists in sizes relevant to the library, keep the
+  Stage-2 schoolbook implementation and record Karatsuba as evaluated/rejected.
+
+### Validation and benchmark method
+
+`benchmarks/Bignum/Stage3Benchmark.c` compares the production Stage-2
+schoolbook multiplier against a benchmark-only one-level Karatsuba candidate.
+The benchmark first runs 120 deterministic randomized comparisons from 4
+through 160 limbs. Timed cases reuse both destination capacity and Karatsuba
+scratch so the comparison measures arithmetic/assembly cost rather than
+per-call allocator noise.
+
+The Stage-3 pull request runs the complete test suite and the crossover
+benchmark on Ubuntu, macOS, and Windows, plus the unit-test label under
+ASan/UBSan on Ubuntu.
+
+### Hosted benchmark result and decision
+
+Results and the production adoption/rejection decision are populated from the
+final validated Stage-3 benchmark head. If Karatsuba is adopted, the threshold
+and a second validation run of the production dispatch are recorded here before
+merge.
