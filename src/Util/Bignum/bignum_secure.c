@@ -48,53 +48,104 @@ static int bignum_square_add_product(uint32_t *limbs, size_t limb_count,
     return carry == 0u ? 0 : -1;
 }
 
-LiberaCError crypto_bignum_square(LiberaCBignum *out,
-                                  const LiberaCBignum *a) {
-    LiberaCBignum tmp;
-    size_t n, i, j, limbs;
-    if (!out || !a) return LIBERAC_ERROR_INVALID_ARGUMENT;
+static int bignum_square_add_double_product(uint32_t *limbs,
+                                            size_t limb_count,
+                                            size_t offset,
+                                            uint64_t product) {
+    uint64_t low_twice, high_twice, sum, carry;
+    if (!limbs || offset >= limb_count)
+        return -1;
 
-    crypto_bignum_init(&tmp);
+    /* 2*product can require 65 bits. Split it into base-2^32 pieces rather
+     * than relying on a native 128-bit type, then propagate the at-most-two
+     * word carry through the existing result. */
+    low_twice = (uint64_t)(uint32_t)product << 1;
+    high_twice = (product >> 32) * UINT64_C(2) + (low_twice >> 32);
+
+    sum = (uint64_t)limbs[offset] + (uint32_t)low_twice;
+    limbs[offset] = (uint32_t)sum;
+    carry = sum >> 32;
+    ++offset;
+    if (offset >= limb_count)
+        return (high_twice | carry) == 0u ? 0 : -1;
+
+    sum = (uint64_t)limbs[offset] + (uint32_t)high_twice + carry;
+    limbs[offset] = (uint32_t)sum;
+    carry = (high_twice >> 32) + (sum >> 32);
+    ++offset;
+
+    while (carry != 0u && offset < limb_count) {
+        sum = (uint64_t)limbs[offset] + (uint32_t)carry;
+        limbs[offset] = (uint32_t)sum;
+        carry = (carry >> 32) + (sum >> 32);
+        ++offset;
+    }
+    return carry == 0u ? 0 : -1;
+}
+
+static LiberaCError bignum_square_noalias(LiberaCBignum *out,
+                                          const LiberaCBignum *a) {
+    size_t n, old_length, i, j, limbs;
+    if (!out || !a || out == a)
+        return LIBERAC_ERROR_INVALID_ARGUMENT;
+
     n = a->LENGTH;
+    old_length = out->LENGTH;
     if (n == 0u) {
-        crypto_bignum_free(out);
-        *out = tmp;
+        if (out->LIMBS && old_length != 0u)
+            crypto_zeroize(out->LIMBS, old_length * sizeof(uint32_t));
+        out->LENGTH = 0u;
         return LIBERAC_SUCCESS;
     }
-    if (n > (SIZE_MAX - 1u) / 2u)
+    if (n > SIZE_MAX / 2u)
         return LIBERAC_ERROR_MESSAGE_TOO_LARGE;
-    limbs = 2u * n + 1u;
-    if (bignum_reserve(&tmp, limbs) != 0)
+    limbs = 2u * n;
+    if (bignum_reserve(out, limbs) != 0)
         return LIBERAC_ERROR_ALLOCATION_FAILED;
-    memset(tmp.LIMBS, 0, limbs * sizeof(uint32_t));
+    memset(out->LIMBS, 0, limbs * sizeof(uint32_t));
+    if (old_length > limbs)
+        crypto_zeroize(out->LIMBS + limbs,
+                       (old_length - limbs) * sizeof(uint32_t));
 
-    /* Variable-time fast path: exploit symmetry so each a[i]*a[j] cross
-     * product is computed once and accumulated twice.  This roughly halves
-     * wide limb multiplications compared with generic schoolbook a*a. */
+    /* Each cross product is multiplied once and accumulated as a single
+     * portable 65-bit 2*a[i]*a[j] value. The previous path invoked the generic
+     * product-adder twice for every cross term. */
     for (i = 0u; i < n; ++i) {
         uint64_t diagonal = (uint64_t)a->LIMBS[i] * a->LIMBS[i];
-        if (bignum_square_add_product(tmp.LIMBS, limbs, 2u * i,
+        if (bignum_square_add_product(out->LIMBS, limbs, 2u * i,
                                       diagonal) != 0)
-            goto fail;
+            return LIBERAC_ERROR_ARITHMETIC;
         for (j = i + 1u; j < n; ++j) {
             uint64_t cross = (uint64_t)a->LIMBS[i] * a->LIMBS[j];
-            if (bignum_square_add_product(tmp.LIMBS, limbs, i + j,
-                                          cross) != 0 ||
-                bignum_square_add_product(tmp.LIMBS, limbs, i + j,
-                                          cross) != 0)
-                goto fail;
+            if (bignum_square_add_double_product(out->LIMBS, limbs,
+                                                 i + j, cross) != 0)
+                return LIBERAC_ERROR_ARITHMETIC;
         }
     }
 
-    tmp.LENGTH = limbs;
-    bignum_normalize(&tmp);
-    crypto_bignum_free(out);
-    *out = tmp;
+    out->LENGTH = limbs;
+    bignum_normalize(out);
     return LIBERAC_SUCCESS;
+}
 
-fail:
+LiberaCError crypto_bignum_square(LiberaCBignum *out,
+                                  const LiberaCBignum *a) {
+    LiberaCBignum tmp;
+    LiberaCError err;
+    if (!out || !a) return LIBERAC_ERROR_INVALID_ARGUMENT;
+
+    if (out != a)
+        return bignum_square_noalias(out, a);
+
+    crypto_bignum_init(&tmp);
+    err = bignum_square_noalias(&tmp, a);
+    if (err == LIBERAC_SUCCESS) {
+        crypto_bignum_free(out);
+        *out = tmp;
+        crypto_bignum_init(&tmp);
+    }
     crypto_bignum_free(&tmp);
-    return LIBERAC_ERROR_ARITHMETIC;
+    return err;
 }
 
 LiberaCError crypto_bignum_mod_square(LiberaCBignum *out,
