@@ -1,0 +1,92 @@
+name: Bignum Validation
+
+on:
+  pull_request:
+    paths:
+      - 'src/Util/Bignum/**'
+      - 'benchmarks/Bignum/**'
+      - 'docs/optimization/Bignum.md'
+      - '.github/workflows/bignum-validation.yml'
+  workflow_dispatch:
+
+jobs:
+  build-test-benchmark:
+    name: ${{ matrix.os }} static test + benchmark
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure LiberaCrypt
+        shell: bash
+        run: >-
+          cmake -S . -B build
+          -DBUILD_SHARED_LIBS=OFF
+          -DLIBERAC_BUILD_TESTS=ON
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_INSTALL_PREFIX="${GITHUB_WORKSPACE}/install"
+
+      - name: Build LiberaCrypt
+        run: cmake --build build --config Release --parallel
+
+      - name: Run complete test suite
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Install static library for benchmark
+        run: cmake --install build --config Release
+
+      - name: Configure bignum benchmark
+        shell: bash
+        run: >-
+          cmake -S benchmarks/Bignum -B build-bench
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_PREFIX_PATH="${GITHUB_WORKSPACE}/install"
+          -DLIBERACRYPT_SOURCE_ROOT="${GITHUB_WORKSPACE}"
+
+      - name: Build bignum benchmark
+        run: cmake --build build-bench --config Release --parallel
+
+      - name: Run bignum benchmark
+        shell: bash
+        run: |
+          set -euo pipefail
+          bin="$(find build-bench -type f \( -name 'liberacrypt_bignum_benchmark' -o -name 'liberacrypt_bignum_benchmark.exe' \) | head -n 1)"
+          test -n "${bin}"
+          output="bignum-benchmark-${RUNNER_OS}.csv"
+          "${bin}" > "${output}"
+          cat "${output}"
+
+      - name: Upload benchmark result
+        uses: actions/upload-artifact@v4
+        with:
+          name: bignum-benchmark-${{ runner.os }}
+          path: bignum-benchmark-${{ runner.os }}.csv
+          if-no-files-found: error
+
+  sanitizer:
+    name: Ubuntu ASan + UBSan unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure sanitizer build
+        run: >-
+          cmake -S . -B build-sanitize
+          -DBUILD_SHARED_LIBS=OFF
+          -DLIBERAC_BUILD_TESTS=ON
+          -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_C_FLAGS='-fsanitize=address,undefined -fno-omit-frame-pointer'
+          -DCMAKE_EXE_LINKER_FLAGS='-fsanitize=address,undefined'
+
+      - name: Build sanitizer configuration
+        run: cmake --build build-sanitize --parallel
+
+      - name: Run unit tests under sanitizers
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: ctest --test-dir build-sanitize -L unit --output-on-failure
