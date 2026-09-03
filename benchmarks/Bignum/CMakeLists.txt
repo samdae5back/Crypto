@@ -7,21 +7,25 @@ endif()
 
 find_package(LiberaCrypt CONFIG REQUIRED)
 
-add_executable(liberacrypt_bignum_benchmark Benchmark.c)
-target_link_libraries(liberacrypt_bignum_benchmark PRIVATE LiberaCrypt::LiberaCrypt)
-target_include_directories(liberacrypt_bignum_benchmark PRIVATE
-    "${LIBERACRYPT_SOURCE_ROOT}/src"
-    "${LIBERACRYPT_SOURCE_ROOT}/inc")
-set_target_properties(liberacrypt_bignum_benchmark PROPERTIES
-    C_STANDARD 11
-    C_STANDARD_REQUIRED YES
-    C_EXTENSIONS NO)
+function(liberac_add_bignum_benchmark TARGET_NAME SOURCE_FILE)
+    add_executable(${TARGET_NAME} ${SOURCE_FILE})
+    target_link_libraries(${TARGET_NAME} PRIVATE LiberaCrypt::LiberaCrypt)
+    target_include_directories(${TARGET_NAME} PRIVATE
+        "${LIBERACRYPT_SOURCE_ROOT}/src"
+        "${LIBERACRYPT_SOURCE_ROOT}/inc")
+    set_target_properties(${TARGET_NAME} PROPERTIES
+        C_STANDARD 11
+        C_STANDARD_REQUIRED YES
+        C_EXTENSIONS NO)
+    if(MSVC)
+        target_compile_options(${TARGET_NAME} PRIVATE /W4 /WX /permissive-)
+    else()
+        target_compile_options(${TARGET_NAME} PRIVATE
+            -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion
+            -Wshadow -Werror)
+    endif()
+endfunction()
 
-if(MSVC)
-    target_compile_options(liberacrypt_bignum_benchmark PRIVATE
-        /W4 /WX /permissive-)
-else()
-    target_compile_options(liberacrypt_bignum_benchmark PRIVATE
-        -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion
-        -Wshadow -Werror)
-endif()
+liberac_add_bignum_benchmark(liberacrypt_bignum_benchmark Benchmark.c)
+liberac_add_bignum_benchmark(
+    liberacrypt_bignum_stage1_accurate_benchmark Stage1AccurateBenchmark.c)
