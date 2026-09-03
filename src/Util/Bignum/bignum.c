@@ -302,32 +302,140 @@ int bignum_add_u32(LiberaCBignum *a, uint32_t v) {
     return 0;
 }
 
-int crypto_bignum_mod(LiberaCBignum *OUT, const LiberaCBignum *A, const LiberaCBignum *MODULUS) {
-    LiberaCBignum r, tmp;
-    size_t bits, i;
-    if (!OUT || !A || !MODULUS || MODULUS->LENGTH == 0) return -1;
-    if (crypto_bignum_compare(A, MODULUS) < 0) return crypto_bignum_copy(OUT, A);
-    crypto_bignum_init(&r);
-    crypto_bignum_init(&tmp);
-    bits = crypto_bignum_bit_length(A);
-    for (i = bits; i > 0; --i) {
-        if (bignum_shift_left_one(&r) != 0) goto fail;
-        if (bignum_get_bit(A, i - 1u) && bignum_add_u32(&r, 1) != 0) goto fail;
-        if (crypto_bignum_compare(&r, MODULUS) >= 0) {
-            if (crypto_bignum_sub(&tmp, &r, MODULUS) != 0) goto fail;
-            crypto_bignum_free(&r);
-            r = tmp;
-            crypto_bignum_init(&tmp);
+static unsigned bignum_clz32(uint32_t value) {
+    unsigned count = 0u;
+    while ((value & UINT32_C(0x80000000)) == 0u) {
+        value <<= 1;
+        ++count;
+    }
+    return count;
+}
+
+int crypto_bignum_mod(LiberaCBignum *OUT, const LiberaCBignum *A,
+                      const LiberaCBignum *MODULUS) {
+    LiberaCBignum remainder;
+    uint32_t *storage = NULL, *vn, *un;
+    size_t n, m, words, i, j;
+    unsigned shift;
+    int rc = -1;
+
+    if (!OUT || !A || !MODULUS || MODULUS->LENGTH == 0u)
+        return -1;
+    if (crypto_bignum_compare(A, MODULUS) < 0)
+        return crypto_bignum_copy(OUT, A);
+    if (MODULUS->LENGTH == 1u) {
+        uint32_t divisor = MODULUS->LIMBS[0];
+        uint32_t rem = bignum_mod_u32(A, divisor);
+        return crypto_bignum_set_u64(OUT, rem);
+    }
+
+    n = MODULUS->LENGTH;
+    if (n > SIZE_MAX - 1u || A->LENGTH > SIZE_MAX - 1u - n)
+        return -1;
+    words = n + A->LENGTH + 1u;
+    if (words > SIZE_MAX / sizeof(uint32_t))
+        return -1;
+
+    storage = (uint32_t *)calloc(words, sizeof(uint32_t));
+    if (!storage)
+        return -1;
+    vn = storage;
+    un = storage + n;
+    shift = bignum_clz32(MODULUS->LIMBS[n - 1u]);
+
+    if (shift == 0u) {
+        memcpy(vn, MODULUS->LIMBS, n * sizeof(uint32_t));
+        memcpy(un, A->LIMBS, A->LENGTH * sizeof(uint32_t));
+    } else {
+        uint32_t carry = 0u;
+        for (i = 0u; i < n; ++i) {
+            uint64_t z = ((uint64_t)MODULUS->LIMBS[i] << shift) | carry;
+            vn[i] = (uint32_t)z;
+            carry = (uint32_t)(z >> 32);
+        }
+        carry = 0u;
+        for (i = 0u; i < A->LENGTH; ++i) {
+            uint64_t z = ((uint64_t)A->LIMBS[i] << shift) | carry;
+            un[i] = (uint32_t)z;
+            carry = (uint32_t)(z >> 32);
+        }
+        un[A->LENGTH] = carry;
+    }
+
+    /* Knuth-style normalized base-2^32 long division, specialized to retain
+     * only the remainder.  This replaces the old bit-at-a-time shift/compare/
+     * subtract loop with one quotient estimate per input limb. */
+    m = A->LENGTH - n;
+    for (j = m + 1u; j > 0u; --j) {
+        const uint64_t radix = UINT64_C(1) << 32;
+        size_t offset = j - 1u;
+        uint64_t numerator = ((uint64_t)un[offset + n] << 32) |
+                             un[offset + n - 1u];
+        uint64_t qhat = numerator / vn[n - 1u];
+        uint64_t rhat = numerator % vn[n - 1u];
+        uint64_t borrow = 0u;
+        uint32_t high;
+        int underflow;
+
+        while (qhat >= radix ||
+               qhat * vn[n - 2u] >
+                   (rhat << 32) + un[offset + n - 2u]) {
+            --qhat;
+            rhat += vn[n - 1u];
+            if (rhat >= radix)
+                break;
+        }
+
+        for (i = 0u; i < n; ++i) {
+            uint64_t product = qhat * vn[i] + borrow;
+            uint32_t low = (uint32_t)product;
+            uint32_t minuend = un[offset + i];
+            borrow = product >> 32;
+            un[offset + i] = (uint32_t)(minuend - low);
+            if (minuend < low)
+                ++borrow;
+        }
+
+        high = un[offset + n];
+        underflow = (uint64_t)high < borrow;
+        un[offset + n] = (uint32_t)((uint64_t)high - borrow);
+        if (underflow) {
+            uint64_t carry = 0u;
+            for (i = 0u; i < n; ++i) {
+                uint64_t sum = (uint64_t)un[offset + i] + vn[i] + carry;
+                un[offset + i] = (uint32_t)sum;
+                carry = sum >> 32;
+            }
+            un[offset + n] =
+                (uint32_t)((uint64_t)un[offset + n] + carry);
         }
     }
+
+    crypto_bignum_init(&remainder);
+    if (bignum_reserve(&remainder, n) != 0)
+        goto done;
+    if (shift == 0u) {
+        memcpy(remainder.LIMBS, un, n * sizeof(uint32_t));
+    } else {
+        uint32_t carry = 0u;
+        for (i = n; i > 0u; --i) {
+            uint32_t word = un[i - 1u];
+            remainder.LIMBS[i - 1u] = (word >> shift) | carry;
+            carry = word << (32u - shift);
+        }
+    }
+    remainder.LENGTH = n;
+    bignum_normalize(&remainder);
     crypto_bignum_free(OUT);
-    *OUT = r;
-    crypto_bignum_free(&tmp);
-    return 0;
-fail:
-    crypto_bignum_free(&r);
-    crypto_bignum_free(&tmp);
-    return -1;
+    *OUT = remainder;
+    crypto_bignum_init(&remainder);
+    rc = 0;
+
+done:
+    crypto_bignum_free(&remainder);
+    crypto_zeroize(storage, words * sizeof(uint32_t));
+    free(storage);
+    return rc;
 }
 
 int bignum_mul_u32(LiberaCBignum *out, const LiberaCBignum *a, uint32_t v) {
