@@ -13,6 +13,8 @@ static int karatsuba_one_shot(LiberaCBignum *out,
         a->LENGTH > (SIZE_MAX - 8u) / 4u)
         return -1;
     workspace_words = 4u * a->LENGTH + 8u;
+    if (workspace_words > SIZE_MAX / sizeof(uint32_t))
+        return -1;
     workspace = (uint32_t *)malloc(workspace_words * sizeof(uint32_t));
     if (!workspace)
         return -1;
