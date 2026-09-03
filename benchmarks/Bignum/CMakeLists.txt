@@ -29,3 +29,5 @@ endfunction()
 liberac_add_bignum_benchmark(liberacrypt_bignum_benchmark Benchmark.c)
 liberac_add_bignum_benchmark(
     liberacrypt_bignum_stage2_benchmark Stage2Benchmark.c)
+liberac_add_bignum_benchmark(
+    liberacrypt_bignum_stage3_benchmark Stage3Benchmark.c)
