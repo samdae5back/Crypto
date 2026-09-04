@@ -50,6 +50,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Validate translation tooling
+        run: |
+          python3 -m py_compile tools/translate_docs.py tools/prune_translations.py tools/build_wiki.py
+
       - name: Check OpenAI API key
         shell: bash
         env:
@@ -59,6 +63,9 @@ jobs:
             echo "OPENAI_API_KEY is not configured in repository Actions secrets." >&2
             exit 1
           fi
+
+      - name: Remove orphaned translations
+        run: python3 tools/prune_translations.py
 
       - name: Translate documentation
         shell: bash
