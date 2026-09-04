@@ -32,7 +32,7 @@ jobs:
         run: |
           ./build/Release/liberacrypt_ecc_benchmark.exe | Out-File -Encoding ascii "ecc-benchmark-${{ runner.os }}.csv"
       - name: Upload result
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ecc-benchmark-${{ runner.os }}
           path: ecc-benchmark-${{ runner.os }}.csv
