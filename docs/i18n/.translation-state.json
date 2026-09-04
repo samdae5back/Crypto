@@ -1,0 +1,13 @@
+{
+  "languages": {
+    "ja": {
+      "model": "manual-initial",
+      "source_commit": "0f3a10772e4aef7f3db6a2e0b2cbfe8127891935"
+    },
+    "ko": {
+      "model": "manual-initial",
+      "source_commit": "0f3a10772e4aef7f3db6a2e0b2cbfe8127891935"
+    }
+  },
+  "version": 1
+}
