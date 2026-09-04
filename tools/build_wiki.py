@@ -46,6 +46,12 @@ def translation_exists(language: str, rel: Path) -> bool:
     return (root / rel).is_file()
 
 
+def source_relative_path(language: str, rel: Path) -> Path:
+    if language == "en":
+        return rel
+    return Path("i18n") / language / rel
+
+
 def language_bar(rel: Path) -> str:
     links: list[str] = []
     for language, info in LANGUAGES.items():
@@ -68,13 +74,27 @@ def translation_notice(language: str) -> str:
     return "> Canonical source: the English Markdown documentation in the main repository."
 
 
-def resolve_doc_target(current_rel: Path, target: str) -> Path | None:
+def resolve_doc_target(language: str, current_rel: Path, target: str) -> Path | None:
     if "://" in target or target.startswith(("mailto:", "#", "/")):
         return None
-    normalized = posixpath.normpath(posixpath.join(current_rel.parent.as_posix(), target))
+
+    source_rel = source_relative_path(language, current_rel)
+    normalized = posixpath.normpath(
+        posixpath.join(source_rel.parent.as_posix(), target)
+    )
     if normalized == ".." or normalized.startswith("../"):
         return None
-    return Path(normalized)
+
+    parts = Path(normalized).parts
+    if len(parts) >= 2 and parts[0] == "i18n" and parts[1] == language:
+        if len(parts) == 2:
+            return None
+        return Path(*parts[2:])
+
+    if parts and parts[0] != "i18n":
+        return Path(normalized)
+
+    return None
 
 
 def rewrite_links(
@@ -86,15 +106,16 @@ def rewrite_links(
 ) -> str:
     def replace(match: re.Match[str]) -> str:
         before, target, anchor, after = match.groups()
-        resolved = resolve_doc_target(current_rel, target)
+        resolved = resolve_doc_target(language, current_rel, target)
 
         if resolved is not None and resolved in canonical:
             target_language = language if translation_exists(language, resolved) else "en"
             wiki_target = page_name(target_language, resolved)
             return f"{before}{wiki_target}{anchor or ''}{after}"
 
+        source_rel = source_relative_path(language, current_rel)
         normalized = posixpath.normpath(
-            posixpath.join("docs", current_rel.parent.as_posix(), target)
+            posixpath.join("docs", source_rel.parent.as_posix(), target)
         )
         if not normalized.startswith("docs/"):
             repo_target = f"https://github.com/{repository}/blob/main/{normalized}"
