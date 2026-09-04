@@ -1,0 +1,92 @@
+name: Bug report
+description: Report incorrect behavior, a crash, regression, or API/cryptographic implementation issue.
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. If this may be a security vulnerability, **do not continue with this public form**. Use the private security reporting link in the issue chooser or follow `SECURITY.md`.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      description: Select the area that best matches the problem.
+      options:
+        - Build / portability
+        - Public API / runtime dispatch
+        - Symmetric encryption / AEAD
+        - Hash / MAC / KDF / DRBG
+        - RSA / ElGamal
+        - ECC / ECDH / X25519 / ECDSA / Ed25519
+        - Post-quantum algorithms
+        - Bignum / shared arithmetic
+        - Documentation / tooling
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: revision
+    attributes:
+      label: LiberaCrypt revision
+      description: Commit SHA, branch, tag, or other revision where the problem occurs.
+      placeholder: e.g. main at abc1234
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include OS, architecture, compiler and version, CMake version/generator, and relevant build options.
+      placeholder: |
+        OS: Ubuntu 24.04
+        Architecture: x86_64
+        Compiler: GCC 14.2
+        CMake: 3.30 / Ninja
+        Build: shared, Release
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Problem description
+      description: Describe what is wrong and why you believe it is a bug.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Provide the smallest practical reproducer, commands, inputs, or sequence of API calls.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior and logs
+      description: Paste relevant error output, sanitizer output, or logs. Remove secrets and unrelated private data first.
+      render: shell
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I checked that this is reproducible on a current revision when practical.
+          required: true
+        - label: I searched existing issues for the same problem.
+          required: true
+        - label: This report does not disclose a suspected security vulnerability or any secret/key/credential.
+          required: true
