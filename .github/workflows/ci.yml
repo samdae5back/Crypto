@@ -6,8 +6,22 @@ on:
       - main
       - 'feature/**'
       - 'refactor/**'
+    paths-ignore:
+      - 'README.md'
+      - 'docs/**'
+      - 'THIRD_PARTY_NOTICES.md'
+      - 'LICENSE'
+      - 'tools/build_wiki.py'
+      - '.github/workflows/wiki-sync.yml'
   pull_request:
     branches: [ main ]
+    paths-ignore:
+      - 'README.md'
+      - 'docs/**'
+      - 'THIRD_PARTY_NOTICES.md'
+      - 'LICENSE'
+      - 'tools/build_wiki.py'
+      - '.github/workflows/wiki-sync.yml'
 
 jobs:
   build:
