@@ -2,16 +2,10 @@
 
 The English documentation under `docs/` is the canonical source of truth for LiberaCrypt.
 
-Translations live under `docs/i18n/<language>/` and mirror the path of the English source they translate. For example:
+Translations live under `docs/i18n/<language>/` and mirror the path of the English source they translate. Korean and Japanese currently mirror the complete canonical document set.
 
-```text
-docs/design/portability.md
-docs/i18n/ko/design/portability.md
-docs/i18n/ja/design/portability.md
-```
+Translations are maintained by the `Translate & Sync Docs` GitHub Actions workflow. The default automatic path uses `gpt-5.6-sol`, translates only canonical documents changed since the last successful translation state, validates preserved technical structure, commits accepted translations, and republishes the Wiki in the same workflow run.
 
-The wiki generator publishes every English Markdown document and publishes a translated counterpart only when the matching translation file exists. Links from a translated page fall back to the English wiki page when that target has not been translated yet.
+For setup and manual reruns, see [Translation automation](AUTOMATION.md).
 
-The initial translated set intentionally focuses on the project overview, architecture, and portability. Additional pages can be translated incrementally without changing the wiki build system.
-
-Translations should preserve technical meaning rather than mechanically mirror English sentence structure. If a translation and the English documentation disagree, the English documentation is authoritative.
+Generated translations should preserve technical meaning rather than mechanically mirror English sentence structure. If a translation and the English documentation disagree, the English documentation is authoritative.
