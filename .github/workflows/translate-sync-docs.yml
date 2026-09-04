@@ -50,6 +50,14 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Require main branch
+        shell: bash
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "Translate & Sync Docs must be run from the main branch." >&2
+            exit 1
+          fi
+
       - name: Validate translation tooling
         run: |
           python3 -m py_compile tools/translate_docs.py tools/prune_translations.py tools/build_wiki.py
