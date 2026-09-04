@@ -37,7 +37,7 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Configure
         run: cmake -S . -B build -DBUILD_SHARED_LIBS=OFF -DLIBERAC_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release
       - name: Build focused RSA test
@@ -48,7 +48,7 @@ jobs:
   openssl-interop:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Configure
         run: cmake -S . -B build -DBUILD_SHARED_LIBS=OFF -DLIBERAC_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release
       - name: Build interoperability driver
@@ -84,7 +84,7 @@ jobs:
       CFLAGS: -fsanitize=address,undefined -fno-omit-frame-pointer
       LDFLAGS: -fsanitize=address,undefined
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Configure
         run: cmake -S . -B build-sanitize -DBUILD_SHARED_LIBS=OFF -DLIBERAC_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
       - name: Build focused RSA test
