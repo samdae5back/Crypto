@@ -1,0 +1,98 @@
+name: Build / portability issue
+description: Report compiler, linker, ABI, endian, architecture, or platform-specific build/runtime problems.
+title: "[Portability] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Portability is a core LiberaCrypt design goal. Please include enough toolchain and platform detail to reproduce the problem. If the issue may expose secret material or create a security vulnerability, use the private security reporting path instead of this public form.
+
+  - type: input
+    id: revision
+    attributes:
+      label: LiberaCrypt revision
+      placeholder: e.g. main at abc1234
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system / platform
+      placeholder: e.g. AIX 7.1, HP-UX 11i v3, Solaris 11, Windows 11
+    validations:
+      required: true
+
+  - type: input
+    id: arch
+    attributes:
+      label: Architecture
+      placeholder: e.g. POWER7 big-endian, SPARC, IA-64, x86_64, arm64
+    validations:
+      required: true
+
+  - type: input
+    id: compiler
+    attributes:
+      label: Compiler and version
+      placeholder: e.g. xlc 13.1, GCC 3.4.6, clang 18, MSVC 19.4
+    validations:
+      required: true
+
+  - type: input
+    id: cmake
+    attributes:
+      label: CMake / generator
+      placeholder: e.g. CMake 3.20 with Unix Makefiles
+
+  - type: textarea
+    id: build
+    attributes:
+      label: Build configuration and command
+      description: Include static/shared choice, build type, flags, generator, and the exact configure/build command where practical.
+      render: shell
+    validations:
+      required: true
+
+  - type: dropdown
+    id: class
+    attributes:
+      label: Failure class
+      options:
+        - Configure failure
+        - Compile failure
+        - Link / symbol export failure
+        - Test failure
+        - Runtime crash / undefined behavior
+        - Endianness / representation mismatch
+        - Warning-only portability problem
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Error output / observed behavior
+      description: Include the smallest relevant compiler, linker, test, or runtime output.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: analysis
+    attributes:
+      label: Additional analysis
+      description: If known, describe the suspected platform assumption, ABI difference, integer-width issue, endian dependency, or compiler behavior involved.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues for the same platform/toolchain problem.
+          required: true
+        - label: I removed secrets, proprietary source, credentials, and unrelated private data from logs.
+          required: true
+        - label: This is not a confidential security vulnerability report.
+          required: true
