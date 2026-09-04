@@ -18,7 +18,9 @@ Only documents changed since the last successful translation state are sent to t
 
 ## Manual mode
 
-Open **Actions → Translate & Sync Docs → Run workflow**. The manual form supports:
+Open **Actions → Translate & Sync Docs → Run workflow** and run it from the `main` branch. The workflow refuses to commit when dispatched from another branch.
+
+The manual form supports:
 
 - language: `all`, `ko`, or `ja`
 - scope: `changed` or `all`
