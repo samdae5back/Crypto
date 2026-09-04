@@ -1,0 +1,69 @@
+name: Feature request
+description: Propose a new API, algorithm, platform capability, optimization, or project improvement.
+title: "[Feature] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please describe the problem or use case before the proposed implementation. LiberaCrypt prioritizes portability, clear API boundaries, standards conformance, and security-sensitive behavior.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What limitation or use case should this change address?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Describe the API, algorithm, implementation, documentation, or workflow change you would like to see.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Public API / architecture
+        - New cryptographic algorithm or parameter set
+        - Portability / platform support
+        - Performance / optimization
+        - Testing / validation
+        - Build / packaging
+        - Documentation / Wiki
+        - Development tooling / CI
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: standards
+    attributes:
+      label: Relevant standards or references
+      description: Link standards, RFCs, NIST documents, papers, upstream implementations, or other references when applicable.
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Portability and security considerations
+      description: Note expected integer-width, endian, ABI, compiler, timing, memory, or interoperability constraints.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Describe other designs or workarounds you considered.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues for a similar request.
+          required: true
+        - label: This request does not disclose a confidential security vulnerability.
+          required: true
