@@ -12,7 +12,10 @@ on:
       - 'THIRD_PARTY_NOTICES.md'
       - 'LICENSE'
       - 'tools/build_wiki.py'
+      - 'tools/translate_docs.py'
+      - 'tools/prune_translations.py'
       - '.github/workflows/wiki-sync.yml'
+      - '.github/workflows/translate-sync-docs.yml'
   pull_request:
     branches: [ main ]
     paths-ignore:
@@ -21,7 +24,10 @@ on:
       - 'THIRD_PARTY_NOTICES.md'
       - 'LICENSE'
       - 'tools/build_wiki.py'
+      - 'tools/translate_docs.py'
+      - 'tools/prune_translations.py'
       - '.github/workflows/wiki-sync.yml'
+      - '.github/workflows/translate-sync-docs.yml'
 
 jobs:
   build:
