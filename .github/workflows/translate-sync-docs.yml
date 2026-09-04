@@ -35,20 +35,28 @@ on:
           - gpt-5.6-terra
           - gpt-5.6-luna
 
-permissions:
-  contents: write
+permissions: {}
 
 concurrency:
   group: liberacrypt-translate-sync
   cancel-in-progress: false
 
 jobs:
-  translate-and-sync:
+  translate:
+    name: Translate documentation
     runs-on: ubuntu-latest
+    environment:
+      name: docs-translation
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.changes.outputs.changed }}
+
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Require main branch
         shell: bash
@@ -68,7 +76,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           if [ -z "$OPENAI_API_KEY" ]; then
-            echo "OPENAI_API_KEY is not configured in repository Actions secrets." >&2
+            echo "OPENAI_API_KEY is not configured in the docs-translation environment." >&2
             exit 1
           fi
 
@@ -88,60 +96,107 @@ jobs:
             --scope "$TRANSLATE_SCOPE" \
             --model "$TRANSLATE_MODEL"
 
-      - name: Commit translation updates
+      - name: Detect translation changes
+        id: changes
         shell: bash
         run: |
+          if [ -n "$(git status --porcelain -- docs/i18n)" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Generated translation updates." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Translations are already up to date." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Package translation updates
+        if: steps.changes.outputs.changed == 'true'
+        shell: bash
+        run: tar -czf "${RUNNER_TEMP}/translated-docs.tar.gz" docs/i18n
+
+      - name: Upload translation artifact
+        if: steps.changes.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: translated-docs-${{ github.run_id }}
+          path: ${{ runner.temp }}/translated-docs.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
+  propose:
+    name: Propose translation update
+    needs: translate
+    if: needs.translate.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Download translation artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: translated-docs-${{ github.run_id }}
+          path: ${{ runner.temp }}/translated-docs
+
+      - name: Apply translation artifact
+        shell: bash
+        run: tar -xzf "${RUNNER_TEMP}/translated-docs/translated-docs.tar.gz" -C "$GITHUB_WORKSPACE"
+
+      - name: Commit generated translations to automation branch
+        id: commit
+        shell: bash
+        env:
+          TRANSLATION_BRANCH: automation/docs-translations
+        run: |
+          set -euo pipefail
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs/i18n
 
           if git diff --cached --quiet; then
-            echo "Translations are already up to date." >> "$GITHUB_STEP_SUMMARY"
-          else
-            git commit -m "docs: update generated translations"
-            git push origin HEAD:main
-            echo "Updated generated Korean/Japanese translations." >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-      - name: Build wiki pages
-        run: python3 tools/build_wiki.py --output wiki-build
-
-      - name: Check whether the wiki repository is initialized
-        id: wiki
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git"
-          if git ls-remote "$remote" >/dev/null 2>&1; then
-            echo "initialized=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "initialized=false" >> "$GITHUB_OUTPUT"
-            echo "The GitHub Wiki has not been initialized yet." >> "$GITHUB_STEP_SUMMARY"
-            echo "Create one Wiki page once, then rerun this workflow." >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-      - name: Publish generated pages
-        if: steps.wiki.outputs.initialized == 'true'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git"
-          git clone "$remote" wiki
-          rsync -a --delete --exclude='.git/' wiki-build/ wiki/
-
-          cd wiki
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-
-          if git diff --cached --quiet; then
-            echo "Wiki is already up to date." >> "$GITHUB_STEP_SUMMARY"
+            echo "created=false" >> "$GITHUB_OUTPUT"
+            echo "No translation diff remained after applying the artifact." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
-          sync_sha="$(git -C "$GITHUB_WORKSPACE" rev-parse --short=12 HEAD)"
-          git commit -m "Sync documentation from ${sync_sha}"
-          git push origin HEAD
-          echo "Wiki synchronized from ${sync_sha}." >> "$GITHUB_STEP_SUMMARY"
+          git commit -m "docs: update generated translations"
+          git fetch origin "${TRANSLATION_BRANCH}" || true
+          git push --force-with-lease origin HEAD:"${TRANSLATION_BRANCH}"
+          echo "created=true" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update translation pull request
+        if: steps.commit.outputs.created == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TRANSLATION_BRANCH: automation/docs-translations
+        run: |
+          set -euo pipefail
+
+          existing_pr="$(gh pr list \
+            --repo "$GITHUB_REPOSITORY" \
+            --base main \
+            --head "$TRANSLATION_BRANCH" \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')"
+
+          if [ -n "$existing_pr" ]; then
+            pr_url="$(gh pr view "$existing_pr" --repo "$GITHUB_REPOSITORY" --json url --jq '.url')"
+            echo "Updated existing translation PR: ${pr_url}" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          pr_url="$(gh pr create \
+            --repo "$GITHUB_REPOSITORY" \
+            --base main \
+            --head "$TRANSLATION_BRANCH" \
+            --title "docs: update generated translations" \
+            --body $'Automated Korean/Japanese documentation update generated from the canonical English documentation.\n\nThis branch is managed by the `Translate & Sync Docs` workflow. Review and merge this pull request to publish the updated translations. The separate `Wiki Sync` workflow will publish the multilingual Wiki after the translation changes reach `main`.')"
+
+          echo "Created translation PR: ${pr_url}" >> "$GITHUB_STEP_SUMMARY"
