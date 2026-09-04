@@ -1,0 +1,65 @@
+name: Wiki Sync
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'docs/**'
+      - 'tools/build_wiki.py'
+      - '.github/workflows/wiki-sync.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: liberacrypt-wiki-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build wiki pages
+        run: python3 tools/build_wiki.py --output wiki-build
+
+      - name: Check whether the wiki repository is initialized
+        id: wiki
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git"
+          if git ls-remote "$remote" >/dev/null 2>&1; then
+            echo "initialized=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "initialized=false" >> "$GITHUB_OUTPUT"
+            echo "The GitHub Wiki is enabled but has not been initialized yet." >> "$GITHUB_STEP_SUMMARY"
+            echo "Create one page in the repository Wiki once, then run this workflow manually." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Publish generated pages
+        if: steps.wiki.outputs.initialized == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git"
+          git clone "$remote" wiki
+          rsync -a --delete --exclude='.git/' wiki-build/ wiki/
+
+          cd wiki
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "Wiki is already up to date." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          git commit -m "Sync documentation from ${GITHUB_SHA::12}"
+          git push origin HEAD
+          echo "Wiki synchronized from ${GITHUB_SHA}." >> "$GITHUB_STEP_SUMMARY"
