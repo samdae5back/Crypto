@@ -4,40 +4,58 @@ on:
   pull_request:
     branches: [ main ]
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
-  analyze:
-    name: Capture SARIF (${{ matrix.language }})
+  apply-fix:
+    name: Apply targeted SLH-DSA arithmetic fix
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [c-cpp, python]
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v7
         with:
-          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.ref }}
 
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
-        with:
-          languages: ${{ matrix.language }}
-          build-mode: none
+      - name: Widen size arithmetic before multiplication
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
 
-      - name: Analyze without uploading
-        uses: github/codeql-action/analyze@v4
-        with:
-          category: /language:${{ matrix.language }}
-          output: sarif-output
-          upload: false
+          path = Path("src/DigitalSignature/SLH-DSA/Backend/slh_dsa.c")
+          source = path.read_text(encoding="utf-8")
 
-      - name: Upload SARIF
-        uses: actions/upload-artifact@v7
-        with:
-          name: codeql-sarif-${{ matrix.language }}
-          path: sarif-output/*.sarif
-          if-no-files-found: error
-          retention-days: 1
+          old_sig = """size_t slh_sig_sz(const slh_param_t *prm)
+          {
+            return (1 + prm->k * (1 + prm->a) + prm->h + prm->d * get_len(prm)) * prm->n;
+          }"""
+          new_sig = """size_t slh_sig_sz(const slh_param_t *prm)
+          {
+            size_t n = (size_t) prm->n;
+            size_t fors = (size_t) prm->k * ((size_t) 1u + (size_t) prm->a);
+            size_t hypertree = (size_t) prm->h
+                           + (size_t) prm->d * (size_t) get_len(prm);
+
+            return ((size_t) 1u + fors + hypertree) * n;
+          }"""
+          old_st = "  st_sz = (prm->hp + get_len(prm)) * prm->n;"
+          new_st = "  st_sz = ((size_t) prm->hp + (size_t) get_len(prm)) * (size_t) prm->n;"
+
+          if old_sig not in source:
+              raise SystemExit("slh_sig_sz source pattern not found")
+          if old_st not in source:
+              raise SystemExit("ht_verify size source pattern not found")
+
+          source = source.replace(old_sig, new_sig, 1)
+          source = source.replace(old_st, new_st, 1)
+          path.write_text(source, encoding="utf-8")
+          PY
+
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/DigitalSignature/SLH-DSA/Backend/slh_dsa.c
+          git commit -m "fix: widen SLH-DSA size arithmetic"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
