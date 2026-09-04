@@ -2,6 +2,10 @@
 
 LiberaCrypt keeps the repository `README.md` intentionally short. The README is the project landing page; detailed usage, design rationale, security notes, optimization records, and benchmark interpretation live here.
 
+## Languages
+
+English is the canonical documentation. Korean and Japanese translations are maintained under [`docs/i18n/`](i18n/README.md) and are published to the GitHub Wiki with language-switch links. When a translated page is not available, the Wiki falls back to the corresponding English page.
+
 ## Start here
 
 - [Building LiberaCrypt](getting-started/building.md)
