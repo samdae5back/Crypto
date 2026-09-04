@@ -1,0 +1,64 @@
+name: Documentation issue
+description: Report incorrect, unclear, missing, stale, or mistranslated documentation.
+title: "[Docs] "
+body:
+  - type: dropdown
+    id: language
+    attributes:
+      label: Documentation language
+      options:
+        - English
+        - Korean
+        - Japanese
+        - Multiple languages
+    validations:
+      required: true
+
+  - type: input
+    id: location
+    attributes:
+      label: Page / file
+      description: Link the Wiki page or provide the Markdown path when known.
+      placeholder: e.g. docs/design/portability.md
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Issue type
+      options:
+        - Incorrect technical statement
+        - Missing or outdated information
+        - Broken link / navigation
+        - Unclear wording
+        - Translation quality / terminology
+        - English/translation mismatch
+        - Formatting / rendering
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Explain what is incorrect or difficult to understand.
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested correction
+      description: If you have preferred wording or terminology, include it here.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I checked the current `main` documentation or current Wiki page.
+          required: true
+        - label: This report does not disclose a confidential security vulnerability.
+          required: true
