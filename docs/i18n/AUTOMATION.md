@@ -2,9 +2,11 @@
 
 English Markdown under `docs/` is the canonical documentation. Korean and Japanese mirrors are generated through the `Translate & Sync Docs` GitHub Actions workflow.
 
-## Repository secret
+## Environment secret
 
-Add an Actions repository secret named `OPENAI_API_KEY`. The workflow passes it to the translator only as an environment variable; the key is never written to the repository or wiki.
+Create a GitHub Actions environment named `docs-translation` and store `OPENAI_API_KEY` as an environment secret there. The translation job declares that environment explicitly and receives the key only for the API-calling steps.
+
+The translation job has read-only repository permissions. A separate proposal job, which never receives `OPENAI_API_KEY`, has the write permissions needed to update the bot-managed translation branch and open a pull request.
 
 ## Automatic mode
 
@@ -16,9 +18,11 @@ When canonical English Markdown under `docs/` changes on `main`, the workflow ru
 
 Only documents changed since the last successful translation state are sent to the API. Deleted canonical pages have their translated counterparts removed.
 
+If the `docs-translation` environment uses required reviewers, GitHub waits for the environment approval before the translation job receives its secret.
+
 ## Manual mode
 
-Open **Actions → Translate & Sync Docs → Run workflow** and run it from the `main` branch. The workflow refuses to commit when dispatched from another branch.
+Open **Actions → Translate & Sync Docs → Run workflow** and run it from the `main` branch. The workflow refuses to translate when dispatched from another branch.
 
 The manual form supports:
 
@@ -30,8 +34,14 @@ Use `all` scope to regenerate every translation, for example after changing the 
 
 ## Validation
 
-Generated translations are rejected unless they preserve structural material from the English source, including fenced code blocks, inline code, URLs, Markdown link targets, heading levels, numeric values and percentages, commit/revision hashes, and table structure. A failed translation is retried up to three times and is not committed if validation still fails.
+Generated translations are rejected unless they preserve structural material from the English source, including fenced code blocks, inline code, URLs, Markdown link targets, heading levels, numeric values and percentages, commit/revision hashes, and table structure. A failed translation is retried up to three times and is not proposed if validation still fails.
 
-After successful translation, the workflow commits `docs/i18n/` updates to `main`, builds the multilingual wiki, and publishes the generated wiki pages in the same workflow run.
+## Pull request and Wiki publication
+
+Successful translation changes are packaged as a short-lived workflow artifact. A second job checks out the same `main` revision, applies the generated `docs/i18n/` tree, and updates the bot-managed `automation/docs-translations` branch.
+
+The workflow creates a pull request from that branch, or updates the existing open translation pull request when one already exists. It never pushes generated translations directly to `main`.
+
+After the translation pull request is reviewed and merged, the separate `Wiki Sync` workflow sees the `docs/i18n/**` change on `main`, rebuilds the multilingual Wiki, and publishes it.
 
 The English documentation remains authoritative if a generated translation ever disagrees with it.
