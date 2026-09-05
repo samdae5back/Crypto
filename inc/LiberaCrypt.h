@@ -38,6 +38,7 @@
 #define LIBERAC_H
 
 #include "Def.h"
+#include "Version.h"
 #include "BlockCipher.h"
 #include "StreamCipher.h"
 #include "AuthenticatedEncryption.h"
