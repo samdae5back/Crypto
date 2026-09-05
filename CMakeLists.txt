@@ -224,6 +224,16 @@ target_include_directories(crypto_slhdsa_adapter PRIVATE
     ${SLHDSA_BACKEND_DIR}
 )
 
+# These adapter objects define public LIBERAC_* entry points but are compiled
+# separately from the final shared target. Preserve the shared-library ABI
+# decoration that they would receive if they were ordinary LiberaCrypt sources.
+if(BUILD_SHARED_LIBS)
+    target_compile_definitions(crypto_mldsa_adapter PRIVATE
+        LIBERAC_SHARED LIBERAC_BUILDING_LIBRARY)
+    target_compile_definitions(crypto_slhdsa_adapter PRIVATE
+        LIBERAC_SHARED LIBERAC_BUILDING_LIBRARY)
+endif()
+
 add_library(LiberaCrypt ${LIBERAC_SOURCES}
     $<TARGET_OBJECTS:crypto_mldsa>
     $<TARGET_OBJECTS:crypto_mldsa_adapter>
@@ -275,6 +285,10 @@ liberac_configure_portable_warnings(
 liberac_configure_vendor_endianness(
     SLHDSA_TARGET crypto_slhdsa
     MLDSA_TARGET crypto_mldsa
+)
+liberac_configure_vendor_endianness(
+    SLHDSA_TARGET crypto_slhdsa_adapter
+    MLDSA_TARGET crypto_mldsa_adapter
 )
 
 include(CMakePackageConfigHelpers)
