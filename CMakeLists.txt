@@ -160,8 +160,6 @@ set(LIBERAC_SOURCES
     src/DigitalSignature/HAETAE/haetae_polyvec.c
     src/DigitalSignature/HAETAE/haetae_reduce.c
     src/DigitalSignature/HAETAE/haetae_sampler.c
-    src/DigitalSignature/ML-DSA/ml_dsa.c
-    src/DigitalSignature/SLH-DSA/slh_dsa.c
 )
 
 list(APPEND LIBERAC_SOURCES
@@ -184,6 +182,24 @@ target_compile_definitions(crypto_mldsa PRIVATE
     MLD_CONFIG_NAMESPACE_PREFIX=mldsa
 )
 
+# Keep vendor header search paths off the main library target. The first-party
+# adapters that bridge into the vendored backends are isolated object targets,
+# so unrelated translation units cannot accidentally resolve generic vendor
+# names such as ntt.h, poly.h, params.h, or sha2*.h.
+add_library(crypto_mldsa_adapter OBJECT
+    src/DigitalSignature/ML-DSA/ml_dsa.c)
+set_target_properties(crypto_mldsa_adapter PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(crypto_mldsa_adapter PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${MLDSA_BACKEND_DIR}
+)
+target_compile_definitions(crypto_mldsa_adapter PRIVATE
+    MLD_CONFIG_NO_RANDOMIZED_API
+    MLD_CONFIG_MULTILEVEL_BUILD
+    MLD_CONFIG_NAMESPACE_PREFIX=mldsa
+)
+
 # slhdsa-c exposes all twelve FIPS 205 parameter objects from one portable build.
 set(SLHDSA_VENDOR_SOURCES
     ${SLHDSA_BACKEND_DIR}/sha2_256.c
@@ -199,9 +215,20 @@ add_library(crypto_slhdsa OBJECT ${SLHDSA_VENDOR_SOURCES})
 set_target_properties(crypto_slhdsa PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(crypto_slhdsa PRIVATE ${SLHDSA_BACKEND_DIR})
 
+add_library(crypto_slhdsa_adapter OBJECT
+    src/DigitalSignature/SLH-DSA/slh_dsa.c)
+set_target_properties(crypto_slhdsa_adapter PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(crypto_slhdsa_adapter PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${SLHDSA_BACKEND_DIR}
+)
+
 add_library(LiberaCrypt ${LIBERAC_SOURCES}
     $<TARGET_OBJECTS:crypto_mldsa>
+    $<TARGET_OBJECTS:crypto_mldsa_adapter>
     $<TARGET_OBJECTS:crypto_slhdsa>
+    $<TARGET_OBJECTS:crypto_slhdsa_adapter>
 )
 add_library(LiberaCrypt::LiberaCrypt ALIAS LiberaCrypt)
 
@@ -238,7 +265,13 @@ endif()
 
 include(cmake/LiberaCryptExports.cmake)
 liberac_configure_exports(LiberaCrypt)
-liberac_configure_portable_warnings(LiberaCrypt crypto_mldsa crypto_slhdsa)
+liberac_configure_portable_warnings(
+    LiberaCrypt
+    crypto_mldsa
+    crypto_mldsa_adapter
+    crypto_slhdsa
+    crypto_slhdsa_adapter
+)
 liberac_configure_vendor_endianness(
     SLHDSA_TARGET crypto_slhdsa
     MLDSA_TARGET crypto_mldsa
