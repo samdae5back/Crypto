@@ -170,31 +170,22 @@ list(APPEND LIBERAC_SOURCES
     src/KeyEncapsulation/ML-KEM/hash.c
 )
 
-# Build the pinned mldsa-native source three times inside one local adapter TU.
-# This avoids depending on symlinks used by the upstream example directory,
-# which makes checkout/build behavior consistent on Windows as well.
-add_library(crypto_mldsa OBJECT src/DigitalSignature/ML-DSA/mldsa_backend.c)
-set_target_properties(crypto_mldsa PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_include_directories(crypto_mldsa PRIVATE ${MLDSA_BACKEND_DIR})
-target_compile_definitions(crypto_mldsa PRIVATE
-    MLD_CONFIG_NO_RANDOMIZED_API
-    MLD_CONFIG_MULTILEVEL_BUILD
-    MLD_CONFIG_NAMESPACE_PREFIX=mldsa
+# Keep generic vendor header names out of the main LiberaCrypt include path.
+# Each first-party adapter is compiled in the same isolated object target as
+# the vendored backend it bridges to, so both normal and KAT builds can reuse
+# the exact object boundary without exposing ntt.h/poly.h/params.h/sha2*.h to
+# unrelated translation units.
+add_library(crypto_mldsa OBJECT
+    src/DigitalSignature/ML-DSA/mldsa_backend.c
+    src/DigitalSignature/ML-DSA/ml_dsa.c
 )
-
-# Keep vendor header search paths off the main library target. The first-party
-# adapters that bridge into the vendored backends are isolated object targets,
-# so unrelated translation units cannot accidentally resolve generic vendor
-# names such as ntt.h, poly.h, params.h, or sha2*.h.
-add_library(crypto_mldsa_adapter OBJECT
-    src/DigitalSignature/ML-DSA/ml_dsa.c)
-set_target_properties(crypto_mldsa_adapter PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_include_directories(crypto_mldsa_adapter PRIVATE
+set_target_properties(crypto_mldsa PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(crypto_mldsa PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/inc
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${MLDSA_BACKEND_DIR}
 )
-target_compile_definitions(crypto_mldsa_adapter PRIVATE
+target_compile_definitions(crypto_mldsa PRIVATE
     MLD_CONFIG_NO_RANDOMIZED_API
     MLD_CONFIG_MULTILEVEL_BUILD
     MLD_CONFIG_NAMESPACE_PREFIX=mldsa
@@ -211,34 +202,20 @@ set(SLHDSA_VENDOR_SOURCES
     ${SLHDSA_BACKEND_DIR}/slh_sha2.c
     ${SLHDSA_BACKEND_DIR}/slh_shake.c
 )
-add_library(crypto_slhdsa OBJECT ${SLHDSA_VENDOR_SOURCES})
+add_library(crypto_slhdsa OBJECT
+    ${SLHDSA_VENDOR_SOURCES}
+    src/DigitalSignature/SLH-DSA/slh_dsa.c
+)
 set_target_properties(crypto_slhdsa PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_include_directories(crypto_slhdsa PRIVATE ${SLHDSA_BACKEND_DIR})
-
-add_library(crypto_slhdsa_adapter OBJECT
-    src/DigitalSignature/SLH-DSA/slh_dsa.c)
-set_target_properties(crypto_slhdsa_adapter PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_include_directories(crypto_slhdsa_adapter PRIVATE
+target_include_directories(crypto_slhdsa PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/inc
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${SLHDSA_BACKEND_DIR}
 )
 
-# These adapter objects define public LIBERAC_* entry points but are compiled
-# separately from the final shared target. Preserve the shared-library ABI
-# decoration that they would receive if they were ordinary LiberaCrypt sources.
-if(BUILD_SHARED_LIBS)
-    target_compile_definitions(crypto_mldsa_adapter PRIVATE
-        LIBERAC_SHARED LIBERAC_BUILDING_LIBRARY)
-    target_compile_definitions(crypto_slhdsa_adapter PRIVATE
-        LIBERAC_SHARED LIBERAC_BUILDING_LIBRARY)
-endif()
-
 add_library(LiberaCrypt ${LIBERAC_SOURCES}
     $<TARGET_OBJECTS:crypto_mldsa>
-    $<TARGET_OBJECTS:crypto_mldsa_adapter>
     $<TARGET_OBJECTS:crypto_slhdsa>
-    $<TARGET_OBJECTS:crypto_slhdsa_adapter>
 )
 add_library(LiberaCrypt::LiberaCrypt ALIAS LiberaCrypt)
 
@@ -275,20 +252,10 @@ endif()
 
 include(cmake/LiberaCryptExports.cmake)
 liberac_configure_exports(LiberaCrypt)
-liberac_configure_portable_warnings(
-    LiberaCrypt
-    crypto_mldsa
-    crypto_mldsa_adapter
-    crypto_slhdsa
-    crypto_slhdsa_adapter
-)
+liberac_configure_portable_warnings(LiberaCrypt crypto_mldsa crypto_slhdsa)
 liberac_configure_vendor_endianness(
     SLHDSA_TARGET crypto_slhdsa
     MLDSA_TARGET crypto_mldsa
-)
-liberac_configure_vendor_endianness(
-    SLHDSA_TARGET crypto_slhdsa_adapter
-    MLDSA_TARGET crypto_mldsa_adapter
 )
 
 include(CMakePackageConfigHelpers)
