@@ -15,6 +15,8 @@ option(BUILD_SHARED_LIBS "Build LiberaCrypt as a shared library" ON)
 option(LIBERAC_BUILD_TESTS "Build LiberaCrypt tests" ${LIBERAC_IS_TOP_LEVEL})
 option(LIBERAC_BUILD_DOCS "Generate the public API reference with Doxygen" OFF)
 
+include(GNUInstallDirs)
+
 set(LIBERAC_PUBLIC_HEADER_NAMES
     AuthenticatedEncryption.h
     AsymmetricCipher.h
@@ -51,11 +53,12 @@ set(HAETAE_SOURCE_DIR
     ${CMAKE_CURRENT_SOURCE_DIR}/src/DigitalSignature/HAETAE)
 
 # CMake 3.17 added the supported opt-out for AIX's automatic all-symbol
-# export. Set the initializer before creating the shared-library target.
-if(CMAKE_SYSTEM_NAME STREQUAL "AIX")
+# export. Static archives need no export-list handling and remain buildable on
+# older CMake versions.
+if(CMAKE_SYSTEM_NAME STREQUAL "AIX" AND BUILD_SHARED_LIBS)
     if(CMAKE_VERSION VERSION_LESS "3.17")
         message(FATAL_ERROR
-            "Restricted AIX exports require CMake 3.17 or newer")
+            "Restricted AIX shared-library exports require CMake 3.17 or newer")
     endif()
     set(CMAKE_AIX_EXPORT_ALL_SYMBOLS OFF)
 endif()
@@ -96,7 +99,6 @@ set(LIBERAC_SOURCES
     src/Util/ECC/ecc_curves.c
     src/Util/ECC/ecc_field.c
     src/Util/ECC/ecc_projective.c
-    src/Util/ECC/ecc_reference.c
     src/Util/ECC/ecc_scalar_arith.c
     src/Util/ECC/ecc_scalar_vartime.c
     src/Util/ECC/ecc_scalar_secret.c
@@ -157,13 +159,6 @@ list(APPEND LIBERAC_SOURCES
     src/KeyEncapsulation/ML-KEM/hash.c
 )
 
-# Preserve the exact Stage-2 multiply and multiply-then-reduce definitions in
-# bignum.c under internal baseline names. Stage 3 exposes measured production
-# dispatch wrappers from bignum_mul.c and bignum_mod_mul.c.
-set_source_files_properties(src/Util/Bignum/bignum.c PROPERTIES
-    COMPILE_DEFINITIONS
-        "crypto_bignum_mul=crypto_bignum_mul_stage2;crypto_bignum_mod_mul=crypto_bignum_mod_mul_stage2")
-
 # Build the pinned mldsa-native source three times inside one local adapter TU.
 # This avoids depending on symlinks used by the upstream example directory,
 # which makes checkout/build behavior consistent on Windows as well.
@@ -199,6 +194,8 @@ add_library(LiberaCrypt::LiberaCrypt ALIAS LiberaCrypt)
 
 set_target_properties(LiberaCrypt PROPERTIES
     OUTPUT_NAME liberacrypt
+    VERSION ${PROJECT_VERSION}
+    SOVERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}"
     POSITION_INDEPENDENT_CODE ON
     WINDOWS_EXPORT_ALL_SYMBOLS OFF
 )
@@ -212,12 +209,9 @@ endif()
 target_include_directories(LiberaCrypt
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/inc>
-        $<INSTALL_INTERFACE:inc>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/DigitalSignature/ML-DSA
-        ${MLDSA_BACKEND_DIR}
-        ${SLHDSA_BACKEND_DIR}
 )
 target_compile_definitions(LiberaCrypt PRIVATE
     MLD_CONFIG_NO_RANDOMIZED_API
@@ -237,7 +231,6 @@ liberac_configure_vendor_endianness(
     MLDSA_TARGET crypto_mldsa
 )
 
-include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
 set(LIBERAC_CMAKE_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/LiberaCrypt)
@@ -248,10 +241,18 @@ configure_package_config_file(
     NO_SET_AND_CHECK_MACRO
     NO_CHECK_REQUIRED_COMPONENTS_MACRO
 )
+# SameMinorVersion is available from CMake 3.11. On the supported 3.10 floor,
+# fall back to the stricter ExactVersion rather than incorrectly treating every
+# 0.x release as ABI-compatible.
+if(CMAKE_VERSION VERSION_LESS "3.11")
+    set(LIBERAC_PACKAGE_VERSION_COMPATIBILITY ExactVersion)
+else()
+    set(LIBERAC_PACKAGE_VERSION_COMPATIBILITY SameMinorVersion)
+endif()
 write_basic_package_version_file(
     ${CMAKE_CURRENT_BINARY_DIR}/LiberaCryptConfigVersion.cmake
     VERSION ${PROJECT_VERSION}
-    COMPATIBILITY SameMajorVersion
+    COMPATIBILITY ${LIBERAC_PACKAGE_VERSION_COMPATIBILITY}
 )
 
 install(TARGETS LiberaCrypt
@@ -260,7 +261,8 @@ install(TARGETS LiberaCrypt
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
-install(FILES ${LIBERAC_PUBLIC_HEADERS} DESTINATION inc)
+install(FILES ${LIBERAC_PUBLIC_HEADERS}
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/LiberaCrypt)
 install(EXPORT LiberaCryptTargets NAMESPACE LiberaCrypt:: DESTINATION ${LIBERAC_CMAKE_INSTALL_DIR})
 install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/LiberaCryptConfig.cmake
