@@ -23,6 +23,7 @@ set(LIBERAC_PUBLIC_HEADER_NAMES
     BlockCipher.h
     LiberaCrypt.h
     Def.h
+    Version.h
     DigitalSignature.h
     HashFunction.h
     MessageAuthentication.h
@@ -38,6 +39,18 @@ foreach(LIBERAC_PUBLIC_HEADER IN LISTS LIBERAC_PUBLIC_HEADER_NAMES)
     list(APPEND LIBERAC_PUBLIC_HEADERS
         "${CMAKE_CURRENT_SOURCE_DIR}/inc/${LIBERAC_PUBLIC_HEADER}")
 endforeach()
+
+# Version.h is deliberately a literal source header so non-CMake/manual builds
+# expose version metadata too. Fail CMake configuration if it drifts from the
+# package version declared above.
+set(LIBERAC_EXPECTED_VERSION_DEFINE
+    "#define LIBERAC_VERSION_STRING \"${PROJECT_VERSION}\"")
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/inc/Version.h"
+    LIBERAC_VERSION_DEFINE REGEX "^#define LIBERAC_VERSION_STRING ")
+if(NOT "${LIBERAC_VERSION_DEFINE}" STREQUAL "${LIBERAC_EXPECTED_VERSION_DEFINE}")
+    message(FATAL_ERROR
+        "inc/Version.h does not match project version ${PROJECT_VERSION}")
+endif()
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -77,6 +90,7 @@ set(LIBERAC_SOURCES
     src/RandomNumberGeneration.c
     src/StreamCipher.c
     src/Util.c
+    src/Version.c
 
     # Private implementations grouped by primitive family and algorithm.
     src/Util/Core/secure_zero.c
